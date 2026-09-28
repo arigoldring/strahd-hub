@@ -303,3 +303,15 @@
     transition: none;
   }
 }
+
+@media (max-width: 900px) {
+  .recaps .recap__title {
+    font-size: 18px;
+  }
+  .recaps .recap__header {
+    padding: 16px 0 15px;
+  }
+  .recaps .recap-form__number {
+    width: 100%;
+  }
+}

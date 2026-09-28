@@ -335,3 +335,70 @@ html { overflow-y: scroll; }
   font-family: var(--sh-body); font-style: italic; font-size: 14px;
   color: #e08a8a;
 }
+
+/* =========================================================
+   PHONE
+   ========================================================= */
+@media (max-width: 900px) {
+  .shop,
+  .shop-eyebrow,
+  .shop-title {
+    width: 100%;
+  }
+  .shop {
+    margin: 18px 0 0;
+    padding: 20px 16px 22px;
+  }
+  .shop::before { inset: 5px; }
+  .shop::after { display: none; }
+
+  .shop-eyebrow { margin-top: 4px; font-size: 10px; letter-spacing: .3em; }
+  .shop-title { font-size: 28px; }
+
+  /* The label takes its own line so the four filters fit on the next. */
+  .shop > div:nth-of-type(1) > p { flex: 1 0 100%; margin: 0 0 2px; }
+  .shop > div:nth-of-type(1) > button { min-height: 40px; margin: 0; }
+
+  .shop > input { height: 44px; }
+
+  /* No inner scroll box on a phone: a 380px window inside a page that is
+     itself scrolling traps the thumb in whichever one it started in. */
+  .shop > div:nth-of-type(3) {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  /* Each row is one big target rather than a name-sized link. */
+  .shop td { padding: 0; }
+  .shop td > button {
+    display: block; width: 100%;
+    padding: 13px 4px;
+  }
+  .shop td:last-child { padding-left: 10px; }
+  .shop td > button::after { display: none; }
+
+  /* The item modal docks to the bottom, above the tab bar. Still the same
+     backdrop, so a tap above the card dismisses it as before. */
+  .shop > div:nth-of-type(2):has(> div) {
+    align-items: flex-end;
+    padding: 0 0 calc(56px + env(safe-area-inset-bottom));
+  }
+  .shop .item-detail-card {
+    max-width: none;
+    max-height: 70svh;
+    border-width: 1px 0 0;
+    animation: sh-sheet-rise .22s ease-out both;
+  }
+
+  /* The quote box is instructions for a mouse and a lot of height; the list is
+     self-evidently tappable. */
+  .item-detail-empty { display: none; }
+}
+
+@media (pointer: coarse) {
+  .item-detail-close { width: 40px; height: 40px; top: 6px; right: 6px; }
+  .item-detail-header { padding-right: 40px; }
+  .item-detail-add { min-height: 44px; }
+  .item-detail-stat dt { min-width: 110px; }
+}

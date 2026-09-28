@@ -622,3 +622,75 @@
   letter-spacing: 0.04em;
   color: var(--sh-mute);
 }
+
+/* ---------- phone ---------- */
+
+/* The sheet goes edge to edge, and each band stops being a fixed 44px strip:
+   its label, count and picker can't share one line at 360px, so the picker
+   drops to a full-width line of its own underneath. */
+@media (max-width: 900px) {
+  .ch {
+    width: 100%;
+    margin: 12px 0 24px;
+  }
+
+  .ch-head {
+    padding: 20px 16px 16px;
+  }
+  .ch-body {
+    padding: 4px 16px 16px;
+  }
+
+  .ch-name {
+    font-size: 26px;
+  }
+
+  .ch-band {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 44px;
+    padding: 10px 16px;
+    gap: 8px 14px;
+  }
+  .ch-band .ch-add {
+    flex: 1 0 100%;
+    margin-left: 0;
+  }
+  .ch-band .ch-add select {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 40px;
+  }
+  .ch-band .ch-add .ch-button {
+    min-height: 40px;
+  }
+
+  .ch-purse {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+
+  .ch-carried__give {
+    flex: 1 0 100%;
+    margin-left: 0;
+  }
+
+  .ch-table td {
+    padding: 10px 4px;
+  }
+  .ch-table td:first-child {
+    white-space: normal;
+  }
+
+  .ch-roster {
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: 18px;
+  }
+}
+
+@media (pointer: coarse) {
+  .ch-actions > .ch-button,
+  .ch-identity .ch-button {
+    min-height: 40px;
+  }
+}

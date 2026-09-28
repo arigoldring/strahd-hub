@@ -658,3 +658,71 @@
 @media (prefers-reduced-motion: reduce) {
   .portrait-lightbox { animation: none; }
 }
+
+/* ---------- phone ---------- */
+
+/* The reveals drawer becomes a bottom sheet via .sh-sheet (theme.css). */
+@media (max-width: 900px) {
+  .npcs-header {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    padding-bottom: 16px;
+  }
+
+  /* Title block takes the whole first line; count and toggle share the next. */
+  .npcs-header > div:first-child {
+    flex: 1 0 100%;
+  }
+
+  .npcs-count {
+    margin: 0;
+  }
+
+  .npcs-visibility-toggle {
+    margin: 0 0 0 auto;
+    min-height: 40px;
+  }
+
+  .npcs-title {
+    font-size: 28px;
+  }
+
+  /* min(): a 360px column is wider than an iPhone's whole content box. */
+  .npcs .npc-list {
+    grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+    gap: 16px;
+    margin-top: 18px;
+  }
+
+  .npcs .visibility-panel {
+    padding: 20px 20px 24px;
+    border: 0;
+    border-top: 1px solid rgba(160, 140, 110, 0.35);
+  }
+
+  .portrait-lightbox__close {
+    top: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (pointer: coarse) {
+  .npcs .visibility-panel__close,
+  .npcs .visibility-panel__toggle {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* The DM's Edit / Save buttons are ~24px tall on desktop, which is half a
+   fingertip. */
+@media (pointer: coarse) {
+  .npcs .npc-card__edit,
+  .npcs .npc-edit__btn {
+    min-height: 40px;
+    padding: 0 16px;
+  }
+}

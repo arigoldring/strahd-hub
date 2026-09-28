@@ -86,3 +86,19 @@
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }
+
+/* Phone: two seats a row, and every seat gets the same inset, since which one
+   starts a row is no longer just the first. */
+@media (max-width: 900px) {
+  .at-table__grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0 12px;
+  }
+
+  .at-table__seat,
+  .at-table__seat:first-child {
+    padding: 12px 0;
+    border-left: 0;
+    border-top: 1px solid rgba(160, 140, 110, 0.16);
+  }
+}

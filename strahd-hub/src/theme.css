@@ -164,10 +164,14 @@ button {
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 
-button:hover:not(:disabled) {
-  color: var(--sh-bone-bright);
-  border-color: rgba(199, 154, 90, 0.6);
-  background: rgba(199, 154, 90, 0.07);
+/* Gated on a real pointer: iOS applies :hover on tap and leaves it on. See
+   the matching block in index.css. */
+@media (hover: hover) {
+  button:hover:not(:disabled) {
+    color: var(--sh-bone-bright);
+    border-color: rgba(199, 154, 90, 0.6);
+    background: rgba(199, 154, 90, 0.07);
+  }
 }
 
 button:disabled {
@@ -255,5 +259,78 @@ hr {
   * {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* --- touch ---------------------------------------------------------------- */
+
+/* iOS Safari zooms the whole page in when a field under 16px takes focus, and
+   doesn't zoom back out. !important because page sheets set their own smaller
+   sizes with higher specificity, and every one of them would otherwise need
+   its own touch override; coarse pointer only, so desktop keeps those sizes. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* The grey flash iOS paints over any tapped link or button fights the theme's
+   own pressed states. */
+a,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 900px) {
+  h1 {
+    font-size: 28px;
+  }
+  h2 {
+    font-size: 22px;
+  }
+}
+
+/* --- .sh-sheet: side panels become bottom sheets on a phone ----------------
+
+   Add class="sh-sheet" to any drawer, popover or detail card that sits beside
+   its content on desktop (the map's location drawer, a spell's detail card,
+   the Shop's item card). Above 900px it does nothing; below, the panel lifts
+   off the page and docks to the bottom edge, just above the tab bar, where a
+   thumb can scroll and dismiss it.
+
+   !important on the geometry only, and deliberately: every one of those panels
+   is placed by its own page sheet with selectors like `.maps .loc-panel--drawer`
+   that outrank a single class, and this is the one rule that has to win over
+   all of them. It sets where the panel is, never what it looks like — colour,
+   type and padding stay the page's. */
+@media (max-width: 900px) {
+  .sh-sheet {
+    position: fixed !important;
+    inset: auto 0 calc(56px + env(safe-area-inset-bottom)) 0 !important;
+    z-index: 45 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: 62svh !important;
+    margin: 0 !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    /* translate, not transform: popovers centre themselves with the translate
+       property, and the rise animation below needs transform to itself — an
+       !important transform would beat the animation in the cascade. */
+    translate: none !important;
+    border-width: 1px 0 0 !important;
+    box-shadow: 0 -24px 60px -20px rgba(0, 0, 0, 0.95) !important;
+    animation: sh-sheet-rise 0.22s ease-out both !important;
+  }
+}
+
+@keyframes sh-sheet-rise {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
   }
 }

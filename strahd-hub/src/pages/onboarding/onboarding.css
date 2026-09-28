@@ -341,3 +341,15 @@
   line-height: 1.35;
   padding: 14px 16px;
 }
+
+/* A 220px floor beside a button still fits a phone, but not with the
+   threshold's own padding around it; let the input shrink and the row wrap. */
+@media (max-width: 900px) {
+  .threshold {
+    padding: 32px 0 40px;
+  }
+  .campaign-name-form input {
+    min-width: 0;
+    flex-basis: 160px;
+  }
+}

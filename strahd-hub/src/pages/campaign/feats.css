@@ -416,3 +416,135 @@
   line-height: 2.2;
   color: var(--sh-gold-deep);
 }
+
+/* =========================================================
+   PHONE — the table becomes a list of cards
+
+   Spells' pattern (see the matching block in spells.css): the name on line
+   one; category · prerequisite on line two; the description is one tap away
+   in the docked detail card. `.feats tbody td:nth-child(n)` outranks the
+   desktop column widths.
+   ========================================================= */
+@media (max-width: 900px) {
+  .feats__head {
+    flex-wrap: wrap;
+    gap: 14px;
+    padding-bottom: 16px;
+  }
+  .feats__search {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .feats__filters {
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 16px;
+  }
+  .feats__filters-label {
+    flex-basis: 100%;
+    margin: 0 0 2px;
+  }
+  .feats__filters button {
+    min-height: 40px;
+    margin: 0;
+  }
+  .feats__count {
+    margin: 6px 0 0;
+  }
+  .feats__forge {
+    margin: 6px 0 0 auto;
+    padding: 10px 0 6px;
+  }
+
+  .feats table,
+  .feats tbody {
+    display: block;
+  }
+  .feats table {
+    margin-top: 16px;
+  }
+  .feats thead {
+    display: none;
+  }
+
+  .feats tbody tr {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 0;
+    padding: 13px 14px 12px;
+  }
+  .feats tbody tr:hover {
+    background: none;
+    box-shadow: none;
+  }
+  .feats tbody tr:active {
+    background: rgba(154, 122, 58, 0.1);
+  }
+
+  .feats tbody td:nth-child(n) {
+    width: auto;
+    padding: 0;
+    white-space: normal;
+  }
+
+  .feats tbody td:nth-child(1) {
+    flex: 1 0 100%;
+    font-size: 18px;
+    line-height: 1.25;
+  }
+  .feats tbody td:nth-child(2) {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .feats tbody td:nth-child(3) {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .feats tbody td:nth-child(3)::before {
+    content: "·";
+    margin: 0 8px;
+    color: var(--sh-dim);
+  }
+  /* "no prerequisite" prints as a dash on desktop to hold the column; with no
+     column to hold it is just noise, so the cell goes. */
+  .feats tbody td:nth-child(3):has(> .feats__no-prereq) {
+    display: none;
+  }
+  .feats tbody td:nth-child(4) {
+    display: none;
+  }
+
+  /* stretched target — the whole card opens the feat */
+  .feats__open::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .feat-detail-backdrop:has(> div) {
+    align-items: flex-end;
+    padding: 0 0 calc(56px + env(safe-area-inset-bottom));
+  }
+  .feat-detail-card {
+    max-width: none;
+    max-height: 70svh;
+    padding: 22px 18px 24px;
+    border-width: 1px 0 0;
+    animation: sh-sheet-rise 0.22s ease-out both;
+  }
+}
+
+@media (pointer: coarse) {
+  .feat-detail-close {
+    top: 6px;
+    right: 6px;
+    width: 40px;
+    height: 40px;
+  }
+  .feat-detail-header {
+    padding-right: 42px;
+  }
+}

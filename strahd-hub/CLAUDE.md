@@ -2,7 +2,7 @@
 
 Campaign management app for a Curse of Strahd game. Solo developer.
 ~5-10 users total (my D&D group). I'm the DM.
-Primary goal is learning full-stack development; the working app is secondary.
+earning full-stack concepts and AI-assisted development
 Not production software — no SLA, no uptime concerns, no team to onboard.
 
 **Current through migration 047. Last updated 2026-08-31.**
@@ -23,14 +23,28 @@ belongs elsewhere.**
 - **`db/`** — ground truth for schema. Every migration explains itself in a
   header comment. The database, not this document, is what to check when the
   two disagree.
-- **`public.schema_migrations`** — ground truth for *what has actually run*.
+- **`public.schema_migrations`** — ground truth for _what has actually run_.
 
-## How I want help
+## How I want help (as of 28 Sep 2026)
 
-I write the code. Review and guide me; give complete implementations only
-when I'm genuinely stuck. Explain the concept before the code. When I'm
-wrong, tell me why it's wrong and how to think about it correctly.
-Push back on me. Flag architectural problems proactively.
+My focus has shifted from writing code by hand to learning how to build
+software _with_ AI. I'm fine with AI writing the code. What I want to get
+better at is directing it well and understanding what it produces.
+
+- **Write the code when asked.** Give complete implementations by default;
+  I don't need to type every line myself.
+- **Explain the reasoning, not just the result.** For any meaningful choice
+  (a pattern, a library, a schema shape, a trade-off), say why it was made,
+  what the alternatives were, and what it costs.
+- **Make sure I understand the output.** Walk me through non-obvious code:
+  what each part does, how it connects to the rest of the app, and where
+  it could break. I should be able to explain and modify anything we ship.
+- **Teach me to work with AI.** Point out when my prompt was vague or missing
+  context, and show what a better one would look like. Flag when AI output
+  (including yours) is likely wrong, over-engineered, or needs verification.
+- **Still push back.** If I'm wrong, tell me why and how to think about it
+  correctly. Flag architectural problems proactively. Hold generated code to
+  the project's conventions and past decisions.
 
 ### Response length
 
@@ -78,6 +92,7 @@ a PostgREST embed genuinely defeats inference (see `PARTY_SELECT`).
   No `on conflict` — that's the point. A re-run fails on the primary key and
   rolls back, and a half-run leaves no entry, so the table never claims a
   migration landed that didn't.
+
 - Verification blocks live in the same file as the migration, below it, and get
   no ledger row. Every block runs in its own transaction and ends in `rollback`,
   so they can be re-run against the live database whenever.
@@ -123,7 +138,7 @@ There are two shapes in this codebase and they are not interchangeable:
   `Prefer: resolution=ignore-duplicates` → `ON CONFLICT DO NOTHING`, which needs
   only INSERT — and neither migration ships an UPDATE policy, deliberately.
   Flip it to `false` and PostgREST emits `ON CONFLICT DO UPDATE`; the first add
-  still succeeds and the *duplicate* add starts throwing 42501.
+  still succeeds and the _duplicate_ add starts throwing 42501.
 - `campaign_map_reveals` (042) upserts **without** `ignoreDuplicates`, because a
   re-toggle must actually change the stored value. That is exactly why 042 ships
   the UPDATE policy the other two omit.
@@ -133,12 +148,12 @@ a verification block for it on `npc_dm_notes`; 042's BLOCK 5 is the same block
 pointed at the opposite mistake.
 
 **The pin triggers are blocklists.** `pin_npc_row`, `pin_character_row` and
-`stamp_session_recap` name the columns an update may *not* touch, so every
+`stamp_session_recap` name the columns an update may _not_ touch, so every
 column added to those tables from here on is client-writable until someone
 remembers to pin it. It fails open. Check the trigger before adding a column.
 (See KNOWN_ISSUES for the allowlist inversion, if it's ever worth doing.)
 
-**A pin trigger also blocks *your* migration.** `pin_npc_row` silently no-ops a
+**A pin trigger also blocks _your_ migration.** `pin_npc_row` silently no-ops a
 direct `UPDATE` to a pinned column even when you're the table owner, so a
 migration that sets one needs `ALTER TABLE ... DISABLE TRIGGER` scoped inside
 its own `begin`/`commit`. The update otherwise reports success and changes
@@ -154,7 +169,7 @@ came back" as a refusal (`updateNpc`, `deleteCharacter`, `deleteRecap`,
 `notify pgrst, 'reload schema';` and check `pg_proc` before touching a migration
 file. The 2026-08-13 episode — three inventory RPCs read as "030 and 032 never
 ran" — was this, or might have been; the ledger exists so the question is now
-answerable. A missing *grant* reads as 401/42501 instead.
+answerable. A missing _grant_ reads as 401/42501 instead.
 
 ---
 
@@ -208,7 +223,7 @@ answerable. A missing *grant* reads as 401/42501 instead.
 
 - **Routes are flat above the campaign line, nested below it.** `/`
   (CampaignPicker), `/claim`, and `/invites` (DM invites) are all things you do
-  *before* you have a campaign, so none can sit under `:campaignId`. Everything
+  _before_ you have a campaign, so none can sit under `:campaignId`. Everything
   campaign-scoped lives under `/campaign/:campaignId`, gated by `CampaignLayout`,
   which validates the param against the user's own campaign list and — like
   AuthGate — renders nothing below until there's a real campaign, then puts it
@@ -276,7 +291,7 @@ answerable. A missing *grant* reads as 401/42501 instead.
 - **`is_dm()` (global `profiles.role`) means exactly one thing: "may create
   campaigns."** As of 018/019 no content or invite policy asks it. It survives
   in four legit places: `create_campaign` + "dm inserts campaigns" (no campaign
-  exists yet to be DM *of*), `claim_dm_invite` (what sets the flag), and "dms can
+  exists yet to be DM _of_), `claim_dm_invite` (what sets the flag), and "dms can
   view invites" on `dm_invites` (a DM invite grants the flag, so the flag gates
   it — the one place `is_dm()` correctly guards `is_dm()`). Everything else asks
   the per-campaign `is_campaign_dm`.
@@ -287,17 +302,17 @@ answerable. A missing *grant* reads as 401/42501 instead.
   is the only remaining gate. Invoker functions (`is_campaign_member`,
   `can_edit_character`, and both 038 transfer RPCs) skip the revoke because an
   anonymous caller just gets `false` out of reads RLS already governs.
-  *(⚠ This paragraph was partly reconstructed — check it against 013/014/018
-  before trusting the detail on which helpers are definer vs invoker.)*
+  _(⚠ This paragraph was partly reconstructed — check it against 013/014/018
+  before trusting the detail on which helpers are definer vs invoker.)_
 
 - **Recaps: uniqueness is on `(campaign_id, session_number)`.** The old
   global-unique constraint meant the second campaign could never have a Session
   1. The `stamp_session_recap` BEFORE-UPDATE trigger pins the immutable facts
-  (`id`, `session_number`, `created_at`, `campaign_id`) and sets
-  `last_edited_by/at` from the JWT — because RLS can't restrict columns, that
-  trigger is what keeps "any member may edit" from meaning "may rewrite
-  anything," and pinning `campaign_id` is what stops a two-campaign member
-  dragging a recap between their campaigns.
+     (`id`, `session_number`, `created_at`, `campaign_id`) and sets
+     `last_edited_by/at` from the JWT — because RLS can't restrict columns, that
+     trigger is what keeps "any member may edit" from meaning "may rewrite
+     anything," and pinning `campaign_id` is what stops a two-campaign member
+     dragging a recap between their campaigns.
 
 - **Invites: player invites are campaign-scoped, DM invites are global, and both
   write only through security-definer RPCs.** Both invite tables have a SELECT
@@ -314,13 +329,13 @@ answerable. A missing *grant* reads as 401/42501 instead.
   `getLocations`, `getNpcs`, `getInvites`, `getItems`, `getSpells`, `getFeats`
   and `getMapReveals` all filter by campaign. This is NOT a duplicated
   permission check — RLS answers "may this viewer see this row," and a member of
-  two campaigns passes it for *both*, so an unfiltered read merges two campaigns
+  two campaigns passes it for _both_, so an unfiltered read merges two campaigns
   onto one page. The filter narrows "every campaign I'm in" down to "the one I'm
-  looking at." (Contrast `getCampaigns`, where the policy *is* the list, and
+  looking at." (Contrast `getCampaigns`, where the policy _is_ the list, and
   restating it in the client would just add a second place to get it wrong.)
 
   For `items`/`spells`/`feats` the filter is `campaign_id is null or campaign_id
-  = <the viewed campaign>`, which keeps the shared catalogue and drops the other
+= <the viewed campaign>`, which keeps the shared catalogue and drops the other
   campaign's homebrew.
 
 ### Characters, inventory, spells and feats (028–032, 037–038, 041)
@@ -346,7 +361,7 @@ answerable. A missing *grant* reads as 401/42501 instead.
   made adds insert-or-increment; 032 moved decrement into a plpgsql function
   taking a `SELECT ... FOR UPDATE` lock, because the branch "decrement, but
   DELETE at the last one" can't be one statement (`quantity > 0` CHECK means 0
-  isn't a storable state) and the lock-free version loses a concurrent *add*.
+  isn't a storable state) and the lock-free version loses a concurrent _add_.
   Both are `security invoker`, so RLS remains the boundary. There is no
   read-modify-write left in the app.
 
@@ -382,7 +397,7 @@ answerable. A missing *grant* reads as 401/42501 instead.
   differences are all downstream of one fact: a feat has no level. `category`
   takes the ordering/grouping/filtering job a spell's level does, and its six
   values live in a CHECK constraint rather than a lookup table because the set
-  is small, closed, and changing it *should* be a migration someone has to
+  is small, closed, and changing it _should_ be a migration someone has to
   write. `benefits` is `text[]` defaulted to `'{}'` so the detail card renders a
   `<ul>` without branching on null.
 
@@ -398,7 +413,7 @@ answerable. A missing *grant* reads as 401/42501 instead.
   022/025 where homebrew was retrofitted. DM homebrew was part of the feature
   this time, so there's no window where the table is read-only by accident. The
   `campaign_id is not null` clause is what stops any client path from writing a
-  new *shared* catalogue row — only 040 does that, and only because it runs as
+  new _shared_ catalogue row — only 040 does that, and only because it runs as
   the table owner outside RLS.
 
 - **The known consequence: a cross-campaign feat can be attached by hand, and
@@ -490,12 +505,12 @@ answerable. A missing *grant* reads as 401/42501 instead.
 
 - **Four policies here, where 037 insists on three, and that is not drift.**
   037 has no UPDATE policy because `character_spells` has nothing an update
-  could change. These tables are nothing *but* a mutable column, and the client
+  could change. These tables are nothing _but_ a mutable column, and the client
   saves through an upsert whose second save is an UPDATE — so three policies
   here is the bug, in exact mirror image. Both migrations say so in their
   headers, and both BLOCK 0s assert four. Note the matching inversion in the
-  client: `ignoreDuplicates` is load-bearing by its *presence* on
-  `addSpellToCharacter` and by its *absence* on `saveCharacterSpellDescription`.
+  client: `ignoreDuplicates` is load-bearing by its _presence_ on
+  `addSpellToCharacter` and by its _absence_ on `saveCharacterSpellDescription`.
 
 - **They also ship a DELETE policy, which `npc_dm_notes` and
   `location_dm_notes` deliberately refuse.** Those tables clear with
@@ -570,7 +585,7 @@ answerable. A missing *grant* reads as 401/42501 instead.
   branch to every policy in the app to serve one account. Recovery is re-running
   `db/fixtures/demo_campaign_reset.sql` instead, which is why that file is a
   delete-then-insert and not the `on conflict do nothing` its predecessor uses —
-  a no-op restores a *deleted* character and silently keeps a *renamed* one, and
+  a no-op restores a _deleted_ character and silently keeps a _renamed_ one, and
   renaming is what actually happens.
 
 - **`/demo` is the only route above `AuthGate`, and it has to be.** The gate

@@ -402,3 +402,56 @@
     grid-column: span 2;
   }
 }
+
+/* Phone: one column. Every span has to come back down to 1, not just the
+   template: a `span 2` in a one-column grid doesn't clamp, it invents a second
+   implicit column and the page scrolls sideways. */
+@media (max-width: 900px) {
+  .desk__head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 14px;
+    padding-bottom: 16px;
+  }
+
+  .desk__head-right {
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .desk__cta {
+    padding: 13px 18px 12px;
+  }
+
+  .desk__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    margin-top: 16px;
+  }
+
+  .desk-panel--wide,
+  .desk-panel--full,
+  .desk-dm {
+    grid-column: auto;
+  }
+
+  .desk-panel {
+    padding: 18px 16px 16px;
+  }
+
+  /* The DM band's stats sit in a row divided by rules; on a phone they stack,
+     and the dividing rule turns from a left edge into a top one. */
+  .desk-dm {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .desk-dm__label + * {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid rgba(138, 13, 13, 0.4);
+    padding-top: 14px;
+  }
+}

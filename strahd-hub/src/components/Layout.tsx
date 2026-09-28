@@ -1,24 +1,23 @@
 import { Outlet, NavLink } from "react-router-dom";
-import { signOut } from "../services/auth";
-import { NamePrompt } from "./NamePrompt";
-import { useAuth } from "../services/AuthContext";
 import { useCampaign } from "./CampaignLayout";
-import { usePlayerPreview } from "./PlayerPreviewContext";
-import { useState } from "react";
+import { AccountControls, PreviewToggle } from "./RailControls";
+import { MobileNav } from "./MobileNav";
+import { visibleNavItems } from "./navItems";
 import "./layout.css";
 
 export function Layout() {
-  const { profile } = useAuth();
-  const { previewing, setPreviewing } = usePlayerPreview();
   // Read back off the outlet only to hand it down again. A bare <Outlet /> is
   // not a pass-through: it provides context={undefined}, which would blank out
   // the campaign CampaignLayout set. Every layout between the provider and the
   // page has to re-provide it.
   const campaign = useCampaign();
-  const [isEditing, setIsEditing] = useState(false);
+  const items = visibleNavItems(campaign.isDm);
 
   return (
     <div className="app-shell">
+      {/* Both navs are always rendered and layout.css picks one by width. A JS
+          media query would render only one, but would also flash the wrong
+          nav on first paint and re-mount on every rotation of an iPad. */}
       <nav className="app-rail">
         <div className="app-rail__campaign">
           <p className="app-rail__eyebrow">Campaign</p>
@@ -28,81 +27,46 @@ export function Layout() {
           >
             {campaign.isDm ? "Dungeon Master" : "Player"}
           </span>
-          {/* campaign.isDm, never the previewing-aware gate the pages use: this
-              control has to survive its own effect, or switching it on would
-              take away the only way to switch it back off. The rail itself is
-              not part of what preview hides — the badge above and the DM links
-              below stay exactly as they are. */}
-          {campaign.isDm && (
-            <button
-              className={`app-rail__preview${previewing ? " is-on" : ""}`}
-              onClick={() => setPreviewing(!previewing)}
-            >
-              {previewing ? "Exit player view" : "View as player"}
-            </button>
-          )}
+          {/* The rail itself is not part of what preview hides — the badge
+              above and the DM links below stay exactly as they are. */}
+          {campaign.isDm && <PreviewToggle />}
         </div>
 
         <div className="app-nav">
-          <NavLink to="." end>Home</NavLink>
-          {/* A DM has no PC of their own — Character.tsx dispatches to a
-              roster of the campaign's players for them instead of the
-              create/own-sheet flow, so the label says which one this rail
-              is about to open. */}
-          <NavLink to="Character">
-            {campaign.isDm ? "Characters" : "Character"}
-          </NavLink>
-          {/* Directly after Character, because Inventory is now half a personal
-              page — your own pack, with the party's hoard beside it — rather
-              than the shared pile alone. */}
-          <NavLink to="Inventory">Inventory</NavLink>
-          {/* Not DM-gated: a player sees the same page, without the Give
-              controls on each panel.
-
-              Temporarily hidden while we look at the app without The Party. */}
-          {/* <NavLink to="Party">The Party</NavLink> */}
-          <NavLink to="Shop">Shop</NavLink>
-          {campaign.isDm && (
-            <NavLink to="CreateItem" className="app-nav__dm">New Item</NavLink>
-          )}
-          <NavLink to="Maps">Maps</NavLink>
-          <NavLink to="Spells">Spells</NavLink>
-          {/* Beside Spells, because they are the same kind of page: a reference
-              catalogue you browse and then take something from onto your sheet.
-              CreateFeat is deliberately not here — the rail is for
-              destinations, and the Feats page carries its own forge link. */}
-          <NavLink to="Feats">Feats</NavLink>
-          <NavLink to="NPC">NPCs</NavLink>
-          <NavLink to="Recaps">Recaps</NavLink>
+          {items
+            .filter((item) => !item.footer)
+            .map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={item.dmOnly ? "app-nav__dm" : undefined}
+              >
+                {item.label(campaign.isDm)}
+              </NavLink>
+            ))}
           <div className="app-nav__rule" />
-          {campaign.isDm && (
-            <NavLink to="Invites" className="app-nav__dm">Invites</NavLink>
-          )}
-          <NavLink to="/">Campaigns</NavLink>
+          {items
+            .filter((item) => item.footer)
+            .map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={item.dmOnly ? "app-nav__dm" : undefined}
+              >
+                {item.label(campaign.isDm)}
+              </NavLink>
+            ))}
         </div>
 
-        <div className="app-rail__you">
-          {!isEditing ? (
-            <p>
-              {profile?.displayName}
-              <button onClick={() => setIsEditing(true)}>Edit</button>
-            </p>
-          ) : (
-            <NamePrompt
-              initialName={profile?.displayName ?? ""}
-              heading="Name:"
-              onSuccess={() => setIsEditing(false)}
-            />
-          )}
-          <p className="app-rail__signout">
-            <button onClick={() => signOut()}>Sign out</button>
-          </p>
-        </div>
+        <AccountControls />
       </nav>
 
       <main className="app-main">
         <Outlet context={campaign} />
       </main>
+
+      <MobileNav campaign={campaign} items={items} />
     </div>
   );
 }

@@ -534,3 +534,124 @@
   background: rgba(5, 4, 8, 0.72);
   backdrop-filter: blur(2px);
 }
+
+/* =========================================================
+   PHONE
+
+   The columns already collapse at 1140px (above). What a phone adds: the pack
+   table's rows become two-line cards — name and count, then the three action
+   buttons on a line of their own at full tap size — and the hoard loses its
+   inner scroll box. Both lists keep their markup; only layout changes.
+   ========================================================= */
+@media (max-width: 900px) {
+  .inv-title {
+    font-size: 28px;
+  }
+  .inv-sub {
+    font-size: 16px;
+  }
+
+  .inv-add select,
+  .inv-search {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .inv-section,
+  .inv-purse {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .inv-purse__form select,
+  .inv-purse__amount {
+    min-height: 44px;
+  }
+  .inv-purse__amount {
+    flex: 1 1 90px;
+  }
+
+  .inv-table,
+  .inv-table tbody {
+    display: block;
+  }
+  .inv-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--sh-rule-faint);
+  }
+  .inv-table tr:last-child {
+    border-bottom: 0;
+  }
+  .inv-table td,
+  .inv-table td:first-child,
+  .inv-table td:last-child {
+    display: block;
+    padding: 0;
+    border-bottom: 0;
+  }
+  .inv-table td:first-child {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: normal;
+  }
+  /* the dotted leader runs to a count that is no longer at the far edge */
+  .inv-table td:first-child::after {
+    display: none;
+  }
+  .inv-byline {
+    display: block;
+    margin: 4px 0 0;
+  }
+  .inv-qty {
+    width: auto;
+    flex: none;
+  }
+  .inv-actions {
+    flex: 1 0 100%;
+    width: auto;
+    display: flex;
+    gap: 8px;
+    white-space: normal;
+  }
+  .inv-actions button + button {
+    margin-left: 0;
+  }
+  .inv-actions button {
+    flex: 1;
+    min-height: 44px;
+    margin: 0;
+  }
+
+  .inv-rail {
+    padding: 18px 14px 18px;
+  }
+  /* Nested scrolling traps a thumb; the page scrolls instead. */
+  .inv-rail__list {
+    max-height: none;
+    overflow: visible;
+  }
+  .inv-rail__actions button {
+    flex: 1;
+    min-height: 44px;
+    margin: 0;
+  }
+  .inv-rail__row .inv-move {
+    padding: 0 10px;
+    font-size: 10px;
+  }
+
+  .inv-backdrop:has(> *) {
+    place-items: end stretch;
+    padding: 0 0 calc(56px + env(safe-area-inset-bottom));
+  }
+  .inv-backdrop .item-detail-card {
+    max-width: none;
+    max-height: 70svh;
+    border-width: 1px 0 0;
+    animation: sh-sheet-rise 0.22s ease-out both;
+  }
+}

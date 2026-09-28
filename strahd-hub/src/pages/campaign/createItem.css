@@ -355,3 +355,11 @@
     grid-row: auto;
   }
 }
+
+/* Phone: the property checkboxes go two to a row; three left each label a
+   third of ~330px. (The form itself already went to one column at 1100px.) */
+@media (max-width: 900px) {
+  .create-item-checkboxes {
+    grid-template-columns: 1fr 1fr;
+  }
+}
