@@ -220,8 +220,8 @@ export function Home() {
                 stacks, so the item id isn't unique here */}
             {entries.slice(0, 6).map((entry) => (
               <li key={entry.entryId}>
-                <span>{entry.name}</span>
                 <span className="desk-hoard__qty">×{entry.quantity}</span>
+                <span>{entry.name}</span>
               </li>
             ))}
           </ul>

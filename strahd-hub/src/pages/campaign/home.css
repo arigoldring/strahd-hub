@@ -312,12 +312,17 @@
   color: var(--sh-copper);
 }
 
+/* Quantity leads the name, in a fixed-width slot so the names line up, and
+   the columns are narrow cells that auto-fill the panel — on a full-width
+   panel a 1fr/1fr split pushed the count half a screen away from the item it
+   counts. No row rules: with a variable column count there's no way to find
+   the last row to drop its rule. */
 .desk-hoard__list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 0 34px;
 }
 
@@ -325,19 +330,15 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 9px 0;
-  border-bottom: 1px dashed rgba(160, 140, 110, 0.18);
+  padding: 7px 0;
   font-size: 16px;
   color: var(--sh-bone);
 }
 
-/* the last row in each column loses its rule */
-.desk-hoard__list li:nth-last-child(-n + 2) {
-  border-bottom: 0;
-}
-
 .desk-hoard__qty {
-  margin-left: auto;
+  flex: none;
+  min-width: 3ch;
+  text-align: right;
   font: 400 12px/1 var(--sh-mono);
   color: var(--sh-gold-deep);
 }
