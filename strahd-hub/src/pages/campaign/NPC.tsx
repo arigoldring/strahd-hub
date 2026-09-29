@@ -261,7 +261,7 @@ export function Npcs() {
       </div>
 
       {showDmUi && showVisibilityPanel && (
-        <aside className="visibility-panel">
+        <aside className="visibility-panel sh-sheet">
           <div className="visibility-panel__header">
             <h3>Who the party knows</h3>
             <button

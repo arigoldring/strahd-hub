@@ -1,0 +1,228 @@
+/* ============================================================================
+   mobileNav.css – the phone's chrome: a tab bar pinned to the bottom edge and
+   a More sheet that rises from it. Import from components/MobileNav.tsx.
+
+   Hidden above --sh-nav-break (900px), where layout.css shows the rail
+   instead. 900 and not a phone width, because a portrait iPad (768–834px)
+   can't spare the rail's 226px either: it would leave the page ~560px, which
+   is phone territory with a sidebar bolted on.
+
+   The 900 is written out in both files: custom properties can't be used inside
+   a media query, so keep the two in step by hand.
+   ========================================================================== */
+
+.tabbar {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .tabbar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 50;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    /* The home indicator on a notchless-bottom iPhone sits over the last
+       ~34px of the screen; env() is 0 everywhere else. Needs viewport-fit=cover
+       in index.html or it is always 0. */
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+    background: linear-gradient(180deg, rgba(20, 16, 18, 0.97), rgba(8, 6, 8, 0.99));
+    border-top: 1px solid rgba(160, 140, 110, 0.24);
+    box-shadow: 0 -12px 30px -18px rgba(0, 0, 0, 0.9);
+  }
+}
+
+/* Button and link share one look; the resets are for the <button> (More). */
+.tabbar__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  /* 56px tall: over Apple's 44px minimum target with room for the label. */
+  min-height: 56px;
+  margin: 0;
+  padding: 7px 2px 6px;
+  font: 500 9px/1 var(--sh-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sh-dim);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  border-top: 2px solid transparent;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tabbar__tab:hover:not(:disabled) {
+  color: var(--sh-dim);
+  background: none;
+  border-color: transparent;
+}
+
+.tabbar__tab.active,
+.tabbar__tab.active:hover:not(:disabled) {
+  color: var(--sh-bone-bright);
+  border-top-color: var(--sh-blood-bright);
+  background: linear-gradient(180deg, rgba(106, 10, 10, 0.28), transparent);
+}
+
+.tabbar__tab:active {
+  transform: none;
+}
+
+/* --- the More sheet ----------------------------------------------------- */
+
+/* A modal <dialog> pinned to the bottom edge. The UA stylesheet centres it
+   with margin: auto and caps it with max-width/height; all four are undone
+   here so it can sit flush on the tab bar's edge. */
+.sheet {
+  width: 100%;
+  max-width: 100%;
+  max-height: 85svh;
+  margin: auto 0 0;
+  padding: 0;
+  color: var(--sh-bone);
+  background: none;
+  border: 0;
+  overflow: visible;
+}
+
+.sheet::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.sheet[open] {
+  animation: sheet-rise 0.22s ease-out;
+}
+
+@keyframes sheet-rise {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+
+.sheet__body {
+  max-height: 85svh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px calc(20px + env(safe-area-inset-right))
+    calc(24px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+  background: linear-gradient(180deg, rgba(28, 22, 25, 0.99), rgba(10, 8, 10, 1));
+  border-top: 1px solid rgba(160, 140, 110, 0.3);
+  box-shadow: 0 -20px 50px -20px rgba(0, 0, 0, 0.95);
+}
+
+.sheet__grip {
+  width: 38px;
+  height: 4px;
+  margin: 0 auto 16px;
+  background: rgba(160, 140, 110, 0.35);
+  border-radius: 2px;
+}
+
+.sheet__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(160, 140, 110, 0.16);
+}
+
+.sheet__campaign {
+  margin: 8px 0 0;
+  font: 500 20px/1.2 var(--sh-display);
+  font-variant: small-caps;
+  color: var(--sh-bone);
+}
+
+.sheet__head .app-rail__role {
+  margin: 0;
+  flex: none;
+}
+
+/* Two columns of big targets: nine links in a single column would push
+   Sign out off the bottom of an iPhone SE. */
+.sheet__links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 16px 0;
+}
+
+.sheet__links a {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 14px;
+  font: 500 11px/1.2 var(--sh-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sh-mute);
+  text-decoration: none;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--sh-rule);
+  border-left: 3px solid transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet__links a.app-nav__dm {
+  color: var(--sh-gold);
+}
+
+.sheet__links a.active {
+  color: var(--sh-bone-bright);
+  border-left-color: var(--sh-blood-bright);
+  background: linear-gradient(90deg, rgba(106, 10, 10, 0.3), rgba(0, 0, 0, 0.25));
+}
+
+.sheet__preview .app-rail__preview {
+  width: 100%;
+  margin: 0;
+  padding: 14px 10px 13px;
+}
+
+/* The rail's footer, restyled for a thumb: the rail makes Edit and Sign out
+   small text so they don't compete with the nav, which on a phone just makes
+   them hard to hit. */
+.sheet .app-rail__you {
+  padding: 18px 0 0;
+}
+
+.sheet .app-rail__you p {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sheet .app-rail__you button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--sh-rule);
+}
+
+.sheet .app-rail__signout {
+  margin-top: 10px !important;
+}
+
+.sheet .app-rail__signout button {
+  width: 100%;
+  justify-content: center;
+  color: var(--sh-blood-ink);
+  border-color: rgba(138, 13, 13, 0.5);
+}
+
+.sheet .app-rail__you form {
+  display: flex;
+  gap: 8px;
+}
+
+.sheet .app-rail__you input {
+  flex: 1;
+  min-width: 0;
+}

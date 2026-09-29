@@ -414,3 +414,160 @@
   color: var(--sh-mute);
   border: 1px solid var(--sh-rule-strong);
 }
+
+/* =========================================================
+   PHONE — the table becomes a list of cards
+
+   Same markup, re-laid-out: each <tr> turns into a wrapping flex row. The name
+   and level sit on the first line, and school · casting time · duration run
+   underneath. The description is dropped because it's one tap away in the
+   detail card, which docks to the bottom of the screen. The whole card is the
+   tap target (see .spells__open::after).
+
+   Selectors are written `.spells tbody td:nth-child(n)` so they outrank the
+   desktop column widths above (`.spells td:nth-child(n)`) instead of fighting
+   them with !important.
+   ========================================================= */
+@media (max-width: 900px) {
+  .spells__head {
+    flex-wrap: wrap;
+    gap: 14px;
+    padding-bottom: 16px;
+  }
+  .spells__search {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .spells__filters {
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 16px;
+  }
+  .spells__filters-label {
+    flex-basis: 100%;
+    margin: 0 0 2px;
+  }
+  .spells__filters button {
+    min-width: 40px;
+    min-height: 40px;
+    margin: 0;
+  }
+  .spells__count {
+    flex-basis: 100%;
+    margin: 6px 0 0;
+  }
+
+  .spells table,
+  .spells tbody {
+    display: block;
+  }
+  .spells table {
+    margin-top: 16px;
+  }
+  .spells thead {
+    display: none;
+  }
+
+  .spells tbody tr {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 0;
+    padding: 13px 14px 12px;
+  }
+  /* The hover inset bar reads as "selected" once iOS leaves :hover stuck on a
+     tapped row; :active gives the press feedback instead. */
+  .spells tbody tr:hover {
+    background: none;
+    box-shadow: none;
+  }
+  .spells tbody tr:active {
+    background: rgba(154, 122, 58, 0.1);
+  }
+
+  .spells tbody td:nth-child(n) {
+    width: auto;
+    padding: 0;
+    white-space: normal;
+  }
+
+  /* Line one: name + tags, with the level at the right edge. The name's
+     basis is the full row less the level's slot, which is what pushes
+     everything after the level down onto a second line — no wrapper needed. */
+  .spells tbody td:nth-child(1) {
+    flex: 1 1 calc(100% - 56px);
+    min-width: 0;
+    font-size: 18px;
+    line-height: 1.25;
+  }
+  .spells tbody td:nth-child(2) {
+    flex: 0 0 56px;
+    text-align: right;
+  }
+  .spells tbody td:nth-child(2)::before {
+    content: "Lv ";
+    font: 500 9px/1 var(--sh-display);
+    letter-spacing: 0.14em;
+    color: var(--sh-dim);
+  }
+
+  /* Line two: school · casting time · duration, in small text. */
+  .spells tbody td:nth-child(3) {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .spells tbody td:nth-child(4),
+  .spells tbody td:nth-child(5) {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .spells tbody td:nth-child(4)::before,
+  .spells tbody td:nth-child(5)::before {
+    content: "·";
+    margin: 0 8px;
+    color: var(--sh-dim);
+  }
+
+  .spells tbody td:nth-child(6) {
+    display: none;
+  }
+
+  /* Stretched target: the button's box covers the whole row, so a tap
+     anywhere on the card opens it — the name alone is a small target. */
+  .spells__open::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  /* The detail overlay docks to the bottom, above the tab bar, instead of
+     centring. Shared with the character sheet's spell list. */
+  .spell-detail-backdrop:has(> div) {
+    align-items: flex-end;
+    padding: 0 0 calc(56px + env(safe-area-inset-bottom));
+  }
+  .spell-detail-card {
+    max-width: none;
+    max-height: 70svh;
+    padding: 22px 18px 24px;
+    border-width: 1px 0 0;
+    animation: sh-sheet-rise 0.22s ease-out both;
+  }
+  .spell-detail-stat dt {
+    flex-basis: 100px;
+  }
+}
+
+@media (pointer: coarse) {
+  .spell-detail-close {
+    top: 6px;
+    right: 6px;
+    width: 40px;
+    height: 40px;
+  }
+  .spell-detail-header {
+    padding-right: 42px;
+  }
+}

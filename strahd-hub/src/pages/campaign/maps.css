@@ -810,3 +810,65 @@
   .maps .map-hotspot::before { animation: none; }
   .maps .loc-panel { animation: none; }
 }
+
+/* ============================================================================
+   PHONE / TOUCH
+   The drawer and visibility panel become bottom sheets through .sh-sheet
+   (theme.css); what is left here is the map's own geometry.
+   ========================================================================== */
+
+/* A 30px target is fine for a mouse and a miss for a fingertip. Only the
+   invisible hit area grows; the dot stays the size the map was designed for,
+   so dense clusters don't turn into a wall of red. */
+@media (pointer: coarse) {
+  .maps {
+    --hit: 44px;
+    --dot: 16px;
+  }
+
+  .maps .loc-panel__close,
+  .visibility-panel__close {
+    width: 44px;
+    height: 44px;
+  }
+
+  .visibility-panel__toggle {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 900px) {
+  .maps-header {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 0;
+  }
+
+  /* The drawer's inline-edge borders and side shadows are for a panel beside
+     the map; as a sheet it gets one rule along its top instead. */
+  .maps .loc-panel--drawer,
+  .maps .loc-panel--drawer.loc-panel--left,
+  .visibility-panel {
+    padding: 22px 20px 24px;
+    border: 0;
+    border-top: 1px solid rgba(160, 140, 110, 0.35);
+  }
+
+  .maps .loc-panel__close {
+    top: 6px;
+    right: 6px;
+  }
+
+  .visibility-panel__close {
+    top: -10px;
+    right: -10px;
+  }
+
+  /* min(): an iPhone SE's content box is ~288px, under the 280px column plus
+     this list's own padding, which would otherwise scroll sideways. */
+  .maps-index .map-list {
+    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+    padding: 12px 0;
+  }
+}

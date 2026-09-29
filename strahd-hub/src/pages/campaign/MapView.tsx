@@ -18,6 +18,13 @@ const PEEK_CLEARANCE = 150;
 // inline `left` is a CENTRE, not an edge — .loc-panel--popover translates
 // itself -50% — so this is how far the centre must stay from either side.
 const PEEK_HALF_WIDTH = 140;
+// A 390px-wide phone map at 3x is still smaller than the desktop one at 1x, so
+// touch screens get more headroom. Read once at load: the pointer type of a
+// device does not change under it.
+const MAX_SCALE =
+  typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches
+    ? 6
+    : 3;
 
 type Peek = { loc: Location; left: number; top: number; below: boolean };
 
@@ -240,7 +247,7 @@ function MapViewInner({
       <div className="map-stage" ref={stageRef}>
         <TransformWrapper
           minScale={1}
-          maxScale={3}
+          maxScale={MAX_SCALE}
           doubleClick={{ disabled: true }}
           onPanningStart={clearPeek}
           onZoomStart={clearPeek}
@@ -342,7 +349,9 @@ function MapViewInner({
             // Open on the side away from the marker so the drawer never covers
             // the pin you just clicked (and its gold is-active ring).
             className={
-              "loc-panel loc-panel--drawer" +
+              // sh-sheet: a bottom sheet on a phone, where a side drawer would
+              // cover most of a map that is only ~360px wide to begin with.
+              "loc-panel loc-panel--drawer sh-sheet" +
               (selected.x > 50 ? " loc-panel--left" : "")
             }
             role="dialog"
@@ -417,7 +426,7 @@ function MapViewInner({
         )}
 
         {showDmUi && showVisibilityPanel && (
-          <aside className="visibility-panel">
+          <aside className="visibility-panel sh-sheet">
             <div className="visibility-panel__header">
               <h3>Location Visibility</h3>
               <button

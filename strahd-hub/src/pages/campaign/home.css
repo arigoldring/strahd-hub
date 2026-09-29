@@ -312,12 +312,17 @@
   color: var(--sh-copper);
 }
 
+/* Quantity leads the name, in a fixed-width slot so the names line up, and
+   the columns are narrow cells that auto-fill the panel — on a full-width
+   panel a 1fr/1fr split pushed the count half a screen away from the item it
+   counts. No row rules: with a variable column count there's no way to find
+   the last row to drop its rule. */
 .desk-hoard__list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 0 34px;
 }
 
@@ -325,19 +330,15 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 9px 0;
-  border-bottom: 1px dashed rgba(160, 140, 110, 0.18);
+  padding: 7px 0;
   font-size: 16px;
   color: var(--sh-bone);
 }
 
-/* the last row in each column loses its rule */
-.desk-hoard__list li:nth-last-child(-n + 2) {
-  border-bottom: 0;
-}
-
 .desk-hoard__qty {
-  margin-left: auto;
+  flex: none;
+  min-width: 3ch;
+  text-align: right;
   font: 400 12px/1 var(--sh-mono);
   color: var(--sh-gold-deep);
 }
@@ -400,5 +401,58 @@
   .desk-panel--full,
   .desk-dm {
     grid-column: span 2;
+  }
+}
+
+/* Phone: one column. Every span has to come back down to 1, not just the
+   template: a `span 2` in a one-column grid doesn't clamp, it invents a second
+   implicit column and the page scrolls sideways. */
+@media (max-width: 900px) {
+  .desk__head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 14px;
+    padding-bottom: 16px;
+  }
+
+  .desk__head-right {
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .desk__cta {
+    padding: 13px 18px 12px;
+  }
+
+  .desk__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    margin-top: 16px;
+  }
+
+  .desk-panel--wide,
+  .desk-panel--full,
+  .desk-dm {
+    grid-column: auto;
+  }
+
+  .desk-panel {
+    padding: 18px 16px 16px;
+  }
+
+  /* The DM band's stats sit in a row divided by rules; on a phone they stack,
+     and the dividing rule turns from a left edge into a top one. */
+  .desk-dm {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .desk-dm__label + * {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid rgba(138, 13, 13, 0.4);
+    padding-top: 14px;
   }
 }
