@@ -5,9 +5,9 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 047. Last updated 2026-08-31.**
+**Current through migration 052. Last updated 2026-09-29.**
 
-This is the single source of truth for open work. `CONTEXT.md` holds decisions
+This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
 
 ---
@@ -334,34 +334,30 @@ precisely because a key naming no file fails silently. This is a piece of work,
 not a policy line. **The absence is the design; do not add either policy for
 symmetry.**
 
-### No portraits exist (noted 2026-08-14)
+Narrowed by 048: a *new* campaign no longer needs the SQL editor for the
+standard roster, because a trigger on `campaigns` seeds it (see CLAUDE.md,
+"Campaign seeding"). Anything beyond that roster, and any backfill into an
+existing campaign, is still a hand-run migration. Copy 051 for that, not 034.
 
-`src/assets/portraits/` is not in the repo, so `PORTRAITS` resolves to an empty
-object and every card renders without an image. Vite handles the empty glob
-without complaint; the build confirms it. Git cannot track an empty directory, so
-the folder appears with the first file. Both seeded NPCs land with a null
-`portrait_key` for the same reason (034 says so explicitly).
+### Death House sits at placeholder coordinates (noted 2026-09-18)
 
-**Fix:** two steps in this order — drop `<key>.webp` into
-`src/assets/portraits/`, then a migration setting that NPC's `portrait_key` to
-the same key. Doing it the other way round produces a key naming no file, which
-is exactly the silent failure the pinning exists to prevent.
+048 added Death House to the locations seed with `(20.0, 70.0)`, and its header
+said to replace those with real coordinates from `MapView`'s DM coordinate finder
+before running. That never happened. The live campaign's row (from 048's
+trigger) and every campaign created since use the made-up spot. 051 flagged it
+and left it out of scope.
 
-Two things that will bite during that work:
+**Trigger:** opening the Village of Barovia map once Death House is revealed.
 
-- `pin_npc_row` silently no-ops a direct `UPDATE` to `portrait_key`, including
-  for the table owner in the SQL editor. Scope an
-  `alter table npcs disable trigger pin_npc_row` inside the migration's
-  transaction, or the update appears to succeed and changes nothing.
-- `import.meta.glob` is eager and resolves at transform time. Restart Vite after
-  adding files or the new portrait won't appear.
+**Cost:** one pin in the wrong place. Lancelot's home resolves correctly, since
+that lookup is by name.
 
-Prep: 256×256 WebP at ~80 quality; ImageMagick `-gravity north` for the crop.
-Human-readable slugs beat uuids as keys — the folder stays browsable.
-
-Related: `public/portraits/strahd.png` is the old hardcoded path and nothing
-references it. Delete it — an unreferenced file at a path that used to be
-load-bearing is what future-you greps for and gets misled by.
+**Fix:** read the real coordinates off the finder, then a small migration that
+does two things: re-creates `seed_campaign_locations` (fifth version, copied
+from 048) with those numbers, and updates `x`/`y` on existing Death House rows
+where `map_key = 'village-of-barovia'`. `locations` has no pin trigger, so a
+plain UPDATE works. The client can't move pins, despite 050's header suggesting
+"drag it", so this can't be done in the app.
 
 ### `truncate locations cascade` now empties `npcs` (noted 2026-08-14)
 
@@ -604,6 +600,36 @@ one.
 **Fix:** nothing, unless characters grow stats. If they ever do, the honest
 version is a warning beside the picker rather than a disabled option — a DM
 waiving a prerequisite is a normal thing to do, and a hard block would be wrong.
+
+### Feats can't be edited from the app, not even a DM's own homebrew (noted 2026-09-18)
+
+039 ships SELECT and INSERT policies on `feats` and no UPDATE, so once a feat
+exists nothing in the client can change it — not a typo in the description, not
+its category. 052 recategorised five feats by running as the table owner in the
+SQL editor, outside RLS, which is the only path today.
+
+**Trigger:** a DM wanting to fix or recategorise a homebrew feat.
+
+**Cost:** a trip to the SQL editor per correction. The same is true of shared
+catalogue rows, and there it is correct: those should never be editable from
+the client.
+
+**Fix:** an UPDATE policy scoped like the INSERT one (`campaign_id is not null`
+and DM of that campaign), plus an edit form. 052 is explicitly not a precedent
+for skipping that and writing more owner-run migrations instead.
+
+### The faction feats lost their original categories (noted 2026-09-18)
+
+052 moved the five faction feats into `factions`, and a feat has exactly one
+category, so Harpers stopped being `social`, Zhentarim stopped being `skill`,
+and so on. Accepted: the original assignments were arbitrary (five feats across
+four categories), and what the five actually share is being faction
+memberships.
+
+**Cost:** filtering by Social no longer shows Harpers.
+
+**Fix:** if per-feat flavour matters, put it in `tags`, which exists and is
+unused. Don't add a second category column.
 
 ### `CharacterFeatRow` asserts the embedded feat is non-null (noted 2026-08-19)
 
@@ -935,6 +961,14 @@ Small, understood, not worth an entry of their own.
   references a campaign that does not exist in this database. It misled the NPC
   seed work once already. 026 reseeded locations campaign-scoped; the literal
   survives in the older files.
+- **Which uuid is the live campaign isn't recorded.** 033 onward hardcode
+  `d721b412-…` (the campaign those files call "The cool kids"); 050 and 051
+  resolve "Not Curse of Strahd" by name instead because nothing says whether
+  those are the same row. One `select id, name from campaigns` would settle it.
+- **`public/portraits/strahd.png` is dead.** The old hardcoded path; `NPC.tsx`
+  reads only `src/assets/portraits/` now, and 049 shipped the real Strahd there.
+  Delete it — an unreferenced file at a formerly load-bearing path misleads the
+  next grep.
 - **Double `console.error` on a failed NPC save.** `updateNpc` logs the Supabase
   error and `NpcEditor`'s catch logs again. One failure, two entries. The same
   pattern is now in `characterSpells.ts` and its callers.
@@ -976,6 +1010,24 @@ Small, understood, not worth an entry of their own.
 ---
 
 ## Resolved
+
+### No portraits existed (noted 2026-08-14, resolved by 048–050)
+
+`src/assets/portraits/` was not in the repo, so every NPC card rendered without
+an image. It now holds three: Rose and Thorn (set in 048's seed INSERT), Strahd
+(049, seeded and backfilled into every campaign) and Lancelot (050/051). The
+recipe and its traps (file before key, `pin_npc_row` on UPDATE, restarting Vite
+for the eager glob) now live in CLAUDE.md under "Campaign seeding and NPC
+portraits".
+
+### 050's backfill matched zero rows and committed (noted and resolved 2026-09-18, by 051)
+
+050 named its campaign in three statements and guarded only the first, so fixing
+a misspelling in the guard left both inserts matching nothing. They committed,
+the ledger recorded 050, and the live campaign had no Lancelot. 051 redid the
+backfill with the name in one variable and an end-state assertion. The lesson is
+in CLAUDE.md's migration conventions ("A literal that must agree across
+statements appears once").
 
 ### Nothing recorded which migrations had been applied (noted 2026-08-14, resolved by 036)
 

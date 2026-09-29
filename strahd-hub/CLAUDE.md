@@ -5,7 +5,7 @@ Campaign management app for a Curse of Strahd game. Solo developer.
 Primary goal is learning full-stack development; the working app is secondary.
 Not production software — no SLA, no uptime concerns, no team to onboard.
 
-**Current through migration 047. Last updated 2026-08-31.**
+**Current through migration 052. Last updated 2026-09-29.**
 
 ## What lives where — read this before editing this file
 
@@ -81,6 +81,16 @@ a PostgREST embed genuinely defeats inference (see `PARTY_SELECT`).
 - Verification blocks live in the same file as the migration, below it, and get
   no ledger row. Every block runs in its own transaction and ends in `rollback`,
   so they can be re-run against the live database whenever.
+- **A literal that must agree across statements appears once.** Resolve a
+  campaign name (or a list of row names) into a constant at the top of the
+  block and have every statement read from there. 050 named its campaign in
+  three statements, guarded only the first, and committed two inserts that
+  matched zero rows — a `where` that matches nothing is a successful statement,
+  not an error. 051 is the repair and the shape to copy; 052 follows it.
+- **Assert the end state, not the rows touched.** A second run of an idempotent
+  migration legitimately touches zero rows, so "N rows updated" can't be the
+  check. Raise unless the rows the file is about are now in the state it
+  promises (052's assertion block).
 - **A verification block that expects a refusal catches it and reports it as a
   row** (039's shape, taken from 037's BLOCK 3). A block whose documented pass
   condition is "ERROR" is worse than it looks: the SQL editor paints it red and
@@ -142,7 +152,8 @@ remembers to pin it. It fails open. Check the trigger before adding a column.
 direct `UPDATE` to a pinned column even when you're the table owner, so a
 migration that sets one needs `ALTER TABLE ... DISABLE TRIGGER` scoped inside
 its own `begin`/`commit`. The update otherwise reports success and changes
-nothing.
+nothing. For a row being created, skip all that: set the column in the INSERT,
+which a BEFORE UPDATE trigger never sees (048, 050).
 
 **A refused write raises nothing.** RLS `USING` excludes rows before `WITH
 CHECK` is consulted, so a forbidden UPDATE or DELETE comes back as a clean
@@ -376,15 +387,79 @@ answerable. A missing *grant* reads as 401/42501 instead.
   The Give and Teach controls are gated on `isDm` for honesty about whose
   controls they are; RLS is the enforcement.
 
-### Catalogue tables: feats (039–041)
+### Catalogue tables: feats (039–041, 052)
 
 - **`feats` is 022's spells table with a different set of columns**, and the
   differences are all downstream of one fact: a feat has no level. `category`
-  takes the ordering/grouping/filtering job a spell's level does, and its six
-  values live in a CHECK constraint rather than a lookup table because the set
-  is small, closed, and changing it *should* be a migration someone has to
-  write. `benefits` is `text[]` defaulted to `'{}'` so the detail card renders a
-  `<ul>` without branching on null.
+  takes the ordering/grouping/filtering job a spell's level does, and its seven
+  values (six from 039, `factions` from 052) live in a CHECK constraint rather
+  than a lookup table because the set is small, closed, and changing it
+  *should* be a migration someone has to write. `benefits` is `text[]`
+  defaulted to `'{}'` so the detail card renders a `<ul>` without branching on
+  null.
+
+- **The CHECK and `featCategories` in `services/feats.ts` are one list in two
+  places, and must change together.** `parseOneOf` narrows the text column
+  against the tuple at the boundary, so a value the database admits but the
+  tuple doesn't know throws on the way into the client. The generated type is
+  plain `string` and won't warn you. The tuple's order is the filter-button
+  order: combat first, `general` (the leftovers) always last.
+
+- **A category is exclusive; `tags` is the non-exclusive axis, and still
+  empty.** 052 moved the five faction feats into `factions` because the filter
+  row, the sheet's grouping and CreateFeat's `<select>` are all generated from
+  the tuple, so one value gives the button, the header and the option with no
+  new code. A tag would have needed a second filter axis, and `useSearchBar`
+  only matches names, so a tag would not have been searchable either. The price
+  is that Harpers is no longer `social`, and so on (see KNOWN_ISSUES).
+
+- **`factions` is plural on purpose.** `featCategoryLabel` title-cases the
+  stored value and nothing else, so the stored string *is* the button label.
+  The other six read as adjectives ("a combat feat"); this one names a set.
+  Don't "fix" it to `faction`.
+
+### Campaign seeding and NPC portraits (027, 048–051)
+
+- **A new campaign seeds itself.** Two security-definer AFTER INSERT triggers
+  on `campaigns` write the standard locations (027) and NPC roster (048). That
+  is how rows reach `locations` and `npcs` despite neither having an INSERT
+  policy, and it's why a campaign created from the app arrives with Strahd,
+  Rahadin, Rose and Thorn, Lancelot and Death House already in place.
+
+- **⚠ The two triggers depend on firing in alphabetical order.** Postgres fires
+  same-event AFTER triggers in order of trigger name, and the NPC seed looks
+  each NPC's home up by location name. `seed_locations_on_campaign_create`
+  sorts before `seed_npcs_on_campaign_create`, so the locations exist by then.
+  Rename either one and NPCs silently land homeless. Before adding a third
+  trigger, check where its name sorts.
+
+- **The seed functions are replaced whole, and each version copies the last
+  one verbatim.** `seed_campaign_locations` is on its fourth body (027, 042,
+  043, 048) and `seed_campaign_npcs` on its third (048, 049, 050). The trigger
+  bindings never change. Edit from the latest file, not an older one, or you
+  roll back whatever was added in between.
+
+- **The seed only reaches campaigns created after it. Backfilling an existing
+  campaign is a separate, explicit decision** and gets its own block. 049
+  backfilled every campaign, since one portrait file is right for every copy
+  of Strahd. 051 backfilled one campaign and is the template to copy (not 034
+  or 050): one campaign name, resolved once with `into strict`, guarded with
+  `not exists` because `npcs` has no unique `(campaign_id, name)` by design.
+
+- **Resolve the campaign by name, not by the uuid older migrations hardcode.**
+  Nothing in the repo records which uuid is the live campaign (050), and a
+  wrong guess seeds someone else's game. `into strict` turns "no match" and "two
+  matches" into a rollback.
+
+- **Portraits are file first, then key.** Put `src/assets/portraits/<key>.webp`
+  in the repo (lowercase slug, matching the key exactly), then set
+  `portrait_key`: in the seed's INSERT for new rows, or in a backfill with
+  `pin_npc_row` disabled for existing ones (049). A key that names no file
+  renders an empty portrait band, with no 404, build error or exception.
+  `import.meta.glob` is eager, so restart Vite after adding a file. Re-export
+  source art to roughly the existing portraits' size (about 340×520, ~10 KB).
+  050's original was a 4 MB phone photo. Check the crop against npc.css's
+  shared `object-position: 50% 22%` rather than changing the CSS.
 
 - **`prerequisite` and `repeatable` are DISPLAY ONLY, and that is structural,
   not lazy.** Nothing in this database can enforce "Strength 13 or higher" —
