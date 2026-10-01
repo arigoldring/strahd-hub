@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 052. Last updated 2026-09-29.**
+**Current through migration 053. Last updated 2026-09-30.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -266,6 +266,12 @@ fix — do all three together or none, so the pattern stays legible.
 each naming its two key columns and `updated_at`. Both say so in their own
 headers. Five blocklists now; the inversion gets one table more expensive every
 time this pattern is copied.
+
+053 makes it six: `pin_item_row` pins `id`, `campaign_id` and `created_at` on
+`items`. This one is wider than it looks, because `items` is the table most
+likely to grow columns (rarity, attunement, weight), and every one of them is
+DM-editable on homebrew the moment it lands. Today that is the right answer for
+each of them, which is exactly how a blocklist stays unnoticed.
 
 ### `npcs.description` is normalised in the client only (noted 2026-08-14, partly addressed by 035)
 
@@ -617,6 +623,40 @@ the client.
 **Fix:** an UPDATE policy scoped like the INSERT one (`campaign_id is not null`
 and DM of that campaign), plus an edit form. 052 is explicitly not a precedent
 for skipping that and writing more owner-run migrations instead.
+
+053 has since done exactly this for items, and it is the template: the policy,
+a `pin_feat_row` trigger pinning `id`/`campaign_id`/`created_at`, an
+`updateFeat` that treats "no row back" as a refusal, and CreateFeat's form
+seeded from an `initial` feat the way `HomebrewItemForm` now is. Feats are
+simpler than items, with no kind-dependent columns to null on a change.
+
+### Editing a homebrew item rewrites every stack that holds it (noted 2026-09-30)
+
+053 edits the `items` row in place, which is the point: no copy, no reseed. But
+the hoard and every pack store an `item_id` and nothing else, so a change shows
+up everywhere at once, including on stacks bought at the old price. Raise a
+homebrew sword from 50 to 500 gold and the hoard's "in goods" total jumps by
+450 per sword the party already holds. There is no history, so the old values
+are gone.
+
+**Trigger:** editing price or stats on a homebrew item someone already carries.
+
+**Cost:** usually what the DM meant (a typo in the damage dice should be fixed
+on the sword in the fighter's hands, too). The price case is the surprise, and
+at a table of five it is one sentence of explanation.
+
+**Fix if it ever matters:** snapshot the price onto the stack at purchase. Not
+worth it while no screen distinguishes "what we paid" from "what it's worth".
+
+### EditItem forgets where it came from on a refresh (noted 2026-09-30)
+
+The Edit link passes the page it was pressed on as router state, and EditItem
+returns there after Save or Cancel. Router state lives in the history entry, so
+a refresh or a pasted link loses it and both buttons fall back to the Shop.
+
+**Cost:** one extra click back to the hoard, rarely.
+
+**Fix:** a `?from=` search param instead of state, if it ever annoys anyone.
 
 ### The faction feats lost their original categories (noted 2026-09-18)
 

@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Item } from "../services/items";
 // The card's look lives in shop.css (the item-detail-* classes). Imported here
 // so the card carries its own styling wherever it's used, rather than depending
@@ -140,5 +141,33 @@ export function ItemDetailCard({
       )}
       {footer}
     </div>
+  );
+}
+
+/**
+ * The DM's way into EditItem, for a card's footer. Renders nothing for a
+ * shared catalogue item, since 053 only lets homebrew be edited; the caller
+ * decides whether the viewer is a DM (showDmUi, so player preview hides it).
+ *
+ * Carries the current path as router state so EditItem returns here after a
+ * save or cancel instead of always landing on the Shop.
+ */
+export function EditItemLink({
+  campaignId,
+  item,
+}: {
+  campaignId: string;
+  item: Item;
+}) {
+  const location = useLocation();
+  if (!item.isHomebrew) return null;
+  return (
+    <Link
+      className="item-detail-edit"
+      to={`/campaign/${campaignId}/EditItem/${item.id}`}
+      state={{ returnTo: location.pathname }}
+    >
+      Edit item
+    </Link>
   );
 }

@@ -3,6 +3,7 @@ import { SubmitEvent, useState } from "react";
 import { useCampaign } from "../../components/CampaignLayout";
 import { usePartyInventory } from "../../hooks/usePartyInventory";
 import {
+  type Item,
   type NewItem,
   armorCategories,
   damageTypes,
@@ -33,26 +34,53 @@ export function CreateItem() {
         Saved straight into this campaign's hoard — you'll land in the Inventory
         when it's made.
       </p>
-      <HomebrewItemForm onCreate={handleCreate} />
+      <HomebrewItemForm
+        onSubmit={handleCreate}
+        submitLabel="Create Item"
+        savingLabel="Creating..."
+      />
     </div>
   );
 }
 
-function HomebrewItemForm({
-  onCreate,
+/**
+ * The forge's fields, shared by CreateItem and EditItem. `initial` is the item
+ * being edited; without it every field starts blank. It seeds state once, on
+ * mount — a refetch mid-edit does not overwrite what the DM is typing, which
+ * is why EditItem keys this on the item id rather than passing a live object.
+ *
+ * Every kind's fields are seeded, not only the item's own, so switching a
+ * weapon to armor and back restores the weapon's stats. Only the visible
+ * kind's fields are submitted; updateItem nulls the rest (001's checks).
+ */
+export function HomebrewItemForm({
+  initial,
+  onSubmit,
+  submitLabel,
+  savingLabel,
 }: {
-  onCreate: (input: NewItem) => Promise<void>;
+  initial?: Item;
+  onSubmit: (input: NewItem) => Promise<void>;
+  submitLabel: string;
+  savingLabel: string;
 }) {
-  const [kind, setKind] = useState<"general" | "weapon" | "armor">("general");
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [price, setPrice] = useState("");
-  const [tagsInput, setTagsInput] = useState("");
+  const weapon = initial?.kind === "weapon" ? initial : undefined;
+  const armor = initial?.kind === "armor" ? initial : undefined;
+
+  const [kind, setKind] = useState<"general" | "weapon" | "armor">(
+    initial?.kind ?? "general",
+  );
+  const [name, setName] = useState(initial?.name ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [price, setPrice] = useState(
+    initial ? String(initial.price) : "",
+  );
+  const [tagsInput, setTagsInput] = useState(initial?.tags.join(", ") ?? "");
 
   const [weaponCategory, setWeaponCategory] = useState<"simple" | "martial">(
-    "simple",
+    weapon?.category ?? "simple",
   );
-  const [damageDice, setDamageDice] = useState("");
+  const [damageDice, setDamageDice] = useState(weapon?.damageDice ?? "");
   const [damageType, setDamageType] = useState<
     | "acid"
     | "bludgeoning"
@@ -67,18 +95,32 @@ function HomebrewItemForm({
     | "radiant"
     | "slashing"
     | "thunder"
-  >("piercing");
-  const [properties, setProperties] = useState<Set<string>>(new Set());
-  const [versatileDice, setVersatileDice] = useState("");
-  const [rangeNormal, setRangeNormal] = useState("");
-  const [rangeLong, setRangeLong] = useState("");
+  >(weapon?.damageType ?? "piercing");
+  const [properties, setProperties] = useState<Set<string>>(
+    () => new Set(weapon?.properties ?? []),
+  );
+  const [versatileDice, setVersatileDice] = useState(
+    weapon?.versatileDice ?? "",
+  );
+  const [rangeNormal, setRangeNormal] = useState(
+    weapon?.rangeNormal != null ? String(weapon.rangeNormal) : "",
+  );
+  const [rangeLong, setRangeLong] = useState(
+    weapon?.rangeLong != null ? String(weapon.rangeLong) : "",
+  );
 
   const [armorCategory, setArmorCategory] = useState<
     "light" | "medium" | "heavy" | "shield"
-  >("light");
-  const [baseArmorClass, setBaseArmorClass] = useState("");
-  const [strengthRequirement, setStrengthRequirement] = useState("");
-  const [stealthDisadvantage, setStealthDisadvantage] = useState(false);
+  >(armor?.category ?? "light");
+  const [baseArmorClass, setBaseArmorClass] = useState(
+    armor ? String(armor.baseArmorClass) : "",
+  );
+  const [strengthRequirement, setStrengthRequirement] = useState(
+    armor?.strengthRequirement != null ? String(armor.strengthRequirement) : "",
+  );
+  const [stealthDisadvantage, setStealthDisadvantage] = useState(
+    armor?.stealthDisadvantage ?? false,
+  );
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -170,10 +212,10 @@ function HomebrewItemForm({
     setSaving(true);
     setError(null);
     try {
-      await onCreate(input);
+      await onSubmit(input);
     } catch (err) {
-      console.error("Problem creating homebrew item:", err);
-      setError(errorMessage(err, "Couldn't create this item"));
+      console.error("Problem saving homebrew item:", err);
+      setError(errorMessage(err, "Couldn't save this item"));
       setSaving(false);
     }
   }
@@ -444,7 +486,7 @@ function HomebrewItemForm({
           className="create-item-btn create-item-btn--primary"
           disabled={saving}
         >
-          {saving ? "Creating..." : "Create Item"}
+          {saving ? savingLabel : submitLabel}
         </button>
       </div>
 

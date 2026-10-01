@@ -402,3 +402,17 @@ html { overflow-y: scroll; }
   .item-detail-add { min-height: 44px; }
   .item-detail-stat dt { min-width: 110px; }
 }
+
+/* The DM's Edit link on a homebrew item's card (053). Quieter than the Add
+   button beside it: an outline, not blood, because editing is the rarer
+   action and should not compete with buying. */
+.item-detail-edit {
+  font-family: var(--sh-display); font-size: 12px; font-weight: 500;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--sh-bone);
+  border: 1px solid var(--sh-rule-strong); padding: 9px 16px;
+  text-decoration: none; transition: border-color .2s, color .2s;
+}
+.item-detail-edit:hover { color: var(--sh-candle); border-color: rgba(255,210,180,.5); }
+@media (pointer: coarse) {
+  .item-detail-edit { min-height: 44px; display: inline-flex; align-items: center; }
+}

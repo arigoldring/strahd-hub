@@ -9,7 +9,10 @@ import { usePartyCurrency } from "../../hooks/usePartyCurrency";
 import { useInventoryTransfer } from "../../hooks/useInventoryTransfer";
 import { useItems } from "../../hooks/useItems";
 import { useSearchBar } from "../../hooks/useSearchBar";
-import { ItemDetailCard } from "../../components/ItemDetailCard";
+import {
+  EditItemLink,
+  ItemDetailCard,
+} from "../../components/ItemDetailCard";
 import { CustomDescriptionBlock } from "../../components/CustomDescription";
 import type { Character as CharacterModel, Denomination } from "../../services/characters";
 import type { CharacterInventoryEntry } from "../../services/characterInventory";
@@ -586,13 +589,21 @@ function Hoard({
           stops propagation so clicking inside doesn't dismiss it. */}
       <div className="inv-backdrop" onClick={() => setPanelId(null)}>
         {panel && (
-          // No footer: an item already in the party's hoard has nothing to add.
-          // Shop is the page that passes the Add button; here the card is
-          // read-only and the controls live on the rows.
+          // No Add button: an item already in the party's hoard has nothing to
+          // add, and the stack controls live on the rows. The one footer is
+          // the DM's Edit link, on homebrew only (053), and the row is skipped
+          // entirely otherwise so a player's card has no empty ruled-off band.
           <ItemDetailCard
             key={panel.entryId}
             item={panel}
             onClose={() => setPanelId(null)}
+            footer={
+              showDmUi && panel.isHomebrew ? (
+                <div className="item-detail-add-row">
+                  <EditItemLink campaignId={campaignId} item={panel} />
+                </div>
+              ) : undefined
+            }
           />
         )}
       </div>

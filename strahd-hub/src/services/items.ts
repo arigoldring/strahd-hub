@@ -1,6 +1,10 @@
 import { supabase } from "../lib/supabase";
 import { parseOneOf, requireField } from "../lib/parse";
-import type { Tables, TablesInsert } from "../types/database.types";
+import type {
+  Tables,
+  TablesInsert,
+  TablesUpdate,
+} from "../types/database.types";
 /**
  * Item is how the rest of the app sees an item; the DB row shape comes from the
  * generated Database types via the typed supabase client, and getItems maps one
@@ -16,6 +20,11 @@ export interface ItemBase {
   price: number;
   description: string;
   tags: string[];
+  // True for this campaign's homebrew (campaign_id not null), false for the
+  // shared catalogue. Only homebrew is editable (053), so this decides whether
+  // a DM sees an Edit button. Not campaignId itself: getItems has already
+  // narrowed to shared-or-this-campaign, so "not shared" is enough.
+  isHomebrew: boolean;
 }
 export const weaponProperties = [
   "ammunition",
@@ -80,10 +89,12 @@ export interface Armor extends ItemBase {
 
 export type Item = GeneralItem | Weapon | Armor;
 
+// isHomebrew is omitted along with id because neither is the author's to
+// choose: a client write is always homebrew (025's INSERT check, 053's pin).
 export type NewItem =
-  | Omit<GeneralItem, "id">
-  | Omit<Weapon, "id">
-  | Omit<Armor, "id">;
+  | Omit<GeneralItem, "id" | "isHomebrew">
+  | Omit<Weapon, "id" | "isHomebrew">
+  | Omit<Armor, "id" | "isHomebrew">;
 
 // Maps one items row into the app's Item. Explicit fields (vs `...row`)
 // intentionally drop price_cp and created_at.
@@ -102,6 +113,7 @@ export function toItem(row: Tables<"items">): Item {
     description: requireField(row.description, "description", subject),
     price: row.price_cp / 100,
     tags: row.tags,
+    isHomebrew: row.campaign_id !== null,
   };
   switch (row.kind) {
     case "weapon":
@@ -171,12 +183,32 @@ export function toItem(row: Tables<"items">): Item {
   }
 }
 
-function toInsertRow(
-  campaignId: string,
-  input: NewItem,
-): TablesInsert<"items"> {
-  const base: TablesInsert<"items"> = {
-    campaign_id: campaignId,
+// The columns an item's kind decides, each at the value it must hold on a row
+// of any other kind: 001's *_fields_absent checks require them null whenever
+// the kind doesn't use them. An insert gets that for free (unset columns
+// default to null); an update does not. Turning a weapon into a general item
+// must null its weapon columns explicitly, or the old values stay behind and
+// the check refuses the save.
+const KIND_FIELDS_CLEARED = {
+  weapon_category: null,
+  damage_dice: null,
+  damage_type: null,
+  properties: null,
+  versatile_dice: null,
+  range_normal: null,
+  range_long: null,
+  armor_category: null,
+  base_armor_class: null,
+  strength_requirement: null,
+  stealth_disadvantage: null,
+} satisfies TablesUpdate<"items">;
+
+// Every author-controlled column for this input, campaign_id excluded. Shared
+// by insert (which adds the campaign) and update (which must not send one;
+// pin_item_row would discard it anyway).
+function toAuthoredColumns(input: NewItem) {
+  const base = {
+    ...KIND_FIELDS_CLEARED,
     name: input.name,
     description: input.description,
     price_cp: Math.round(input.price * 100),
@@ -207,6 +239,13 @@ function toInsertRow(
     case "general":
       return base;
   }
+}
+
+function toInsertRow(
+  campaignId: string,
+  input: NewItem,
+): TablesInsert<"items"> {
+  return { campaign_id: campaignId, ...toAuthoredColumns(input) };
 }
 
 // Scoped to shared-or-this-campaign, not left to RLS: RLS answers "may this
@@ -247,6 +286,37 @@ export async function createItem(
   if (error) {
     console.error(error);
     throw error;
+  }
+
+  return toItem(data);
+}
+
+// Edits a homebrew item in place, so every stack holding it (the party hoard,
+// every character's pack) reads the new values on its next fetch. 053 allows
+// this for the campaign's DM on homebrew only. A shared row, another
+// campaign's row or a non-DM caller is refused, and a refused UPDATE raises
+// nothing: it matches zero rows and returns 200. Hence .maybeSingle(), with
+// "no row came back" turned into the error the form shows.
+export async function updateItem(
+  itemId: string,
+  input: NewItem,
+): Promise<Item> {
+  const update: TablesUpdate<"items"> = toAuthoredColumns(input);
+  const { data, error } = await supabase
+    .from("items")
+    .update(update)
+    .eq("id", itemId)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+  if (!data) {
+    throw new Error(
+      "This item can't be edited. Only this campaign's DM can edit its homebrew.",
+    );
   }
 
   return toItem(data);

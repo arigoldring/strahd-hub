@@ -5,7 +5,7 @@ Campaign management app for a Curse of Strahd game. Solo developer.
 earning full-stack concepts and AI-assisted development
 Not production software — no SLA, no uptime concerns, no team to onboard.
 
-**Current through migration 052. Last updated 2026-09-29.**
+**Current through migration 053. Last updated 2026-09-30.**
 
 ## What lives where — read this before editing this file
 
@@ -157,8 +157,8 @@ Both failures wear the same costume: works once, refuses mid-session. 033 wrote
 a verification block for it on `npc_dm_notes`; 042's BLOCK 5 is the same block
 pointed at the opposite mistake.
 
-**The pin triggers are blocklists.** `pin_npc_row`, `pin_character_row` and
-`stamp_session_recap` name the columns an update may _not_ touch, so every
+**The pin triggers are blocklists.** `pin_npc_row`, `pin_character_row`,
+`pin_item_row` and `stamp_session_recap` name the columns an update may _not_ touch, so every
 column added to those tables from here on is client-writable until someone
 remembers to pin it. It fails open. Check the trigger before adding a column.
 (See KNOWN_ISSUES for the allowlist inversion, if it's ever worth doing.)
@@ -500,6 +500,43 @@ answerable. A missing _grant_ reads as 401/42501 instead.
   nothing) or a trigger re-deriving the character's campaign on every insert,
   and the exposure is one DM mislabelling their own table. The client never
   offers it: the picker is fed by `getFeats(campaignId)`.
+
+### Editing homebrew items (053)
+
+- **Homebrew only, in place.** The UPDATE policy is 025's INSERT check reused
+  as both USING and WITH CHECK, so a campaign's DM edits that campaign's
+  homebrew and nothing else. The row is updated where it stands, so every
+  stack in the hoard and in every pack shows the change; nothing is copied or
+  reseeded. Shared catalogue rows stay owner-only on purpose: one row belongs
+  to every campaign, so no campaign DM owns it, and the global `is_dm()` was
+  rejected for the reason in Multi-campaign above. If a DM ever needs to
+  reskin a shared item for one campaign, the shape is an override table keyed
+  on `(campaign_id, item_id)` (046/047's pattern), not a looser policy.
+
+- **`pin_item_row` exists because RLS can't compare old to new.** WITH CHECK
+  alone would let a DM of two campaigns move an item from A to B, since both
+  sides pass `is_campaign_dm`, and every stack in A would then embed null for
+  A's players. The trigger silently resets `id`, `campaign_id` and
+  `created_at`, the same shape as `pin_npc_row`.
+
+- **An update has to null the other kinds' columns, an insert doesn't.**
+  001's `*_fields_absent` checks require weapon columns null on armor and so
+  on. An insert gets that from column defaults; an update leaves the old
+  values behind. `toAuthoredColumns` in `services/items.ts` spreads
+  `KIND_FIELDS_CLEARED` under every write so changing a weapon into a general
+  item saves rather than tripping the check.
+
+- **One form, two pages.** `HomebrewItemForm` (in `CreateItem.tsx`) takes an
+  optional `initial` item and seeds its state once on mount; EditItem keys it
+  on the item id. `Item.isHomebrew` decides whether a card shows the Edit
+  link (`EditItemLink`, gated on `showDmUi` by the caller). EditItem looks the
+  item up in `useItems` rather than fetching by id, so another campaign's id
+  simply isn't found and a shared one bounces back before the form.
+
+- **An edit invalidates four caches**, because `toItem` runs on the catalogue,
+  the hoard and every pack: `items` and `partyInventory` for the campaign,
+  `party` for the roster, and every `characterInventory` by prefix (that key
+  has no campaign in it).
 
 ### Maps (042)
 

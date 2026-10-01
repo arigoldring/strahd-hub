@@ -363,3 +363,22 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* EditItem's Cancel, sitting at the end of the sub-line. A button styled as
+   a link because it navigates by router state (back to where Edit was
+   pressed), which a plain <Link> can't compute. */
+.create-item-link {
+  padding: 0;
+  font: inherit;
+  font-style: normal;
+  color: var(--sh-gold);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.create-item-link:hover {
+  color: var(--sh-bone);
+}

@@ -13,6 +13,7 @@ import { Character, CharacterDetail } from "./pages/campaign/Character";
 // import { Party } from "./pages/campaign/Party";
 import { CreateItem } from "./pages/campaign/CreateItem";
 import { CreateFeat } from "./pages/campaign/CreateFeat";
+import { EditItem } from "./pages/campaign/EditItem";
 import { AuthProvider, AuthGate } from "./services/AuthContext";
 import { CampaignLayout } from "./components/CampaignLayout";
 import { CampaignPicker } from "./pages/onboarding/CampaignPicker";
@@ -102,6 +103,11 @@ function App() {
                     nav rail: each is linked from the catalogue it writes into,
                     which is where you are when you want one. */}
                   <Route path="CreateFeat" element={<CreateFeat />} />
+                  {/* CreateItem's form, seeded from an existing homebrew item.
+                    Reached from the Edit button on the item card (Shop and the
+                    hoard rail), not the nav. Guards itself the same way and is
+                    refused by 053 behind that; shared items bounce back. */}
+                  <Route path="EditItem/:itemId" element={<EditItem />} />
                   {/* The app's first route with a second dynamic segment. Maps
                     is an index of map cards; Maps/:mapId is the viewer for
                     one. :mapId is a key from src/data/maps.ts, not a database

@@ -1,11 +1,15 @@
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useItems } from "../../hooks/useItems";
 import { Item } from "../../services/items";
 import { useCampaign } from "../../components/CampaignLayout";
+import { usePlayerPreview } from "../../components/PlayerPreviewContext";
 import { addToPartyInventory } from "../../services/partyInventory";
 import { errorMessage } from "../../lib/errors";
-import { ItemDetailCard } from "../../components/ItemDetailCard";
+import {
+  EditItemLink,
+  ItemDetailCard,
+} from "../../components/ItemDetailCard";
 import { useSearchBar } from "../../hooks/useSearchBar";
 import "./shop.css";
 
@@ -14,6 +18,10 @@ export function Shop() {
   // the catalog (shared SRD plus this campaign's homebrew — see getItems) and
   // adding to a party's inventory are scoped to it.
   const campaign = useCampaign();
+  const { previewing } = usePlayerPreview();
+  // Gates the Edit link on a homebrew card, nothing else. showDmUi rather
+  // than bare isDm so player preview shows the card a player would see.
+  const showDmUi = campaign.isDm && !previewing;
   const { data: items = [], isLoading: loading, error } = useItems(campaign.id);
   // The open item is held by id, not as the Item itself — same as Maps holds a
   // location id. Storing the object would leave `panel` pointing at whichever
@@ -102,7 +110,11 @@ export function Shop() {
                 <AddToPartyInventory
                   campaignId={campaign.id}
                   itemId={panel.id}
-                />
+                >
+                  {showDmUi && (
+                    <EditItemLink campaignId={campaign.id} item={panel} />
+                  )}
+                </AddToPartyInventory>
               }
             />
           )}
@@ -126,12 +138,16 @@ export function Shop() {
 // cache without mounting a query, and invalidating an inactive query only
 // marks it stale (no fetch), so an add here costs nothing yet still shows up
 // in Inventory even once partyInventory gets a nonzero staleTime.
+// `children` sits in the same row, after the button: the DM's Edit link
+// shares this footer rather than drawing a second ruled-off row beneath it.
 function AddToPartyInventory({
   campaignId,
   itemId,
+  children,
 }: {
   campaignId: string;
   itemId: string;
+  children?: ReactNode;
 }) {
   const queryClient = useQueryClient();
   const [adding, setAdding] = useState(false);
@@ -164,6 +180,7 @@ function AddToPartyInventory({
             ? "Add another"
             : "Add to party inventory"}
       </button>
+      {children}
       {/* "Add another" and a note, rather than a disabled button, because a
           second add is a real action — buying a second torch. Since 031 each
           click raises the party's stack of this item by one instead of filing a
