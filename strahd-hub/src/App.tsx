@@ -10,7 +10,7 @@ import { Npcs } from "./pages/campaign/NPC";
 import { Recaps } from "./pages/campaign/Recaps";
 import { Inventory } from "./pages/campaign/Inventory";
 import { Character, CharacterDetail } from "./pages/campaign/Character";
-import { SheetMock } from "./pages/campaign/SheetMock";
+import { Sheet } from "./pages/campaign/Sheet";
 // import { Party } from "./pages/campaign/Party";
 import { CreateItem } from "./pages/campaign/CreateItem";
 import { CreateFeat } from "./pages/campaign/CreateFeat";
@@ -90,10 +90,10 @@ function App() {
                     path="Character/:characterId"
                     element={<CharacterDetail />}
                   />
-                  {/* MOCK-UP of a full sheet (abilities, saves, skills) on
-                    the feat/character-sheet-mockup branch. Its numbers live in
-                    localStorage only — see useSheetMock. */}
-                  <Route path="Sheet" element={<SheetMock />} />
+                  {/* The full sheet: abilities, saves, skills, combat and attacks,
+                    stored in 054-057's tables. Beside Character rather than
+                    replacing it until it has been played with. */}
+                  <Route path="Sheet" element={<Sheet />} />
                   {/* The same read one level up: every character in the
                     campaign rather than only yours. Not DM-gated — 028 lets any
                     member read the whole table, and the page's one write is.

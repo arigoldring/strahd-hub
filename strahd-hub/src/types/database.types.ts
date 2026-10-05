@@ -116,6 +116,58 @@ export type Database = {
         }
         Relationships: []
       }
+      character_classes: {
+        Row: {
+          character_id: string
+          class_id: string
+          created_at: string
+          id: string
+          is_starting: boolean
+          level: number
+          subclass_id: string | null
+        }
+        Insert: {
+          character_id: string
+          class_id: string
+          created_at?: string
+          id?: string
+          is_starting?: boolean
+          level?: number
+          subclass_id?: string | null
+        }
+        Update: {
+          character_id?: string
+          class_id?: string
+          created_at?: string
+          id?: string
+          is_starting?: boolean
+          level?: number
+          subclass_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_classes_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_classes_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_classes_subclass_id_class_id_fkey"
+            columns: ["subclass_id", "class_id"]
+            isOneToOne: false
+            referencedRelation: "subclasses"
+            referencedColumns: ["id", "class_id"]
+          },
+        ]
+      }
       character_feats: {
         Row: {
           character_id: string
@@ -157,6 +209,7 @@ export type Database = {
           added_by: string | null
           character_id: string
           created_at: string
+          equipped: boolean
           id: string
           item_id: string
           quantity: number
@@ -165,6 +218,7 @@ export type Database = {
           added_by?: string | null
           character_id: string
           created_at?: string
+          equipped?: boolean
           id?: string
           item_id: string
           quantity?: number
@@ -173,6 +227,7 @@ export type Database = {
           added_by?: string | null
           character_id?: string
           created_at?: string
+          equipped?: boolean
           id?: string
           item_id?: string
           quantity?: number
@@ -236,6 +291,35 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      character_proficiencies: {
+        Row: {
+          character_id: string
+          key: string
+          kind: string
+          level: number
+        }
+        Insert: {
+          character_id: string
+          key: string
+          kind: string
+          level?: number
+        }
+        Update: {
+          character_id?: string
+          key?: string
+          kind?: string
+          level?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_proficiencies_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
             referencedColumns: ["id"]
           },
         ]
@@ -315,6 +399,72 @@ export type Database = {
           },
         ]
       }
+      character_stats: {
+        Row: {
+          ac_bonus: number
+          character_id: string
+          charisma: number
+          constitution: number
+          dexterity: number
+          hp_current: number
+          hp_max: number
+          hp_temp: number
+          intelligence: number
+          race_id: string | null
+          speed_override: number | null
+          strength: number
+          updated_at: string
+          wisdom: number
+        }
+        Insert: {
+          ac_bonus?: number
+          character_id: string
+          charisma?: number
+          constitution?: number
+          dexterity?: number
+          hp_current?: number
+          hp_max?: number
+          hp_temp?: number
+          intelligence?: number
+          race_id?: string | null
+          speed_override?: number | null
+          strength?: number
+          updated_at?: string
+          wisdom?: number
+        }
+        Update: {
+          ac_bonus?: number
+          character_id?: string
+          charisma?: number
+          constitution?: number
+          dexterity?: number
+          hp_current?: number
+          hp_max?: number
+          hp_temp?: number
+          intelligence?: number
+          race_id?: string | null
+          speed_override?: number | null
+          strength?: number
+          updated_at?: string
+          wisdom?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_stats_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: true
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_stats_race_id_fkey"
+            columns: ["race_id"]
+            isOneToOne: false
+            referencedRelation: "races"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       characters: {
         Row: {
           campaign_id: string
@@ -359,6 +509,56 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "campaign_members"
             referencedColumns: ["campaign_id", "user_id"]
+          },
+        ]
+      }
+      classes: {
+        Row: {
+          campaign_id: string | null
+          created_at: string
+          description: string
+          hit_die: number
+          id: string
+          name: string
+          save_proficiencies: string[]
+          spell_ability: string | null
+          subclass_level: number
+          unarmored_ability: string | null
+          weapon_training: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          created_at?: string
+          description?: string
+          hit_die: number
+          id?: string
+          name: string
+          save_proficiencies: string[]
+          spell_ability?: string | null
+          subclass_level?: number
+          unarmored_ability?: string | null
+          weapon_training: string
+        }
+        Update: {
+          campaign_id?: string | null
+          created_at?: string
+          description?: string
+          hit_die?: number
+          id?: string
+          name?: string
+          save_proficiencies?: string[]
+          spell_ability?: string | null
+          subclass_level?: number
+          unarmored_ability?: string | null
+          weapon_training?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -812,6 +1012,44 @@ export type Database = {
         }
         Relationships: []
       }
+      races: {
+        Row: {
+          campaign_id: string | null
+          created_at: string
+          description: string
+          id: string
+          name: string
+          size: string
+          speed: number
+        }
+        Insert: {
+          campaign_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          name: string
+          size?: string
+          speed: number
+        }
+        Update: {
+          campaign_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          name?: string
+          size?: string
+          speed?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "races_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schema_migrations: {
         Row: {
           applied_at: string
@@ -949,6 +1187,51 @@ export type Database = {
           },
         ]
       }
+      subclasses: {
+        Row: {
+          campaign_id: string | null
+          class_id: string
+          created_at: string
+          description: string
+          id: string
+          name: string
+          spell_ability: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          class_id: string
+          created_at?: string
+          description?: string
+          id?: string
+          name: string
+          spell_ability?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          class_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          name?: string
+          spell_ability?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subclasses_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subclasses_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -965,6 +1248,31 @@ export type Database = {
       adjust_character_currency: {
         Args: { delta: number; denomination: string; target_character: string }
         Returns: number
+      }
+      adjust_character_hp: {
+        Args: { delta: number; target_character: string }
+        Returns: {
+          ac_bonus: number
+          character_id: string
+          charisma: number
+          constitution: number
+          dexterity: number
+          hp_current: number
+          hp_max: number
+          hp_temp: number
+          intelligence: number
+          race_id: string | null
+          speed_override: number | null
+          strength: number
+          updated_at: string
+          wisdom: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "character_stats"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       adjust_party_currency: {
         Args: { delta: number; denomination: string; target_campaign: string }
@@ -1026,12 +1334,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1055,11 +1363,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1080,11 +1388,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1105,11 +1413,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1122,11 +1430,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

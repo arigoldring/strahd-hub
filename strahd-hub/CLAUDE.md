@@ -5,7 +5,7 @@ Campaign management app for a Curse of Strahd game. Solo developer.
 earning full-stack concepts and AI-assisted development
 Not production software — no SLA, no uptime concerns, no team to onboard.
 
-**Current through migration 053. Last updated 2026-09-30.**
+**Current through migration 057. Last updated 2026-10-05.**
 
 ## What lives where — read this before editing this file
 
@@ -477,11 +477,13 @@ answerable. A missing _grant_ reads as 401/42501 instead.
   shared `object-position: 50% 22%` rather than changing the CSS.
 
 - **`prerequisite` and `repeatable` are DISPLAY ONLY, and that is structural,
-  not lazy.** Nothing in this database can enforce "Strength 13 or higher" —
-  028's `characters` stores a name and nothing else: no level, no class, no
-  ability scores. And 041's unique `(character_id, feat_id)` caps every feat at
-  one per sheet, so `repeatable` tells a reader that Elemental Adept may be
-  taken again without the app being able to record it. Making either real is a
+  not lazy.** Nothing in the database enforces "Strength 13 or higher". When
+  this was written `characters` stored a name and nothing else; since 056 the
+  scores and class levels exist (`character_stats`, `character_classes`), so a
+  client-side check is now possible, but nothing does it yet. And 041's
+  unique `(character_id, feat_id)` caps every feat at one per sheet, so
+  `repeatable` tells a reader that Elemental Adept may be taken again without
+  the app being able to record it. Making either real is a
   much larger change than it looks.
 
 - **039 ships its INSERT policy in the same migration as the table**, unlike
@@ -537,6 +539,58 @@ answerable. A missing _grant_ reads as 401/42501 instead.
   the hoard and every pack: `items` and `partyInventory` for the campaign,
   `party` for the roster, and every `characterInventory` by prefix (that key
   has no campaign in it).
+
+### The full character sheet (054–057)
+
+- **Definitions are catalogues; a character's numbers are siblings.**
+  `classes`, `subclasses` and `races` (054, seeded by 055) are `feats`' shape:
+  null `campaign_id` is the shared PHB row, non-null is DM homebrew. A
+  character's own numbers live in three tables keyed by `character_id`:
+  `character_stats` (one row), `character_classes` (one row per class, so
+  multiclass needs no migration) and `character_proficiencies` (one row per
+  save, skill, weapon, armour, tool or language).
+
+- **Siblings, not columns on `characters`, because the DM edits them.** The
+  decision was owner-or-DM, the line 028 drew for gear. `characters`' UPDATE
+  is owner-only and `can_edit_character` must not appear in its own policies,
+  so DM-writable data cannot live there. It also keeps ~20 columns out of
+  `pin_character_row`'s blocklist. All three use 046's four-policy shape plus
+  a pin trigger on their key columns (047's reasoning: a DM passes
+  `can_edit_character` on every sheet, so rows must not move between them).
+
+- **Only inputs are stored.** Modifiers, proficiency bonus, AC, attacks,
+  passives, spell DC and hit dice are derived in `src/data/rules.ts`, so the
+  database can't hold a number that disagrees with its inputs. Total level is
+  the sum of `character_classes.level`, never a column.
+  `speed_override` null means "use the race's speed".
+
+- **Absence means untrained.** `character_proficiencies` has no level 0; a
+  cleared proficiency is a DELETE (046's "absence is the only spelling").
+  Setting one is an upsert **without** `ignoreDuplicates`, because proficient
+  → expertise must change the stored level; 056 ships the UPDATE policy for
+  exactly that (see the upsert gotcha above).
+
+- **The stats row always exists.** An AFTER INSERT trigger on `characters`
+  (`create_character_stats_row`, security invoker) writes it, and 056
+  backfilled the rest, so the client only UPDATEs. A missing row is an error,
+  not a state.
+
+- **HP changes go through `adjust_character_hp`**, one UPDATE in 045's shape,
+  so the DM and a player applying damage in the same round can't lose each
+  other's change. Temp HP absorbs damage first; healing caps at max.
+
+- **Ability and skill codes are one list in two places**: `ABILITIES`,
+  `SPELL_ABILITIES` and `SKILLS` in `rules.ts`, and the CHECKs in 054 and 056.
+  Change them together, as with `featCategories`.
+
+- **Equipped is a column on `character_inventory` (057)**, using 028's
+  existing UPDATE policy. A stow deletes the row, which is the un-equip. "One
+  armour, one shield" is enforced by the sheet, not the database.
+
+- **Class-granted weapon proficiency can't be switched off.** A 'weapon'
+  proficiency row (keyed by item id) only *adds* proficiency on top of the
+  class's simple/martial training, because no row already means "nothing
+  extra".
 
 ### Maps (042)
 
