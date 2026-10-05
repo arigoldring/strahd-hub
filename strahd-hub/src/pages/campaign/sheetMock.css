@@ -75,23 +75,6 @@
   box-shadow: var(--sh-inset);
 }
 
-/* The open dropdown is drawn by the OS, which can't composite a translucent
-   background, so options need a solid one or they render dark-on-dark.
-   npc.css fixes the same thing for its location picker. */
-.sm-picker select option,
-.sm-classline select option,
-.sm-stat select option {
-  background: #1f191b;
-  color: var(--sh-bone-bright);
-}
-
-.sm-picker select option:checked,
-.sm-classline select option:checked,
-.sm-stat select option:checked {
-  background: var(--sh-blood);
-  color: var(--sh-candle);
-}
-
 .sm-picker select:focus,
 .sm-classline input:focus,
 .sm-classline select:focus,
