@@ -122,6 +122,21 @@ select {
   color: var(--sh-bone-bright);
 }
 
+/* The open list of a <select> is drawn by the OS, which can't composite the
+   translucent --sh-panel-sunk above, so every option needs a solid background
+   or it renders dark-on-dark. Global because every select inherits the
+   translucent fill from the rule above. */
+select option,
+select optgroup {
+  background: #1f191b;
+  color: var(--sh-bone-bright);
+}
+
+select option:checked {
+  background: var(--sh-blood);
+  color: var(--sh-candle);
+}
+
 input::placeholder,
 textarea::placeholder {
   font-style: italic;

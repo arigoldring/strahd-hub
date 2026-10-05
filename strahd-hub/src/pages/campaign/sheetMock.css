@@ -1,0 +1,463 @@
+/* ============================================================================
+   Full-sheet MOCK-UP — pages/campaign/SheetMock.tsx. Layers on character.css
+   (the frame, bands and bodies are .ch-* classes reused as-is) and adds only
+   the new parts: class line, derived stats, ability tiles, saves and skills.
+   theme.css tokens only, the same rule character.css keeps.
+   ========================================================================== */
+
+/* ---------- page width & two-column layout ---------- */
+
+/* character.css caps .ch at 720px, the right measure for one column of lists.
+   This page has two columns, so it gets roughly twice that. */
+.ch.sm-wide {
+  width: calc(100% - 32px);
+  max-width: 1280px;
+}
+
+/* One column by default (phones, narrow windows). min-width: 0 lets a grid
+   child shrink below its content's width, so a long spell name wraps instead
+   of pushing the page sideways. */
+.sm-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.sm-layout__col {
+  min-width: 0;
+}
+
+@media (min-width: 1000px) {
+  /* The stats column is a fixed-ish width (what the ability tiles and skill
+     rows need); the lists take whatever is left. */
+  .sm-layout {
+    grid-template-columns: minmax(380px, 5fr) minmax(0, 7fr);
+  }
+
+  .sm-layout__col--stats {
+    border-right: 1px solid var(--sh-rule-strong);
+  }
+
+  /* Bands are padded for a 720px sheet; a column is narrower. */
+  .sm-layout .ch-band,
+  .sm-layout .ch-body {
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+}
+
+/* ---------- DM picker, above the frame ---------- */
+
+.sm-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font: 500 11px/1 var(--sh-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sh-gold);
+}
+
+/* ---------- shared form controls ---------- */
+
+.sm-picker select,
+.sm-classline input,
+.sm-classline select,
+.sm-stat select,
+.sm-combat select,
+.sm-combat input,
+.sm-ability__score {
+  padding: 6px 10px;
+  font: 400 16px/1.3 var(--sh-body);
+  color: var(--sh-bone-bright);
+  /* A touch lighter than --sh-panel-sunk, so the controls stand off the
+     sheet instead of reading as holes in it. */
+  background: rgba(255, 245, 225, 0.05);
+  border: 1px solid rgba(190, 165, 120, 0.5);
+  box-shadow: var(--sh-inset);
+}
+
+.sm-picker select:focus,
+.sm-classline input:focus,
+.sm-classline select:focus,
+.sm-stat select:focus,
+.sm-combat select:focus,
+.sm-combat input:focus,
+.sm-ability__score:focus {
+  outline: none;
+  border-color: var(--sh-gold);
+}
+
+/* ---------- class line ---------- */
+
+.sm-classline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.sm-classline label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sm-classline span {
+  font: 500 10px/1 var(--sh-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sh-dim);
+}
+
+.sm-classline select {
+  width: 180px;
+  max-width: 100%;
+}
+
+.sm-classline input[type="number"] {
+  width: 70px;
+}
+
+/* ---------- derived stats strip ---------- */
+
+.sm-derived {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  border-top: 1px solid var(--sh-rule-strong);
+}
+
+.sm-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border-right: 1px solid var(--sh-rule-faint);
+  border-bottom: 1px solid var(--sh-rule-faint);
+  text-align: center;
+}
+
+.sm-stat__label {
+  font: 500 9px/1.2 var(--sh-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--sh-mute);
+}
+
+.sm-stat__value {
+  font: 600 24px/1 var(--sh-display);
+  color: var(--sh-bone-bright);
+}
+
+.sm-stat--select select {
+  max-width: 100%;
+  font-size: 14px;
+}
+
+/* ---------- ability tiles ---------- */
+
+.sm-abilities {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 12px 0 4px;
+}
+
+.sm-ability {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  background: var(--sh-panel-sunk);
+  border: 1px solid var(--sh-rule);
+}
+
+.sm-ability__label {
+  font: 500 10px/1 var(--sh-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sh-gold);
+}
+
+/* The modifier is what gets rolled, so it is the big number; the score is the
+   input underneath it. */
+.sm-ability__mod {
+  font: 600 34px/1 var(--sh-display);
+  color: var(--sh-bone-bright);
+}
+
+.sm-ability__score {
+  width: 64px;
+  text-align: center;
+  font-family: var(--sh-mono);
+  font-size: 14px;
+}
+
+/* ---------- saves & skills ---------- */
+
+.sm-list {
+  margin: 0;
+  padding: 6px 0 0;
+  list-style: none;
+}
+
+/* Six saves in two columns of three: half the height of a single list, which
+   matters now they share a column with the skills. */
+.sm-list--saves {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 24px;
+}
+
+.sm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--sh-rule-faint);
+  cursor: pointer;
+}
+
+.sm-row input[type="checkbox"] {
+  accent-color: var(--sh-gold);
+}
+
+.sm-row__name {
+  flex: 1 1 auto;
+}
+
+.sm-row__ability {
+  margin-left: 8px;
+  font: 400 10px/1 var(--sh-mono);
+  text-transform: uppercase;
+  color: var(--sh-dim);
+}
+
+.sm-row__total {
+  font: 400 14px/1 var(--sh-mono);
+  color: var(--sh-bone-bright);
+}
+
+/* The proficiency pip: an empty ring, a filled dot, a ringed dot. */
+.sm-pip {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--sh-gold-deep);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sm-pip--1 {
+  background: var(--sh-gold);
+  border-color: var(--sh-gold);
+}
+
+.sm-pip--2 {
+  background: var(--sh-gold);
+  border-color: var(--sh-gold);
+  box-shadow:
+    0 0 0 2px var(--sh-void),
+    0 0 0 3px var(--sh-gold);
+}
+
+.sm-legend {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--sh-dim);
+}
+
+/* ---------- combat block: AC, HP, speed, hit dice ---------- */
+
+/* AC and HP carry controls, so they get the wider tracks. */
+.sm-combat {
+  display: grid;
+  grid-template-columns: 1.4fr 1.2fr 1fr 0.8fr;
+  border-top: 1px solid var(--sh-rule-strong);
+}
+
+.sm-combat__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px 12px;
+  border-right: 1px solid var(--sh-rule-faint);
+  text-align: center;
+}
+
+.sm-combat__tile:last-child {
+  border-right: none;
+}
+
+.sm-combat__big {
+  font: 600 40px/1 var(--sh-display);
+  color: var(--sh-bone-bright);
+}
+
+.sm-combat__big small {
+  font-size: 14px;
+  color: var(--sh-mute);
+}
+
+/* Where the number came from ("Chain Mail 16 · Shield +2"). */
+.sm-combat__note {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--sh-dim);
+}
+
+.sm-combat__note--warn {
+  color: var(--sh-blood-ink);
+}
+
+.sm-combat__controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.sm-combat__controls select {
+  max-width: 100%;
+  font-size: 14px;
+}
+
+.sm-combat__inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sm-combat__inline span {
+  font: 500 9px/1 var(--sh-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sh-mute);
+}
+
+.sm-combat__inline input {
+  width: 64px;
+  text-align: center;
+  font-family: var(--sh-mono);
+  font-size: 14px;
+}
+
+.sm-hp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sm-hp input {
+  width: 72px;
+  text-align: center;
+  font-family: var(--sh-mono);
+  font-size: 16px;
+}
+
+/* Current HP is the number that changes every round; make it the loud one. */
+.sm-hp .sm-hp__current {
+  width: 88px;
+  font: 600 28px/1 var(--sh-display);
+}
+
+.sm-hp__slash {
+  font: 400 24px/1 var(--sh-display);
+  color: var(--sh-dim);
+}
+
+/* ---------- attacks ---------- */
+
+.sm-attacks td {
+  padding: 8px 6px;
+}
+
+.sm-attacks__prof {
+  width: 1%;
+}
+
+.sm-attacks__hit {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  font: 600 18px/1 var(--sh-display);
+  color: var(--sh-bone-bright);
+}
+
+.sm-attacks__dmg {
+  white-space: nowrap;
+  text-align: right;
+  font: 400 13px/1.3 var(--sh-mono);
+  color: var(--sh-bone);
+}
+
+.sm-attacks__meta {
+  display: block;
+  margin-top: 2px;
+  font: 400 12px/1.3 var(--sh-body);
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+  color: var(--sh-dim);
+  white-space: normal;
+}
+
+/* "disadv." beside Stealth when the worn armour imposes it. */
+.sm-row__flag {
+  margin-left: 8px;
+  font: 500 9px/1 var(--sh-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sh-blood-ink);
+}
+
+/* ---------- phone ---------- */
+
+@media (max-width: 600px) {
+  .sm-abilities {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sm-derived {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Four combat tiles need ~900px; below that, two by two. */
+@media (max-width: 900px) {
+  .sm-combat {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sm-combat__tile {
+    border-bottom: 1px solid var(--sh-rule-faint);
+  }
+
+  .sm-combat__tile:nth-child(2n) {
+    border-right: none;
+  }
+}
+
+/* On a phone, AC and HP (the tiles with controls) take a full row each;
+   speed and hit dice share the last one. */
+@media (max-width: 600px) {
+  .sm-combat__tile:nth-child(-n + 2) {
+    grid-column: 1 / -1;
+    border-right: none;
+  }
+
+  .sm-combat__tile:nth-child(3) {
+    border-right: 1px solid var(--sh-rule-faint);
+  }
+
+  .sm-attacks__dmg {
+    white-space: normal;
+  }
+}
