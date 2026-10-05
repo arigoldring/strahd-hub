@@ -39,7 +39,7 @@ import "./sheetMock.css";
 export function SheetMock() {
   const campaign = useCampaign();
   return (
-    <div className="ch">
+    <div className="ch sm-wide">
       {campaign.isDm ? <DmSheetPicker /> : <OwnSheet />}
     </div>
   );
@@ -185,109 +185,116 @@ function FullSheet({
         </label>
       </div>
 
-      <Band label="Abilities" />
-      <div className="ch-body">
-        <div className="sm-abilities">
-          {ABILITIES.map((a) => (
-            <label key={a} className="sm-ability">
-              <span className="sm-ability__label">{ABILITY_LABELS[a]}</span>
-              <span className="sm-ability__mod">{formatModifier(mod(a))}</span>
-              <input
-                className="sm-ability__score"
-                type="number"
-                min={1}
-                max={30}
-                value={sheet.scores[a]}
-                onChange={(e) =>
-                  update({
-                    scores: {
-                      ...sheet.scores,
-                      [a]: clampInt(e.target.value, 1, 30, sheet.scores[a]),
-                    },
-                  })
-                }
-              />
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="sm-columns">
-        <section>
-          <Band label="Saving Throws" />
+      {/* Two columns on a wide screen: the numbers on the left, the lists on
+          the right. Each column is a plain stack of bands, so collapsing to
+          one column on a narrow screen is a CSS change, not a markup one. */}
+      <div className="sm-layout">
+        <div className="sm-layout__col sm-layout__col--stats">
+          <Band label="Abilities" />
           <div className="ch-body">
-            <ul className="sm-list">
+            <div className="sm-abilities">
               {ABILITIES.map((a) => (
-                <li key={a}>
-                  <label className="sm-row">
-                    <input
-                      type="checkbox"
-                      checked={sheet.saves[a]}
-                      onChange={(e) =>
-                        update({
-                          saves: { ...sheet.saves, [a]: e.target.checked },
-                        })
-                      }
-                    />
-                    <span className="sm-row__name">{ABILITY_LABELS[a]}</span>
-                    <span className="sm-row__total">
-                      {formatModifier(mod(a) + (sheet.saves[a] ? pb : 0))}
-                    </span>
-                  </label>
-                </li>
+                <label key={a} className="sm-ability">
+                  <span className="sm-ability__label">{ABILITY_LABELS[a]}</span>
+                  <span className="sm-ability__mod">{formatModifier(mod(a))}</span>
+                  <input
+                    className="sm-ability__score"
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={sheet.scores[a]}
+                    onChange={(e) =>
+                      update({
+                        scores: {
+                          ...sheet.scores,
+                          [a]: clampInt(e.target.value, 1, 30, sheet.scores[a]),
+                        },
+                      })
+                    }
+                  />
+                </label>
               ))}
-            </ul>
+            </div>
           </div>
-        </section>
 
-        <section>
-          <Band label="Skills" />
-          <div className="ch-body">
-            <ul className="sm-list">
-              {SKILLS.map((s) => {
-                const prof = sheet.skills[s.key];
-                return (
-                  <li key={s.key} className="sm-row">
-                    <button
-                      type="button"
-                      className={`sm-pip sm-pip--${prof}`}
-                      title={PROF_LABELS[prof]}
-                      aria-label={`${s.label}: ${PROF_LABELS[prof]}`}
-                      onClick={() =>
-                        update({
-                          skills: {
-                            ...sheet.skills,
-                            [s.key]: ((prof + 1) % 3) as ProficiencyLevel,
-                          },
-                        })
-                      }
-                    />
-                    <span className="sm-row__name">
-                      {s.label}
-                      <span className="sm-row__ability">{s.ability}</span>
-                    </span>
-                    <span className="sm-row__total">
-                      {formatModifier(skillTotal(s.key))}
-                    </span>
+          <section>
+            <Band label="Saving Throws" />
+            <div className="ch-body">
+              <ul className="sm-list sm-list--saves">
+                {ABILITIES.map((a) => (
+                  <li key={a}>
+                    <label className="sm-row">
+                      <input
+                        type="checkbox"
+                        checked={sheet.saves[a]}
+                        onChange={(e) =>
+                          update({
+                            saves: { ...sheet.saves, [a]: e.target.checked },
+                          })
+                        }
+                      />
+                      <span className="sm-row__name">{ABILITY_LABELS[a]}</span>
+                      <span className="sm-row__total">
+                        {formatModifier(mod(a) + (sheet.saves[a] ? pb : 0))}
+                      </span>
+                    </label>
                   </li>
-                );
-              })}
-            </ul>
-            <p className="sm-legend">
-              Tap a pip: ○ untrained · ● proficient · ◎ expertise
-            </p>
+                ))}
+              </ul>
+            </div>
+          </section>
+
+          <section>
+            <Band label="Skills" />
+            <div className="ch-body">
+              <ul className="sm-list">
+                {SKILLS.map((s) => {
+                  const prof = sheet.skills[s.key];
+                  return (
+                    <li key={s.key} className="sm-row">
+                      <button
+                        type="button"
+                        className={`sm-pip sm-pip--${prof}`}
+                        title={PROF_LABELS[prof]}
+                        aria-label={`${s.label}: ${PROF_LABELS[prof]}`}
+                        onClick={() =>
+                          update({
+                            skills: {
+                              ...sheet.skills,
+                              [s.key]: ((prof + 1) % 3) as ProficiencyLevel,
+                            },
+                          })
+                        }
+                      />
+                      <span className="sm-row__name">
+                        {s.label}
+                        <span className="sm-row__ability">{s.ability}</span>
+                      </span>
+                      <span className="sm-row__total">
+                        {formatModifier(skillTotal(s.key))}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="sm-legend">
+                Tap a pip: ○ untrained · ● proficient · ◎ expertise
+              </p>
+            </div>
+          </section>
+        </div>
+
+        <div className="sm-layout__col">
+          <CharacterSpells characterId={character.id} isOwn={isOwn} />
+          <CharacterFeats characterId={character.id} isOwn={isOwn} />
+          <CharacterCarried characterId={character.id} isOwn={isOwn} />
+          <CharacterPurse character={character} />
+
+          <Band label="Class Features" />
+          <div className="ch-body">
+            <p className="ch-empty">Coming later.</p>
           </div>
-        </section>
-      </div>
-
-      <CharacterSpells characterId={character.id} isOwn={isOwn} />
-      <CharacterFeats characterId={character.id} isOwn={isOwn} />
-      <CharacterCarried characterId={character.id} isOwn={isOwn} />
-      <CharacterPurse character={character} />
-
-      <Band label="Class Features" />
-      <div className="ch-body">
-        <p className="ch-empty">Coming later.</p>
+        </div>
       </div>
     </article>
   );

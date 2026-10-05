@@ -5,6 +5,46 @@
    theme.css tokens only, the same rule character.css keeps.
    ========================================================================== */
 
+/* ---------- page width & two-column layout ---------- */
+
+/* character.css caps .ch at 720px, the right measure for one column of lists.
+   This page has two columns, so it gets roughly twice that. */
+.ch.sm-wide {
+  width: calc(100% - 32px);
+  max-width: 1280px;
+}
+
+/* One column by default (phones, narrow windows). min-width: 0 lets a grid
+   child shrink below its content's width, so a long spell name wraps instead
+   of pushing the page sideways. */
+.sm-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.sm-layout__col {
+  min-width: 0;
+}
+
+@media (min-width: 1000px) {
+  /* The stats column is a fixed-ish width (what the ability tiles and skill
+     rows need); the lists take whatever is left. */
+  .sm-layout {
+    grid-template-columns: minmax(380px, 5fr) minmax(0, 7fr);
+  }
+
+  .sm-layout__col--stats {
+    border-right: 1px solid var(--sh-rule-strong);
+  }
+
+  /* Bands are padded for a 720px sheet; a column is narrower. */
+  .sm-layout .ch-band,
+  .sm-layout .ch-body {
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+}
+
 /* ---------- DM picker, above the frame ---------- */
 
 .sm-picker {
@@ -150,20 +190,18 @@
 
 /* ---------- saves & skills ---------- */
 
-/* Side by side on a wide sheet, saves the narrower column. */
-.sm-columns {
-  display: grid;
-  grid-template-columns: 2fr 3fr;
-}
-
-.sm-columns > section + section {
-  border-left: 1px solid var(--sh-rule-faint);
-}
-
 .sm-list {
   margin: 0;
   padding: 6px 0 0;
   list-style: none;
+}
+
+/* Six saves in two columns of three: half the height of a single list, which
+   matters now they share a column with the skills. */
+.sm-list--saves {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 24px;
 }
 
 .sm-row {
@@ -232,14 +270,6 @@
 @media (max-width: 600px) {
   .sm-abilities {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .sm-columns {
-    grid-template-columns: 1fr;
-  }
-
-  .sm-columns > section + section {
-    border-left: none;
   }
 
   .sm-derived {
