@@ -182,15 +182,14 @@ select
 -- BLOCK 1: the DM creates homebrew; a player is refused
 -- ---------------------------------------------------------------------------
 --
--- 039's shape: the refusal is caught and reported as a row, so a passing
--- check doesn't paint the editor red (CLAUDE.md).
+-- 039's shape: each outcome is caught and stashed with set_config, then read
+-- back in one row, so a passing refusal doesn't paint the editor red
+-- (CLAUDE.md).
 --
--- CORRECT OUTPUT: dm_insert = 'ok', player_insert = 'refused (42501)'.
+-- CORRECT OUTPUT: one row: dm_insert = 'ok',
+--                          player_insert = 'denied by RLS (42501)'.
 
 begin;
-
-create temp table results (check_name text, outcome text) on commit drop;
-grant all on results to authenticated;
 
 select set_config(
   'request.jwt.claims',
@@ -204,10 +203,12 @@ begin
   insert into public.classes (campaign_id, name, hit_die, save_proficiencies, weapon_training)
   values ('d721b412-2750-492e-bddd-7387fc464bba', 'Test Blood Hunter', 10,
           array['dex', 'int'], 'martial');
-  insert into results values ('dm_insert', 'ok');
-exception when insufficient_privilege then
-  insert into results values ('dm_insert', 'refused (42501)');
-end $$;
+  perform set_config('verification.dm_insert', 'ok', true);
+exception
+  when insufficient_privilege then
+    perform set_config('verification.dm_insert', 'denied by RLS (42501)', true);
+end
+$$;
 
 select set_config(
   'request.jwt.claims',
@@ -220,12 +221,18 @@ begin
   insert into public.classes (campaign_id, name, hit_die, save_proficiencies, weapon_training)
   values ('d721b412-2750-492e-bddd-7387fc464bba', 'Sneaky Player Class', 12,
           array['str', 'con'], 'martial');
-  insert into results values ('player_insert', 'ok');
-exception when insufficient_privilege then
-  insert into results values ('player_insert', 'refused (42501)');
-end $$;
+  perform set_config('verification.player_insert', 'INSERT SUCCEEDED -- LEAK', true);
+exception
+  when insufficient_privilege then
+    perform set_config('verification.player_insert', 'denied by RLS (42501)', true);
+end
+$$;
 
-select * from results;
+select 'case 1: homebrew classes' as check,
+       jsonb_build_object(
+         'dm_insert',     current_setting('verification.dm_insert'),
+         'player_insert', current_setting('verification.player_insert')
+       ) as result;
 
 rollback;
 
@@ -234,39 +241,44 @@ rollback;
 -- BLOCK 2: the CHECKs refuse a malformed class
 -- ---------------------------------------------------------------------------
 --
--- Three saves, a d7 and a STR caster, each its own attempt.
+-- Three saves, a d7 and a STR caster, each its own attempt. Runs as the table
+-- owner: this is about the CHECKs, not RLS.
 --
--- CORRECT OUTPUT: three rows, every outcome 'refused (23514)'.
+-- CORRECT OUTPUT: one row, all three 'refused (23514)'.
 
 begin;
-
-create temp table results (check_name text, outcome text) on commit drop;
 
 do $$
 begin
   begin
     insert into public.classes (name, hit_die, save_proficiencies, weapon_training)
     values ('Three Saves', 8, array['str', 'dex', 'con'], 'simple');
-    insert into results values ('three saves', 'accepted');
+    perform set_config('verification.three_saves', 'ACCEPTED', true);
   exception when check_violation then
-    insert into results values ('three saves', 'refused (23514)');
+    perform set_config('verification.three_saves', 'refused (23514)', true);
   end;
   begin
     insert into public.classes (name, hit_die, save_proficiencies, weapon_training)
     values ('D7', 7, array['str', 'dex'], 'simple');
-    insert into results values ('d7', 'accepted');
+    perform set_config('verification.d7', 'ACCEPTED', true);
   exception when check_violation then
-    insert into results values ('d7', 'refused (23514)');
+    perform set_config('verification.d7', 'refused (23514)', true);
   end;
   begin
     insert into public.classes (name, hit_die, save_proficiencies, weapon_training, spell_ability)
     values ('Str Caster', 8, array['str', 'dex'], 'simple', 'str');
-    insert into results values ('str caster', 'accepted');
+    perform set_config('verification.str_caster', 'ACCEPTED', true);
   exception when check_violation then
-    insert into results values ('str caster', 'refused (23514)');
+    perform set_config('verification.str_caster', 'refused (23514)', true);
   end;
-end $$;
+end
+$$;
 
-select * from results;
+select 'case 2: malformed classes' as check,
+       jsonb_build_object(
+         'three_saves', current_setting('verification.three_saves'),
+         'd7',          current_setting('verification.d7'),
+         'str_caster',  current_setting('verification.str_caster')
+       ) as result;
 
 rollback;

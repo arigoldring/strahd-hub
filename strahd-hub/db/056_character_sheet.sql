@@ -400,8 +400,11 @@ select
 -- BLOCK 1: owner, DM and a stranger each try to edit Nat's stats
 -- ---------------------------------------------------------------------------
 --
--- CORRECT OUTPUT: target_found = true; owner_rows = 1; dm_rows = 1;
--- stranger_rows = 0; str_now = 16 (the DM's write, the last one that landed).
+-- Row counts are stashed with set_config (039's shape) and read back in one
+-- row at the end.
+--
+-- CORRECT OUTPUT: target_found = true, owner_rows = 1, dm_rows = 1,
+-- stranger_rows = 0, strength_now = 16 (the DM's write, the last that landed).
 
 begin;
 
@@ -412,12 +415,6 @@ select set_config(
       and user_id = '1313672b-6990-45a6-8a28-c448ca116d2d'),
   true
 );
-
-create temp table results (k text, v text) on commit drop;
-grant all on results to authenticated;
-insert into results
-  values ('target_found', (current_setting('verification.nat_character', true) is not null)::text);
-
 set local role authenticated;
 
 select set_config('request.jwt.claims',
@@ -426,7 +423,7 @@ with u as (
   update public.character_stats set strength = 15
    where character_id = current_setting('verification.nat_character')::uuid
   returning 1
-) insert into results select 'owner_rows', count(*)::text from u;
+) select set_config('verification.owner_rows', count(*)::text, true) from u;
 
 select set_config('request.jwt.claims',
   '{"sub":"ea74d56b-8f45-4e4c-80f8-90a6d29b5adf","role":"authenticated"}', true);
@@ -434,7 +431,7 @@ with u as (
   update public.character_stats set strength = 16
    where character_id = current_setting('verification.nat_character')::uuid
   returning 1
-) insert into results select 'dm_rows', count(*)::text from u;
+) select set_config('verification.dm_rows', count(*)::text, true) from u;
 
 -- Someone in no campaign at all.
 select set_config('request.jwt.claims',
@@ -443,14 +440,19 @@ with u as (
   update public.character_stats set strength = 3
    where character_id = current_setting('verification.nat_character')::uuid
   returning 1
-) insert into results select 'stranger_rows', count(*)::text from u;
+) select set_config('verification.stranger_rows', count(*)::text, true) from u;
 
 reset role;
-insert into results
-  select 'str_now', strength::text from public.character_stats
-   where character_id = current_setting('verification.nat_character')::uuid;
 
-select * from results;
+select 'case 1: who may edit stats' as check,
+       jsonb_build_object(
+         'target_found',  current_setting('verification.nat_character', true) is not null,
+         'owner_rows',    current_setting('verification.owner_rows'),
+         'dm_rows',       current_setting('verification.dm_rows'),
+         'stranger_rows', current_setting('verification.stranger_rows'),
+         'strength_now',  (select strength from public.character_stats
+                            where character_id = current_setting('verification.nat_character')::uuid)
+       ) as result;
 
 rollback;
 
@@ -494,10 +496,12 @@ rollback;
 -- BLOCK 3: adjust_character_hp — temp HP first, healing capped
 -- ---------------------------------------------------------------------------
 --
--- Starts Nat at 15/20 with 5 temp, takes 7, then heals 100.
+-- Starts Nat at 15/20 with 5 temp, takes 7, then heals 100. Two separate
+-- statements, so the heal is guaranteed to see the damage.
 --
--- CORRECT OUTPUT: two rows: after_damage {"cur": 13, "temp": 0},
---                           after_heal   {"cur": 20, "temp": 0}.
+-- CORRECT OUTPUT: target_found = true,
+--                 after_damage = {"cur": 13, "temp": 0},
+--                 after_heal   = {"cur": 20, "temp": 0}.
 
 begin;
 
@@ -512,22 +516,24 @@ select set_config(
 update public.character_stats set hp_max = 20, hp_current = 15, hp_temp = 5
  where character_id = current_setting('verification.nat_character')::uuid;
 
-create temp table results (step text, hp jsonb) on commit drop;
-grant all on results to authenticated;
-
 select set_config('request.jwt.claims',
   '{"sub":"ea74d56b-8f45-4e4c-80f8-90a6d29b5adf","role":"authenticated"}', true);
 set local role authenticated;
 
--- Two separate statements, so the heal is guaranteed to see the damage.
-insert into results
-  select 'after_damage', jsonb_build_object('cur', hp_current, 'temp', hp_temp)
-    from public.adjust_character_hp(current_setting('verification.nat_character')::uuid, -7);
-insert into results
-  select 'after_heal', jsonb_build_object('cur', hp_current, 'temp', hp_temp)
-    from public.adjust_character_hp(current_setting('verification.nat_character')::uuid, 100);
+select set_config('verification.after_damage',
+  jsonb_build_object('cur', hp_current, 'temp', hp_temp)::text, true)
+  from public.adjust_character_hp(current_setting('verification.nat_character')::uuid, -7);
 
-select * from results;
+select set_config('verification.after_heal',
+  jsonb_build_object('cur', hp_current, 'temp', hp_temp)::text, true)
+  from public.adjust_character_hp(current_setting('verification.nat_character')::uuid, 100);
+
+select 'case 3: adjust_character_hp' as check,
+       jsonb_build_object(
+         'target_found', current_setting('verification.nat_character', true) is not null,
+         'after_damage', current_setting('verification.after_damage', true)::jsonb,
+         'after_heal',   current_setting('verification.after_heal', true)::jsonb
+       ) as result;
 
 rollback;
 
@@ -545,9 +551,6 @@ rollback;
 
 begin;
 
-create temp table results (outcome text) on commit drop;
-grant all on results to authenticated;
-
 select set_config('request.jwt.claims',
   '{"sub":"ea74d56b-8f45-4e4c-80f8-90a6d29b5adf","role":"authenticated"}', true);
 set local role authenticated;
@@ -561,15 +564,20 @@ begin
           'ea74d56b-8f45-4e4c-80f8-90a6d29b5adf', 'Stats Trigger Test')
   returning id into new_id;
 
-  insert into results
-  select case when exists (select 1 from public.character_stats
-                            where character_id = new_id)
-              then 'stats row created' else 'NO STATS ROW' end;
-exception when unique_violation then
-  insert into results values ('skipped: DM already has a character in A');
-end $$;
+  perform set_config('verification.outcome',
+    case when exists (select 1 from public.character_stats
+                       where character_id = new_id)
+         then 'stats row created' else 'NO STATS ROW' end,
+    true);
+exception
+  when unique_violation then
+    perform set_config('verification.outcome',
+      'skipped: DM already has a character in A', true);
+end
+$$;
 
-select * from results;
+select 'case 4: stats row on create' as check,
+       current_setting('verification.outcome') as outcome;
 
 rollback;
 
@@ -579,10 +587,10 @@ rollback;
 -- ---------------------------------------------------------------------------
 --
 -- A made-up skill, expertise on a save, and a valid expertise on Stealth.
--- Runs as owner: this is about the CHECKs, not RLS.
+-- Runs as the table owner: this is about the CHECKs, not RLS.
 --
--- CORRECT OUTPUT: fake_skill = refused, save_expertise = refused,
--- stealth_expertise = ok.
+-- CORRECT OUTPUT: target_found = true, fake_skill = 'refused',
+-- save_expertise = 'refused', stealth_expertise = 'ok'.
 
 begin;
 
@@ -594,32 +602,37 @@ select set_config(
   true
 );
 
-create temp table results (check_name text, outcome text) on commit drop;
-
 do $$
 declare
   cid uuid := current_setting('verification.nat_character')::uuid;
 begin
   begin
     insert into public.character_proficiencies values (cid, 'skill', 'juggling', 1);
-    insert into results values ('fake_skill', 'ok');
+    perform set_config('verification.fake_skill', 'ok', true);
   exception when check_violation then
-    insert into results values ('fake_skill', 'refused');
+    perform set_config('verification.fake_skill', 'refused', true);
   end;
   begin
     insert into public.character_proficiencies values (cid, 'save', 'dex', 2);
-    insert into results values ('save_expertise', 'ok');
+    perform set_config('verification.save_expertise', 'ok', true);
   exception when check_violation then
-    insert into results values ('save_expertise', 'refused');
+    perform set_config('verification.save_expertise', 'refused', true);
   end;
   begin
     insert into public.character_proficiencies values (cid, 'skill', 'stealth', 2);
-    insert into results values ('stealth_expertise', 'ok');
+    perform set_config('verification.stealth_expertise', 'ok', true);
   exception when check_violation then
-    insert into results values ('stealth_expertise', 'refused');
+    perform set_config('verification.stealth_expertise', 'refused', true);
   end;
-end $$;
+end
+$$;
 
-select * from results;
+select 'case 5: proficiency CHECKs' as check,
+       jsonb_build_object(
+         'target_found',      current_setting('verification.nat_character', true) is not null,
+         'fake_skill',        current_setting('verification.fake_skill'),
+         'save_expertise',    current_setting('verification.save_expertise'),
+         'stealth_expertise', current_setting('verification.stealth_expertise')
+       ) as result;
 
 rollback;
