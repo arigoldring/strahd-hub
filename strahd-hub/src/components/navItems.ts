@@ -26,6 +26,8 @@ export const NAV_ITEMS: NavItem[] = [
   // campaign's players for them instead of the create/own-sheet flow, so the
   // label says which one this link is about to open.
   { to: "Character", label: (isDm) => (isDm ? "Characters" : "Character") },
+  // Mock-up of a full sheet; remove or replace once the real one lands.
+  { to: "Sheet", label: () => "Sheet (mock)" },
   // Directly after Character, because Inventory is now half a personal page —
   // your own pack, with the party's hoard beside it — rather than the shared
   // pile alone.

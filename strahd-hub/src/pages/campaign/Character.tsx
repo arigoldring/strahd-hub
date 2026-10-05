@@ -270,7 +270,7 @@ function CharacterSheet({
 // control. Shared by all three sections because they differ only in what sits
 // at its right end — a picker, a picker, and nothing, Carried's door being a
 // line in its body rather than a button on the strip.
-function Band({
+export function Band({
   label,
   count,
   children,
@@ -302,7 +302,7 @@ function Band({
 // this component is also mounted for a player browsing someone else's sheet
 // by URL — can_edit_character is owner-or-DM, and canEdit mirrors that
 // exactly.
-function CharacterSpells({
+export function CharacterSpells({
   characterId,
   isOwn,
 }: {
@@ -620,7 +620,7 @@ function RemoveSpellFooter({
 // isOwn drives canEdit the same way CharacterSpells does — can_edit_character
 // is owner-or-DM, and this component is also mounted read-only for a player
 // browsing someone else's sheet.
-function CharacterFeats({
+export function CharacterFeats({
   characterId,
   isOwn,
 }: {
@@ -906,7 +906,7 @@ function RemoveFeatFooter({
 // and a failed one should cost the strip, not the page. Hence no isLoading
 // branch and no error line — only the `[]` default, which is what makes that
 // safe.
-function CharacterCarried({
+export function CharacterCarried({
   characterId,
   isOwn,
 }: {
@@ -1055,7 +1055,7 @@ function GiveItemForm({ characterId }: { characterId: string }) {
 // Reads straight off `character` rather than a hook of its own: 045's five
 // columns ride along on every character fetch, the same way price rides along
 // on an item, so there is nothing here to load or fail.
-function CharacterPurse({ character }: { character: CharacterModel }) {
+export function CharacterPurse({ character }: { character: CharacterModel }) {
   return (
     <>
       <Band label="Purse" count="on the Inventory page" />

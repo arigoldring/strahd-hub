@@ -1,0 +1,248 @@
+/* ============================================================================
+   Full-sheet MOCK-UP — pages/campaign/SheetMock.tsx. Layers on character.css
+   (the frame, bands and bodies are .ch-* classes reused as-is) and adds only
+   the new parts: class line, derived stats, ability tiles, saves and skills.
+   theme.css tokens only, the same rule character.css keeps.
+   ========================================================================== */
+
+/* ---------- DM picker, above the frame ---------- */
+
+.sm-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font: 500 11px/1 var(--sh-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sh-gold);
+}
+
+/* ---------- shared form controls ---------- */
+
+.sm-picker select,
+.sm-classline input,
+.sm-stat select,
+.sm-ability__score {
+  padding: 6px 10px;
+  font: 400 16px/1.3 var(--sh-body);
+  color: var(--sh-bone);
+  background: var(--sh-panel-sunk);
+  border: 1px solid var(--sh-rule-strong);
+  box-shadow: var(--sh-inset);
+}
+
+.sm-picker select:focus,
+.sm-classline input:focus,
+.sm-stat select:focus,
+.sm-ability__score:focus {
+  outline: none;
+  border-color: var(--sh-gold);
+}
+
+/* ---------- class line ---------- */
+
+.sm-classline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.sm-classline label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sm-classline span {
+  font: 500 10px/1 var(--sh-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sh-dim);
+}
+
+.sm-classline input[type="text"] {
+  width: 180px;
+  max-width: 100%;
+}
+
+.sm-classline input[type="number"] {
+  width: 70px;
+}
+
+/* ---------- derived stats strip ---------- */
+
+.sm-derived {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  border-top: 1px solid var(--sh-rule-strong);
+}
+
+.sm-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border-right: 1px solid var(--sh-rule-faint);
+  border-bottom: 1px solid var(--sh-rule-faint);
+  text-align: center;
+}
+
+.sm-stat__label {
+  font: 500 9px/1.2 var(--sh-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--sh-mute);
+}
+
+.sm-stat__value {
+  font: 600 24px/1 var(--sh-display);
+  color: var(--sh-bone-bright);
+}
+
+.sm-stat--select select {
+  max-width: 100%;
+  font-size: 14px;
+}
+
+/* ---------- ability tiles ---------- */
+
+.sm-abilities {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 12px 0 4px;
+}
+
+.sm-ability {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  background: var(--sh-panel-sunk);
+  border: 1px solid var(--sh-rule);
+}
+
+.sm-ability__label {
+  font: 500 10px/1 var(--sh-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sh-gold);
+}
+
+/* The modifier is what gets rolled, so it is the big number; the score is the
+   input underneath it. */
+.sm-ability__mod {
+  font: 600 34px/1 var(--sh-display);
+  color: var(--sh-bone-bright);
+}
+
+.sm-ability__score {
+  width: 64px;
+  text-align: center;
+  font-family: var(--sh-mono);
+  font-size: 14px;
+}
+
+/* ---------- saves & skills ---------- */
+
+/* Side by side on a wide sheet, saves the narrower column. */
+.sm-columns {
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+}
+
+.sm-columns > section + section {
+  border-left: 1px solid var(--sh-rule-faint);
+}
+
+.sm-list {
+  margin: 0;
+  padding: 6px 0 0;
+  list-style: none;
+}
+
+.sm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--sh-rule-faint);
+  cursor: pointer;
+}
+
+.sm-row input[type="checkbox"] {
+  accent-color: var(--sh-gold);
+}
+
+.sm-row__name {
+  flex: 1 1 auto;
+}
+
+.sm-row__ability {
+  margin-left: 8px;
+  font: 400 10px/1 var(--sh-mono);
+  text-transform: uppercase;
+  color: var(--sh-dim);
+}
+
+.sm-row__total {
+  font: 400 14px/1 var(--sh-mono);
+  color: var(--sh-bone-bright);
+}
+
+/* The proficiency pip: an empty ring, a filled dot, a ringed dot. */
+.sm-pip {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--sh-gold-deep);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sm-pip--1 {
+  background: var(--sh-gold);
+  border-color: var(--sh-gold);
+}
+
+.sm-pip--2 {
+  background: var(--sh-gold);
+  border-color: var(--sh-gold);
+  box-shadow:
+    0 0 0 2px var(--sh-void),
+    0 0 0 3px var(--sh-gold);
+}
+
+.sm-legend {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--sh-dim);
+}
+
+/* ---------- phone ---------- */
+
+@media (max-width: 600px) {
+  .sm-abilities {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sm-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .sm-columns > section + section {
+    border-left: none;
+  }
+
+  .sm-derived {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
