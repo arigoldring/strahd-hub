@@ -186,8 +186,8 @@ select
 -- back in one row, so a passing refusal doesn't paint the editor red
 -- (CLAUDE.md).
 --
--- CORRECT OUTPUT: one row: dm_insert = 'ok',
---                          player_insert = 'denied by RLS (42501)'.
+-- CORRECT OUTPUT: two rows: dm_insert = 'ok',
+--                           player_insert = 'denied by RLS (42501)'.
 
 begin;
 
@@ -228,11 +228,11 @@ exception
 end
 $$;
 
-select 'case 1: homebrew classes' as check,
-       jsonb_build_object(
+select key as check, value as result
+  from jsonb_each_text(jsonb_build_object(
          'dm_insert',     current_setting('verification.dm_insert'),
          'player_insert', current_setting('verification.player_insert')
-       ) as result;
+       ));
 
 rollback;
 
@@ -244,7 +244,7 @@ rollback;
 -- Three saves, a d7 and a STR caster, each its own attempt. Runs as the table
 -- owner: this is about the CHECKs, not RLS.
 --
--- CORRECT OUTPUT: one row, all three 'refused (23514)'.
+-- CORRECT OUTPUT: three rows, all 'refused (23514)'.
 
 begin;
 
@@ -274,11 +274,11 @@ begin
 end
 $$;
 
-select 'case 2: malformed classes' as check,
-       jsonb_build_object(
+select key as check, value as result
+  from jsonb_each_text(jsonb_build_object(
          'three_saves', current_setting('verification.three_saves'),
          'd7',          current_setting('verification.d7'),
          'str_caster',  current_setting('verification.str_caster')
-       ) as result;
+       ));
 
 rollback;

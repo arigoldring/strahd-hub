@@ -444,15 +444,15 @@ with u as (
 
 reset role;
 
-select 'case 1: who may edit stats' as check,
-       jsonb_build_object(
+select key as check, value as result
+  from jsonb_each_text(jsonb_build_object(
          'target_found',  current_setting('verification.nat_character', true) is not null,
          'owner_rows',    current_setting('verification.owner_rows'),
          'dm_rows',       current_setting('verification.dm_rows'),
          'stranger_rows', current_setting('verification.stranger_rows'),
          'strength_now',  (select strength from public.character_stats
                             where character_id = current_setting('verification.nat_character')::uuid)
-       ) as result;
+       ));
 
 rollback;
 
@@ -482,12 +482,12 @@ with u as (
    where character_id = current_setting('verification.nat_character')::uuid
   returning character_id
 )
-select 'case 2: pin' as check,
-       jsonb_build_object(
+select key as check, value as result
+  from jsonb_each_text(jsonb_build_object(
          'rows_updated', (select count(*) from u),
          'character_id_unchanged',
            (select bool_and(character_id = current_setting('verification.nat_character')::uuid) from u)
-       ) as result;
+       ));
 
 rollback;
 
@@ -528,12 +528,12 @@ select set_config('verification.after_heal',
   jsonb_build_object('cur', hp_current, 'temp', hp_temp)::text, true)
   from public.adjust_character_hp(current_setting('verification.nat_character')::uuid, 100);
 
-select 'case 3: adjust_character_hp' as check,
-       jsonb_build_object(
+select key as check, value as result
+  from jsonb_each_text(jsonb_build_object(
          'target_found', current_setting('verification.nat_character', true) is not null,
          'after_damage', current_setting('verification.after_damage', true)::jsonb,
          'after_heal',   current_setting('verification.after_heal', true)::jsonb
-       ) as result;
+       ));
 
 rollback;
 
@@ -627,12 +627,12 @@ begin
 end
 $$;
 
-select 'case 5: proficiency CHECKs' as check,
-       jsonb_build_object(
+select key as check, value as result
+  from jsonb_each_text(jsonb_build_object(
          'target_found',      current_setting('verification.nat_character', true) is not null,
          'fake_skill',        current_setting('verification.fake_skill'),
          'save_expertise',    current_setting('verification.save_expertise'),
          'stealth_expertise', current_setting('verification.stealth_expertise')
-       ) as result;
+       ));
 
 rollback;

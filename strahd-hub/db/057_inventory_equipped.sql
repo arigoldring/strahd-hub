@@ -93,11 +93,11 @@ with u as (
    where id = current_setting('verification.entry')::uuid
   returning equipped
 )
-select 'case 1: DM equips' as check,
-       jsonb_build_object(
+select key as check, value as result
+  from jsonb_each_text(jsonb_build_object(
          'target_found', current_setting('verification.entry', true) is not null,
          'rows_updated', (select count(*) from u),
          'equipped_now', (select bool_and(equipped) from u)
-       ) as result;
+       ));
 
 rollback;
