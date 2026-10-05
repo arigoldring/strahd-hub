@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import {
   ABILITIES,
   CLASSES,
+  RACES,
   SPELL_ABILITIES,
   SKILLS,
   type Ability,
   type ClassName,
   type ProficiencyLevel,
+  type RaceName,
   type SkillKey,
   type SpellAbility,
 } from "../data/rules";
@@ -31,6 +33,18 @@ export interface SheetMockState {
   scores: Record<Ability, number>;
   saves: Record<Ability, boolean>;
   skills: Record<SkillKey, ProficiencyLevel>;
+  race: RaceName | "";
+  speed: number;
+  hpMax: number;
+  hpCurrent: number;
+  hpTemp: number;
+  /** Inventory item ids. Mock-only: inventory has no "equipped" flag yet. */
+  armorId: string | null;
+  shieldId: string | null;
+  /** Rings, cloaks, spells — anything the sheet can't derive. */
+  acBonus: number;
+  /** Per-weapon override of the class default, keyed by item id. */
+  weaponProf: Record<string, boolean>;
 }
 
 function defaults(): SheetMockState {
@@ -38,6 +52,15 @@ function defaults(): SheetMockState {
     level: 1,
     className: "",
     spellAbility: "int",
+    race: "",
+    speed: 30,
+    hpMax: 10,
+    hpCurrent: 10,
+    hpTemp: 0,
+    armorId: null,
+    shieldId: null,
+    acBonus: 0,
+    weaponProf: {},
     scores: Object.fromEntries(ABILITIES.map((a) => [a, 10])) as Record<
       Ability,
       number
@@ -77,6 +100,8 @@ function load(characterId: string): SheetMockState {
       scores: { ...base.scores, ...saved.scores },
       saves: { ...base.saves, ...saved.saves },
       skills: { ...base.skills, ...saved.skills },
+      race: RACES.find((r) => r.name === saved.race)?.name ?? "",
+      weaponProf: { ...saved.weaponProf },
     };
   } catch {
     return base;

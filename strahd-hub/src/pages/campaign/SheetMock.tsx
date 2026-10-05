@@ -3,24 +3,33 @@ import { useCampaign } from "../../components/CampaignLayout";
 import { useAuth } from "../../services/AuthContext";
 import { useCharacter } from "../../hooks/useCharacter";
 import { useParty } from "../../hooks/useParty";
+import { useCharacterInventory } from "../../hooks/useCharacterInventory";
 import { useSheetMock, type SheetMockState } from "../../hooks/useSheetMock";
 import {
   ABILITIES,
   ABILITY_LABELS,
   CLASSES,
+  RACES,
   SKILLS,
   SPELL_ABILITIES,
   abilityModifier,
+  armorClass,
+  averageHp,
+  damageString,
+  weaponAbility,
   formatModifier,
   proficiencyBonus,
   skillBonus,
   type Ability,
+  type ClassInfo,
   type ClassName,
   type ProficiencyLevel,
   type SkillKey,
   type SpellAbility,
 } from "../../data/rules";
 import type { Character as CharacterModel } from "../../services/characters";
+import type { CharacterInventoryEntry } from "../../services/characterInventory";
+import type { Armor, Weapon } from "../../services/items";
 import {
   Band,
   CharacterCarried,
@@ -141,6 +150,34 @@ function FullSheet({
     return skillBonus(mod(skill.ability), pb, sheet.skills[key]);
   };
   const spellMod = mod(sheet.spellAbility);
+  const cls = CLASSES.find((c) => c.name === sheet.className) ?? null;
+
+  // Armour and weapons come from what the character is actually carrying.
+  // Same query key as the Carried section below, so this is a cache hit, not
+  // a second request.
+  const { data: gear = [] } = useCharacterInventory(character.id);
+  const armors = gear.filter(
+    (i): i is CharacterInventoryEntry & Armor => i.kind === "armor",
+  );
+  const weapons = gear.filter(
+    (i): i is CharacterInventoryEntry & Weapon => i.kind === "weapon",
+  );
+  // An id that no longer matches anything carried (sold, stowed) simply
+  // counts as unequipped.
+  const armor =
+    armors.find((a) => a.id === sheet.armorId && a.category !== "shield") ??
+    null;
+  const shield =
+    armors.find((a) => a.id === sheet.shieldId && a.category === "shield") ??
+    null;
+  const ac = armorClass({
+    armor,
+    shield,
+    dexMod: mod("dex"),
+    cls,
+    unarmoredMod: cls?.unarmored ? mod(cls.unarmored) : 0,
+    bonus: sheet.acBonus,
+  });
 
   return (
     <article className="ch-sheet">
@@ -150,6 +187,29 @@ function FullSheet({
           <h1 className="ch-name">{character.name}</h1>
         </div>
         <div className="sm-classline">
+          <label>
+            <span>Race</span>
+            <select
+              value={sheet.race}
+              onChange={(e) => {
+                // Like class → saves: picking a race sets the speed, which
+                // stays editable afterwards (Wood Elf, the Mobile feat).
+                const race = RACES.find((r) => r.name === e.target.value);
+                update(
+                  race
+                    ? { race: race.name, speed: race.speed }
+                    : { race: "" },
+                );
+              }}
+            >
+              <option value="">Choose a race...</option>
+              {RACES.map((r) => (
+                <option key={r.name} value={r.name}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <label>
             <span>Class</span>
             <select
@@ -178,6 +238,17 @@ function FullSheet({
           </label>
         </div>
       </header>
+
+      <CombatBlock
+        sheet={sheet}
+        update={update}
+        cls={cls}
+        conMod={mod("con")}
+        strScore={sheet.scores.str}
+        ac={ac}
+        armor={armor}
+        armors={armors}
+      />
 
       <div className="sm-derived">
         <Stat label="Proficiency" value={formatModifier(pb)} />
@@ -294,6 +365,14 @@ function FullSheet({
                       <span className="sm-row__name">
                         {s.label}
                         <span className="sm-row__ability">{s.ability}</span>
+                        {s.key === "stealth" && armor?.stealthDisadvantage && (
+                          <span
+                            className="sm-row__flag"
+                            title={`${armor.name} imposes disadvantage`}
+                          >
+                            disadv.
+                          </span>
+                        )}
                       </span>
                       <span className="sm-row__total">
                         {formatModifier(skillTotal(s.key))}
@@ -310,6 +389,15 @@ function FullSheet({
         </div>
 
         <div className="sm-layout__col">
+          <AttacksBlock
+            weapons={weapons}
+            sheet={sheet}
+            update={update}
+            cls={cls}
+            pb={pb}
+            strMod={mod("str")}
+            dexMod={mod("dex")}
+          />
           <CharacterSpells characterId={character.id} isOwn={isOwn} />
           <CharacterFeats characterId={character.id} isOwn={isOwn} />
           <CharacterCarried characterId={character.id} isOwn={isOwn} />
@@ -322,6 +410,275 @@ function FullSheet({
         </div>
       </div>
     </article>
+  );
+}
+
+type Update = (patch: Partial<SheetMockState>) => void;
+type ArmorEntry = CharacterInventoryEntry & Armor;
+type WeaponEntry = CharacterInventoryEntry & Weapon;
+
+/**
+ * AC, HP, speed and hit dice: the numbers read most often mid-fight, so they
+ * sit full width directly under the name. AC is derived from the armour
+ * picked here out of the character's real inventory; HP and speed are typed.
+ */
+function CombatBlock({
+  sheet,
+  update,
+  cls,
+  conMod,
+  strScore,
+  ac,
+  armor,
+  armors,
+}: {
+  sheet: SheetMockState;
+  update: Update;
+  cls: ClassInfo | null;
+  conMod: number;
+  strScore: number;
+  ac: { total: number; parts: string[] };
+  armor: ArmorEntry | null;
+  armors: ArmorEntry[];
+}) {
+  const bodyArmors = armors.filter((a) => a.category !== "shield");
+  const shields = armors.filter((a) => a.category === "shield");
+  // Heavy armour without the Strength for it costs 10 ft of speed (PHB).
+  const tooHeavy =
+    armor?.strengthRequirement != null && strScore < armor.strengthRequirement;
+  const speed = Math.max(0, sheet.speed - (tooHeavy ? 10 : 0));
+
+  return (
+    <div className="sm-combat">
+      <div className="sm-combat__tile">
+        <span className="sm-stat__label">Armor Class</span>
+        <span className="sm-combat__big">{ac.total}</span>
+        <span className="sm-combat__note">{ac.parts.join(" · ")}</span>
+        <div className="sm-combat__controls">
+          <select
+            aria-label="Armor worn"
+            value={sheet.armorId ?? ""}
+            onChange={(e) => update({ armorId: e.target.value || null })}
+          >
+            <option value="">No armor</option>
+            {bodyArmors.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} ({a.category})
+              </option>
+            ))}
+          </select>
+          {shields.length > 0 && (
+            <select
+              aria-label="Shield"
+              value={sheet.shieldId ?? ""}
+              onChange={(e) => update({ shieldId: e.target.value || null })}
+            >
+              <option value="">No shield</option>
+              {shields.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <label className="sm-combat__inline">
+            <span>Other</span>
+            <input
+              type="number"
+              value={sheet.acBonus}
+              onChange={(e) =>
+                update({
+                  acBonus: clampInt(e.target.value, -10, 10, sheet.acBonus),
+                })
+              }
+            />
+          </label>
+        </div>
+        {bodyArmors.length === 0 && (
+          <span className="sm-combat__note">No armor in inventory.</span>
+        )}
+      </div>
+
+      <div className="sm-combat__tile">
+        <span className="sm-stat__label">Hit Points</span>
+        <div className="sm-hp">
+          <input
+            className="sm-hp__current"
+            type="number"
+            aria-label="Current HP"
+            value={sheet.hpCurrent}
+            onChange={(e) =>
+              update({
+                hpCurrent: clampInt(e.target.value, -999, 999, sheet.hpCurrent),
+              })
+            }
+          />
+          <span className="sm-hp__slash">/</span>
+          <input
+            type="number"
+            aria-label="Max HP"
+            min={1}
+            value={sheet.hpMax}
+            onChange={(e) =>
+              update({ hpMax: clampInt(e.target.value, 1, 999, sheet.hpMax) })
+            }
+          />
+        </div>
+        <label className="sm-combat__inline">
+          <span>Temp</span>
+          <input
+            type="number"
+            min={0}
+            value={sheet.hpTemp}
+            onChange={(e) =>
+              update({ hpTemp: clampInt(e.target.value, 0, 999, sheet.hpTemp) })
+            }
+          />
+        </label>
+        {cls && (
+          <span className="sm-combat__note">
+            Average for level {sheet.level}:{" "}
+            {averageHp(cls.hitDie, sheet.level, conMod)}
+          </span>
+        )}
+      </div>
+
+      <div className="sm-combat__tile">
+        <span className="sm-stat__label">Speed</span>
+        <span className="sm-combat__big">
+          {speed}
+          <small> ft</small>
+        </span>
+        <label className="sm-combat__inline">
+          <span>Base</span>
+          <input
+            type="number"
+            min={0}
+            step={5}
+            value={sheet.speed}
+            onChange={(e) =>
+              update({ speed: clampInt(e.target.value, 0, 120, sheet.speed) })
+            }
+          />
+        </label>
+        {tooHeavy && (
+          <span className="sm-combat__note sm-combat__note--warn">
+            −10 ft: {armor!.name} needs STR {armor!.strengthRequirement}
+          </span>
+        )}
+      </div>
+
+      <div className="sm-combat__tile">
+        <span className="sm-stat__label">Hit Dice</span>
+        <span className="sm-combat__big">
+          {cls ? `${sheet.level}d${cls.hitDie}` : "—"}
+        </span>
+        {!cls && <span className="sm-combat__note">Pick a class.</span>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One row per weapon carried, plus an unarmed strike. To-hit and damage are
+ * derived: the ability from weaponAbility (DEX for ranged, the better of
+ * STR/DEX for finesse), proficiency from the class's simple/martial default
+ * unless that weapon's pip has been toggled by hand.
+ */
+function AttacksBlock({
+  weapons,
+  sheet,
+  update,
+  cls,
+  pb,
+  strMod,
+  dexMod,
+}: {
+  weapons: WeaponEntry[];
+  sheet: SheetMockState;
+  update: Update;
+  cls: ClassInfo | null;
+  pb: number;
+  strMod: number;
+  dexMod: number;
+}) {
+  const classProficient = (w: WeaponEntry) =>
+    w.category === "simple" || cls?.weapons === "martial";
+
+  return (
+    <>
+      <Band label="Attacks" count={`${weapons.length} carried`} />
+      <div className="ch-body">
+        <table className="ch-table sm-attacks">
+          <tbody>
+            {weapons.map((w) => {
+              const ability = weaponAbility(w, strMod, dexMod);
+              const abilityMod = ability === "dex" ? dexMod : strMod;
+              const proficient = sheet.weaponProf[w.id] ?? classProficient(w);
+              const toHit = abilityMod + (proficient ? pb : 0);
+              return (
+                <tr key={w.entryId}>
+                  <td className="sm-attacks__prof">
+                    <button
+                      type="button"
+                      className={`sm-pip sm-pip--${proficient ? 1 : 0}`}
+                      title={proficient ? "Proficient" : "Not proficient"}
+                      aria-label={`${w.name}: ${proficient ? "proficient" : "not proficient"}`}
+                      onClick={() =>
+                        update({
+                          weaponProf: { ...sheet.weaponProf, [w.id]: !proficient },
+                        })
+                      }
+                    />
+                  </td>
+                  <td>
+                    {w.customName ?? w.name}
+                    <span className="sm-attacks__meta">
+                      {[
+                        w.category,
+                        ...w.properties,
+                        w.rangeNormal != null &&
+                          `${w.rangeNormal}/${w.rangeLong ?? w.rangeNormal} ft`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </td>
+                  <td className="sm-attacks__hit">{formatModifier(toHit)}</td>
+                  <td className="sm-attacks__dmg">
+                    {damageString(w.damageDice, abilityMod)} {w.damageType}
+                    {w.versatileDice && (
+                      <span className="sm-attacks__meta">
+                        two-handed {damageString(w.versatileDice, abilityMod)}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+            {/* Everyone is proficient with unarmed strikes: 1 + STR. */}
+            <tr>
+              <td className="sm-attacks__prof">
+                <span className="sm-pip sm-pip--1" />
+              </td>
+              <td>
+                Unarmed Strike
+                <span className="sm-attacks__meta">always proficient</span>
+              </td>
+              <td className="sm-attacks__hit">{formatModifier(strMod + pb)}</td>
+              <td className="sm-attacks__dmg">
+                {Math.max(1, 1 + strMod)} bludgeoning
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        {weapons.length === 0 && (
+          <p className="sm-legend">
+            No weapons carried — buy or take one from the hoard to see it here.
+          </p>
+        )}
+      </div>
+    </>
   );
 }
 
