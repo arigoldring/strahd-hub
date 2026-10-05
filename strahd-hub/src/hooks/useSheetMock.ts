@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import {
   ABILITIES,
+  CLASSES,
+  SPELL_ABILITIES,
   SKILLS,
   type Ability,
+  type ClassName,
   type ProficiencyLevel,
   type SkillKey,
+  type SpellAbility,
 } from "../data/rules";
 
 /**
@@ -21,8 +25,9 @@ import {
  */
 export interface SheetMockState {
   level: number;
-  className: string;
-  spellAbility: Ability;
+  /** Empty until a class is picked. */
+  className: ClassName | "";
+  spellAbility: SpellAbility;
   scores: Record<Ability, number>;
   saves: Record<Ability, boolean>;
   skills: Record<SkillKey, ProficiencyLevel>;
@@ -51,16 +56,24 @@ function defaults(): SheetMockState {
 const storageKey = (characterId: string) => `sheet-mock:${characterId}`;
 
 // Merged over the defaults rather than trusted whole, so a value saved by an
-// older shape of this mock (a skill added since, say) still loads.
+// older shape of this mock (a skill added since, say) still loads. Class and
+// casting ability are narrowed too: the first version took the class as free
+// text ("cleric") and offered all six abilities to cast with.
 function load(characterId: string): SheetMockState {
   const base = defaults();
   try {
     const raw = localStorage.getItem(storageKey(characterId));
     if (!raw) return base;
+    // The cast is a claim JSON can't back, which is why className and
+    // spellAbility are re-checked below rather than spread through.
     const saved = JSON.parse(raw) as Partial<SheetMockState>;
+    const savedClass = String(saved.className ?? "").toLowerCase();
     return {
       ...base,
       ...saved,
+      className:
+        CLASSES.find((c) => c.name.toLowerCase() === savedClass)?.name ?? "",
+      spellAbility: SPELL_ABILITIES.find((a) => a === saved.spellAbility) ?? "int",
       scores: { ...base.scores, ...saved.scores },
       saves: { ...base.saves, ...saved.saves },
       skills: { ...base.skills, ...saved.skills },

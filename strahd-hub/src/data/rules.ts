@@ -20,6 +20,35 @@ export const ABILITY_LABELS: Record<Ability, string> = {
   cha: "Charisma",
 };
 
+/** The only abilities any class casts with. */
+export const SPELL_ABILITIES = ["int", "wis", "cha"] as const;
+export type SpellAbility = (typeof SPELL_ABILITIES)[number];
+
+/**
+ * The twelve PHB classes: the two saves each is proficient in, and the ability
+ * it casts with. Null for the non-casters, including Fighter and Rogue, whose
+ * casting comes from a subclass (Eldritch Knight, Arcane Trickster).
+ */
+export const CLASSES = [
+  { name: "Barbarian", saves: ["str", "con"], spellAbility: null },
+  { name: "Bard", saves: ["dex", "cha"], spellAbility: "cha" },
+  { name: "Cleric", saves: ["wis", "cha"], spellAbility: "wis" },
+  { name: "Druid", saves: ["int", "wis"], spellAbility: "wis" },
+  { name: "Fighter", saves: ["str", "con"], spellAbility: null },
+  { name: "Monk", saves: ["str", "dex"], spellAbility: null },
+  { name: "Paladin", saves: ["wis", "cha"], spellAbility: "cha" },
+  { name: "Ranger", saves: ["str", "dex"], spellAbility: "wis" },
+  { name: "Rogue", saves: ["dex", "int"], spellAbility: null },
+  { name: "Sorcerer", saves: ["con", "cha"], spellAbility: "cha" },
+  { name: "Warlock", saves: ["wis", "cha"], spellAbility: "cha" },
+  { name: "Wizard", saves: ["int", "wis"], spellAbility: "int" },
+] as const satisfies readonly {
+  name: string;
+  saves: readonly [Ability, Ability];
+  spellAbility: SpellAbility | null;
+}[];
+export type ClassName = (typeof CLASSES)[number]["name"];
+
 export const SKILLS = [
   { key: "acrobatics", label: "Acrobatics", ability: "dex" },
   { key: "animalHandling", label: "Animal Handling", ability: "wis" },

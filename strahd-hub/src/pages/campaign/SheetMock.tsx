@@ -7,14 +7,18 @@ import { useSheetMock, type SheetMockState } from "../../hooks/useSheetMock";
 import {
   ABILITIES,
   ABILITY_LABELS,
+  CLASSES,
   SKILLS,
+  SPELL_ABILITIES,
   abilityModifier,
   formatModifier,
   proficiencyBonus,
   skillBonus,
   type Ability,
+  type ClassName,
   type ProficiencyLevel,
   type SkillKey,
+  type SpellAbility,
 } from "../../data/rules";
 import type { Character as CharacterModel } from "../../services/characters";
 import {
@@ -113,6 +117,22 @@ function FullSheet({
   const update = (patch: Partial<SheetMockState>) =>
     setSheet((s) => ({ ...s, ...patch }));
 
+  // Picking a class replaces the save proficiencies with that class's two,
+  // and sets the casting ability when the class has one. Both stay editable
+  // afterwards (multiclassing, a subclass caster), so this is a starting
+  // point, not a lock. Clearing the class leaves both alone.
+  const pickClass = (name: ClassName | "") => {
+    const cls = CLASSES.find((c) => c.name === name);
+    if (!cls) return update({ className: "" });
+    update({
+      className: cls.name,
+      saves: Object.fromEntries(
+        ABILITIES.map((a) => [a, (cls.saves as readonly Ability[]).includes(a)]),
+      ) as Record<Ability, boolean>,
+      ...(cls.spellAbility && { spellAbility: cls.spellAbility }),
+    });
+  };
+
   // Everything below is derived on render from the few values typed in.
   const pb = proficiencyBonus(sheet.level);
   const mod = (a: Ability) => abilityModifier(sheet.scores[a]);
@@ -132,12 +152,17 @@ function FullSheet({
         <div className="sm-classline">
           <label>
             <span>Class</span>
-            <input
-              type="text"
+            <select
               value={sheet.className}
-              placeholder="e.g. Cleric"
-              onChange={(e) => update({ className: e.target.value })}
-            />
+              onChange={(e) => pickClass(e.target.value as ClassName | "")}
+            >
+              <option value="">Choose a class...</option>
+              {CLASSES.map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             <span>Level</span>
@@ -173,10 +198,10 @@ function FullSheet({
           <select
             value={sheet.spellAbility}
             onChange={(e) =>
-              update({ spellAbility: e.target.value as Ability })
+              update({ spellAbility: e.target.value as SpellAbility })
             }
           >
-            {ABILITIES.map((a) => (
+            {SPELL_ABILITIES.map((a) => (
               <option key={a} value={a}>
                 {ABILITY_LABELS[a]}
               </option>
