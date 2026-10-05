@@ -67,10 +67,29 @@
 .sm-ability__score {
   padding: 6px 10px;
   font: 400 16px/1.3 var(--sh-body);
-  color: var(--sh-bone);
-  background: var(--sh-panel-sunk);
-  border: 1px solid var(--sh-rule-strong);
+  color: var(--sh-bone-bright);
+  /* A touch lighter than --sh-panel-sunk, so the controls stand off the
+     sheet instead of reading as holes in it. */
+  background: rgba(255, 245, 225, 0.05);
+  border: 1px solid rgba(190, 165, 120, 0.5);
   box-shadow: var(--sh-inset);
+}
+
+/* The open dropdown is drawn by the OS, which can't composite a translucent
+   background, so options need a solid one or they render dark-on-dark.
+   npc.css fixes the same thing for its location picker. */
+.sm-picker select option,
+.sm-classline select option,
+.sm-stat select option {
+  background: #1f191b;
+  color: var(--sh-bone-bright);
+}
+
+.sm-picker select option:checked,
+.sm-classline select option:checked,
+.sm-stat select option:checked {
+  background: var(--sh-blood);
+  color: var(--sh-candle);
 }
 
 .sm-picker select:focus,
