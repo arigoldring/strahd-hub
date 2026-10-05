@@ -630,6 +630,54 @@ a `pin_feat_row` trigger pinning `id`/`campaign_id`/`created_at`, an
 seeded from an `initial` feat the way `HomebrewItemForm` now is. Feats are
 simpler than items, with no kind-dependent columns to null on a change.
 
+### Picking a class is three requests, not one transaction (noted 2026-10-05)
+
+`setStartingClass` updates (or inserts) the `character_classes` row, then
+deletes the character's save proficiencies, then inserts the new class's two.
+A failure between the steps leaves the class changed and the saves stale or
+missing.
+
+**Trigger:** a dropped connection mid-pick, or a refused write on the second
+or third request.
+
+**Cost:** wrong saving throw totals until the class is re-picked or the saves
+are ticked by hand, both of which repair it. The error line on the sheet says
+the save failed.
+
+**Fix:** a `set_starting_class(character, class)` plpgsql function doing all
+three in one transaction, security invoker so RLS stays the boundary.
+
+### A homebrew class or race can be attached across campaigns (noted 2026-10-05)
+
+041's hole, on 054/056's tables. A DM of campaigns A and B can create a class
+or race in B and point a character in A at it, where A's players can't read
+the row: the sheet then shows no class (or race) for that character.
+
+**Trigger:** writing the row by hand; the client never offers it, because its
+pickers read `getClasses(campaignId)` / `getRaces(campaignId)`.
+
+**Cost:** one DM mislabelling their own table. Same reasoning as 041 for
+leaving it open: closing it needs a trigger re-deriving the character's
+campaign on every write.
+
+### Classes, subclasses and races can't be created or edited from the app (noted 2026-10-05)
+
+054 ships SELECT and INSERT policies on all three, so a DM is allowed to
+create homebrew, but there is no form for it yet, and no UPDATE policy at all.
+Subclasses are not seeded (055 leaves them for class features).
+
+**Fix:** a CreateFeat-style form; 053's homebrew-edit policy plus a pin
+trigger for editing.
+
+### The demo characters start with default stats (noted 2026-10-05)
+
+`demo_campaign_reset.sql` predates 056. Its characters still get a stats row
+(the trigger fires for the fixture's insert too), but with every score 10, 1
+HP and no class, so the demo sheet looks empty.
+
+**Fix:** extend the fixture with an UPDATE of `character_stats` and inserts
+into `character_classes`, after its characters insert.
+
 ### Editing a homebrew item rewrites every stack that holds it (noted 2026-09-30)
 
 053 edits the `items` row in place, which is the point: no copy, no reseed. But

@@ -20,66 +20,13 @@ export const ABILITY_LABELS: Record<Ability, string> = {
   cha: "Charisma",
 };
 
+// ABILITIES, SPELL_ABILITIES and SKILLS below are mirrored by CHECK constraints
+// in 054 (classes) and 056 (character_proficiencies). One list in two places:
+// change them together, as with featCategories and 039.
+
 /** The only abilities any class casts with. */
 export const SPELL_ABILITIES = ["int", "wis", "cha"] as const;
 export type SpellAbility = (typeof SPELL_ABILITIES)[number];
-
-/**
- * The twelve PHB classes.
- *
- * - saves: the two saving throws the class is proficient in.
- * - spellAbility: what it casts with. Null for the non-casters, including
- *   Fighter and Rogue, whose casting comes from a subclass.
- * - hitDie: the die size, for hit dice and the average-HP hint.
- * - weapons: "martial" means simple + martial. An approximation — Rogues get
- *   rapiers, Monks shortswords, Wizards only a short list — which is why the
- *   sheet lets each weapon's proficiency be toggled by hand.
- * - unarmored: the ability a class adds to 10 + DEX with no armour on
- *   (Unarmored Defense). Strictly a class feature, but it changes the AC
- *   number, so it lives here rather than waiting for features.
- */
-export const CLASSES = [
-  { name: "Barbarian", saves: ["str", "con"], spellAbility: null, hitDie: 12, weapons: "martial", unarmored: "con" },
-  { name: "Bard", saves: ["dex", "cha"], spellAbility: "cha", hitDie: 8, weapons: "simple", unarmored: null },
-  { name: "Cleric", saves: ["wis", "cha"], spellAbility: "wis", hitDie: 8, weapons: "simple", unarmored: null },
-  { name: "Druid", saves: ["int", "wis"], spellAbility: "wis", hitDie: 8, weapons: "simple", unarmored: null },
-  { name: "Fighter", saves: ["str", "con"], spellAbility: null, hitDie: 10, weapons: "martial", unarmored: null },
-  { name: "Monk", saves: ["str", "dex"], spellAbility: null, hitDie: 8, weapons: "simple", unarmored: "wis" },
-  { name: "Paladin", saves: ["wis", "cha"], spellAbility: "cha", hitDie: 10, weapons: "martial", unarmored: null },
-  { name: "Ranger", saves: ["str", "dex"], spellAbility: "wis", hitDie: 10, weapons: "martial", unarmored: null },
-  { name: "Rogue", saves: ["dex", "int"], spellAbility: null, hitDie: 8, weapons: "simple", unarmored: null },
-  { name: "Sorcerer", saves: ["con", "cha"], spellAbility: "cha", hitDie: 6, weapons: "simple", unarmored: null },
-  { name: "Warlock", saves: ["wis", "cha"], spellAbility: "cha", hitDie: 8, weapons: "simple", unarmored: null },
-  { name: "Wizard", saves: ["int", "wis"], spellAbility: "int", hitDie: 6, weapons: "simple", unarmored: null },
-] as const satisfies readonly {
-  name: string;
-  saves: readonly [Ability, Ability];
-  spellAbility: SpellAbility | null;
-  hitDie: 6 | 8 | 10 | 12;
-  weapons: "simple" | "martial";
-  unarmored: Ability | null;
-}[];
-export type ClassName = (typeof CLASSES)[number]["name"];
-export type ClassInfo = (typeof CLASSES)[number];
-
-/**
- * The nine PHB (2014) races and their base walking speed. Picking one sets
- * the sheet's speed; it stays editable for subraces (Wood Elf, 35 ft) and
- * feats (Mobile). Ability score increases are deliberately not applied — the
- * scores are typed in as final values.
- */
-export const RACES = [
-  { name: "Dragonborn", speed: 30 },
-  { name: "Dwarf", speed: 25 },
-  { name: "Elf", speed: 30 },
-  { name: "Gnome", speed: 25 },
-  { name: "Half-Elf", speed: 30 },
-  { name: "Half-Orc", speed: 30 },
-  { name: "Halfling", speed: 25 },
-  { name: "Human", speed: 30 },
-  { name: "Tiefling", speed: 30 },
-] as const satisfies readonly { name: string; speed: number }[];
-export type RaceName = (typeof RACES)[number]["name"];
 
 /** Average HP: max die at 1st level, then the rounded-up average per level. */
 export function averageHp(hitDie: number, level: number, conMod: number) {
@@ -150,8 +97,9 @@ export interface ArmorLike {
 /**
  * AC from what's worn. Light adds all of DEX, medium caps it at +2, heavy adds
  * none. A shield adds its own value (+2 for the PHB shield). With no armour,
- * Unarmored Defense (Barbarian CON, Monk WIS) replaces the plain 10 + DEX —
- * except a Monk loses it with a shield.
+ * Unarmored Defense (Barbarian CON, Monk WIS) adds its ability on top of the
+ * plain 10 + DEX, unless the class loses it with a shield (the Monk). The
+ * caller says which: whether a shield breaks it is not a column on classes.
  *
  * Returns the parts as well as the total, so the sheet can say where the
  * number came from rather than just print it.
@@ -160,11 +108,10 @@ export function armorClass(opts: {
   armor: ArmorLike | null;
   shield: ArmorLike | null;
   dexMod: number;
-  cls: ClassInfo | null;
-  unarmoredMod: number;
+  unarmored: { ability: Ability; mod: number; allowsShield: boolean } | null;
   bonus: number;
 }): { total: number; parts: string[] } {
-  const { armor, shield, dexMod, cls, unarmoredMod, bonus } = opts;
+  const { armor, shield, dexMod, unarmored, bonus } = opts;
   const parts: string[] = [];
   let total: number;
 
@@ -179,13 +126,10 @@ export function armorClass(opts: {
     parts.push(`${armor.name} ${armor.baseArmorClass}`);
     if (armor.category !== "heavy") parts.push(`DEX ${formatModifier(dex)}`);
   } else {
-    const unarmored =
-      cls?.unarmored && !(cls.name === "Monk" && shield) ? unarmoredMod : null;
-    total = 10 + dexMod + (unarmored ?? 0);
+    const ud = unarmored && (unarmored.allowsShield || !shield) ? unarmored : null;
+    total = 10 + dexMod + (ud?.mod ?? 0);
     parts.push("10", `DEX ${formatModifier(dexMod)}`);
-    if (unarmored !== null) {
-      parts.push(`${cls!.unarmored!.toUpperCase()} ${formatModifier(unarmored)}`);
-    }
+    if (ud) parts.push(`${ud.ability.toUpperCase()} ${formatModifier(ud.mod)}`);
   }
 
   if (shield) {
@@ -229,4 +173,9 @@ export function weaponAbility(
 export function damageString(dice: string, mod: number): string {
   if (mod === 0) return dice;
   return `${dice}${mod > 0 ? "+" : "−"}${Math.abs(mod)}`;
+}
+
+/** A character's level is the sum of their class levels; 1 before any class. */
+export function totalLevel(classes: readonly { level: number }[]): number {
+  return Math.max(1, classes.reduce((sum, c) => sum + c.level, 0));
 }

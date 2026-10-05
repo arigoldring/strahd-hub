@@ -3,6 +3,7 @@ import {
   decrementCharacterInventoryItem,
   getCharacterInventory,
   removeFromCharacterInventory,
+  setCharacterInventoryEquipped,
 } from "../services/characterInventory";
 import {
   clearCharacterItemDescription,
@@ -83,6 +84,14 @@ export function useCharacterInventory(characterId: string) {
     onSuccess: invalidate,
   });
 
+  // 057. Invalidated like every other write here; the sheet derives AC from
+  // this list, so the new number appears once the refetch lands.
+  const setEquippedMutation = useMutation({
+    mutationFn: (vars: { entryId: string; equipped: boolean }) =>
+      setCharacterInventoryEquipped(vars.entryId, vars.equipped),
+    onSuccess: invalidate,
+  });
+
   return {
     data,
     isLoading,
@@ -92,5 +101,6 @@ export function useCharacterInventory(characterId: string) {
     removeItem: removeItemMutation.mutateAsync,
     saveDescription: saveDescriptionMutation.mutateAsync,
     clearDescription: clearDescriptionMutation.mutateAsync,
+    setEquipped: setEquippedMutation.mutateAsync,
   };
 }

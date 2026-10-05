@@ -57,6 +57,10 @@ export type CharacterInventoryEntry = Item & {
   // once on a sheet and quantity carries the count.
   entryId: string;
   quantity: number;
+  // 057. Whether the character is wearing or wielding it; the sheet derives AC
+  // from the equipped armour and shield. A stow deletes the row, which is the
+  // un-equip.
+  equipped: boolean;
   // null when nobody was recorded (an entry predating this column, or an added_by
   // profile since deleted). Not the same as "added by nobody".
   addedByName: string | null;
@@ -80,6 +84,7 @@ function toCharacterInventoryEntry(
     ...toItem(row.items),
     entryId: row.id,
     quantity: row.quantity,
+    equipped: row.equipped,
     addedByName: row.addedBy?.display_name ?? null,
     customName: custom?.customName ?? null,
     customDescription: custom?.customDescription ?? null,
@@ -196,5 +201,29 @@ export async function removeFromCharacterInventory(
   if (error) {
     console.error(error);
     throw error;
+  }
+}
+
+// 057. A plain UPDATE through 028's "owner or dm updates inventory" policy,
+// which had nothing to update until this column. A refused or vanished row is
+// a clean zero-row 200 (CLAUDE.md, "A refused write raises nothing"), so the
+// row is selected back and its absence treated as the refusal.
+export async function setCharacterInventoryEquipped(
+  entryId: string,
+  equipped: boolean,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("character_inventory")
+    .update({ equipped })
+    .eq("id", entryId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+  if (!data) {
+    throw new Error("That item is no longer in this pack, or it isn't yours to change.");
   }
 }
