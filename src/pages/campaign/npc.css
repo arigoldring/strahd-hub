@@ -259,8 +259,12 @@
   color: var(--sh-gold-deep);
 }
 
+/* pre-line so a newline in a description is a line break -- 061 puts the
+   portrait credit on a line of its own above Ireena's text. Runs of spaces
+   still collapse, so nothing typed before this renders differently. */
 .npcs .npc-card__desc {
   margin: 0;
+  white-space: pre-line;
   font-size: 16px;
   line-height: 1.55;
   color: var(--sh-mute);

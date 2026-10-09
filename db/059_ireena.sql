@@ -1,5 +1,9 @@
 -- db/059_ireena.sql
 --
+-- SUPERSEDED IN PART BY 061: the portrait was re-cropped to the full figure and
+-- the credit moved into the seeded description. The crop notes below describe
+-- the landscape version this file shipped with, which no longer exists.
+--
 -- Ireena Kolyanovich joins the roster with a portrait. Same recipe as 058:
 --
 --   1. src/assets/portraits/ireena-kolyanovich.webp, committed alongside
