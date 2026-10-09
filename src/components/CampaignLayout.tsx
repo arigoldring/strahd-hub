@@ -69,7 +69,7 @@ function PlayerPreviewBanner() {
           DM band still standing on the dashboard read as intended rather than
           as a leak. Three clauses, one per thing preview actually does. */}
       <span className="preview-banner__note">
-        Unrevealed NPCs and locations are hidden, your DM notes are gone, and
+        Unrevealed NPCs, locations and fortunes are hidden, your DM notes are gone, and
         your DM controls are put away. Nothing about the campaign has changed.
       </span>
       <button

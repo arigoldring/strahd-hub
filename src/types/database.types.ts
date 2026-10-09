@@ -39,6 +39,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaign_fortunes: {
+        Row: {
+          campaign_id: string
+          card: number
+          created_at: string
+          id: string
+          is_found: boolean
+          is_revealed: boolean
+          lines: string[]
+          title: string
+        }
+        Insert: {
+          campaign_id: string
+          card: number
+          created_at?: string
+          id?: string
+          is_found?: boolean
+          is_revealed?: boolean
+          lines: string[]
+          title: string
+        }
+        Update: {
+          campaign_id?: string
+          card?: number
+          created_at?: string
+          id?: string
+          is_found?: boolean
+          is_revealed?: boolean
+          lines?: string[]
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_fortunes_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_map_reveals: {
         Row: {
           campaign_id: string

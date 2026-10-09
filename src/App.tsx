@@ -8,6 +8,7 @@ import { Feats } from "./pages/campaign/Feats";
 import { Layout } from "./components/Layout";
 import { Npcs } from "./pages/campaign/NPC";
 import { Recaps } from "./pages/campaign/Recaps";
+import { Fortunes } from "./pages/campaign/Fortunes";
 import { Inventory } from "./pages/campaign/Inventory";
 import { Character, CharacterDetail } from "./pages/campaign/Character";
 import { Sheet } from "./pages/campaign/Sheet";
@@ -128,6 +129,10 @@ function App() {
                     shared-plus-your-campaign, the same as spells. */}
                   <Route path="Feats" element={<Feats />} />
                   <Route path="NPC" element={<Npcs />} />
+                  {/* Madam Eva's reading. Not DM-gated: 065's read policy is
+                    what keeps it empty for players until it's revealed, and
+                    the nav hides the link until then. */}
+                  <Route path="Fortunes" element={<Fortunes />} />
                   <Route path="Recaps" element={<Recaps />} />
                   {/* DM of THIS campaign only, enforced by the page itself and
                     by 019 behind it. Down here rather than beside /invites

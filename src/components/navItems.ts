@@ -18,6 +18,11 @@ export interface NavItem {
   tab?: boolean;
   /** Below the rule: the doors out of the campaign's content. */
   footer?: boolean;
+  /**
+   * Hidden from players until Madam Eva's reading is revealed (065). A DM
+   * always sees it, styled as a DM link until the players can too.
+   */
+  hiddenUntilRead?: boolean;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -45,11 +50,31 @@ export const NAV_ITEMS: NavItem[] = [
   // Feats page carries its own forge link.
   { to: "Feats", label: () => "Feats" },
   { to: "NPC", label: () => "NPCs", tab: true },
+  // Madam Eva's reading (065). Not a tab: it is consulted between sessions,
+  // not mid-fight.
+  { to: "Fortunes", label: () => "Fortunes", hiddenUntilRead: true },
   { to: "Recaps", label: () => "Recaps", tab: true },
   { to: "Invites", label: () => "Invites", dmOnly: true, footer: true },
   { to: "/", label: () => "Campaigns", footer: true },
 ];
 
-export function visibleNavItems(isDm: boolean): NavItem[] {
-  return NAV_ITEMS.filter((item) => isDm || !item.dmOnly);
+/**
+ * fortunesRead is "is any fortune revealed". The link appears for players
+ * once the DM reveals the reading (on their next refetch). Hiding it is
+ * cosmetic, not the boundary: until then RLS returns a player no rows, so the
+ * page behind the link is empty for them anyway.
+ */
+export function visibleNavItems(
+  isDm: boolean,
+  fortunesRead: boolean,
+): NavItem[] {
+  return NAV_ITEMS.filter(
+    (item) =>
+      isDm || (!item.dmOnly && (!item.hiddenUntilRead || fortunesRead)),
+  );
+}
+
+/** Styled as a DM link: DM-only for good, or only for now. */
+export function isDmStyled(item: NavItem, fortunesRead: boolean): boolean {
+  return !!item.dmOnly || (!!item.hiddenUntilRead && !fortunesRead);
 }

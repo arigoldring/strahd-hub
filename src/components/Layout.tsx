@@ -2,7 +2,8 @@ import { Outlet, NavLink } from "react-router-dom";
 import { useCampaign } from "./CampaignLayout";
 import { AccountControls, PreviewToggle } from "./RailControls";
 import { MobileNav } from "./MobileNav";
-import { visibleNavItems } from "./navItems";
+import { visibleNavItems, isDmStyled, type NavItem } from "./navItems";
+import { useFortunes } from "../hooks/useFortunes";
 import "./layout.css";
 
 export function Layout() {
@@ -11,7 +12,14 @@ export function Layout() {
   // the campaign CampaignLayout set. Every layout between the provider and the
   // page has to re-provide it.
   const campaign = useCampaign();
-  const items = visibleNavItems(campaign.isDm);
+  // Any row back means the reading is revealed to this viewer (or they are the
+  // DM). Loading and error both read as "not yet" -- the link is a door, and
+  // the cost of it appearing a moment late is nothing.
+  const { data: fortunes = [] } = useFortunes(campaign.id);
+  const fortunesRead = fortunes.some((f) => f.isRevealed);
+  const items = visibleNavItems(campaign.isDm, fortunesRead);
+  const navClass = (item: NavItem) =>
+    isDmStyled(item, fortunesRead) ? "app-nav__dm" : undefined;
 
   return (
     <div className="app-shell">
@@ -40,7 +48,7 @@ export function Layout() {
                 key={item.to}
                 to={item.to}
                 end={item.end}
-                className={item.dmOnly ? "app-nav__dm" : undefined}
+                className={navClass(item)}
               >
                 {item.label(campaign.isDm)}
               </NavLink>
@@ -52,7 +60,7 @@ export function Layout() {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={item.dmOnly ? "app-nav__dm" : undefined}
+                className={navClass(item)}
               >
                 {item.label(campaign.isDm)}
               </NavLink>
@@ -66,7 +74,7 @@ export function Layout() {
         <Outlet context={campaign} />
       </main>
 
-      <MobileNav campaign={campaign} items={items} />
+      <MobileNav campaign={campaign} items={items} navClass={navClass} />
     </div>
   );
 }

@@ -1,0 +1,181 @@
+/* =========================================================
+   Fortunes -- Madam Eva's reading, three cards.
+
+   Palette and fonts come from theme.css's --sh-* tokens on :root.
+   ========================================================= */
+
+.fortunes__heading {
+  margin-bottom: 4px;
+}
+
+.fortunes__intro {
+  margin: 0 0 22px;
+  color: var(--sh-mute);
+  font-style: italic;
+}
+
+.fortunes__empty {
+  color: var(--sh-dim);
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------
+   DM bar -- reveal state and the one toggle
+   --------------------------------------------------------- */
+
+.fortunes__dm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.fortunes__dm button {
+  margin: 0;
+}
+
+.fortunes__status {
+  font-family: var(--sh-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-dim);
+}
+.fortunes__status--live {
+  color: var(--sh-gold);
+}
+
+.fortunes__error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--sh-blood-ink);
+}
+
+/* ---------------------------------------------------------
+   The spread -- one card per fortune, stacked on a phone
+   --------------------------------------------------------- */
+
+.fortunes__spread {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.fortune {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 22px;
+  background: var(--sh-panel);
+  border: 1px solid var(--sh-rule-strong);
+  box-shadow: var(--sh-lift);
+}
+
+.fortune__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--sh-rule);
+}
+
+.fortune__numeral {
+  font-family: var(--sh-display);
+  color: var(--sh-gold-deep);
+}
+
+/* h2 globally carries a bottom margin; the header's rule does the spacing. */
+.fortune__title {
+  flex: 1;
+  margin: 0;
+  font-family: var(--sh-display);
+  font-size: 1.05rem;
+  color: var(--sh-bone-bright);
+}
+
+.fortune__found {
+  font-family: var(--sh-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-gold);
+}
+
+.fortune__lines {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: var(--sh-body);
+  font-style: italic;
+  font-size: 1.08rem;
+  line-height: 1.5;
+  color: var(--sh-bone);
+}
+.fortune__lines p {
+  margin: 0 0 10px;
+}
+.fortune__lines p:last-child {
+  margin-bottom: 0;
+}
+
+.fortune__dm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+.fortune__dm button {
+  margin: 0;
+}
+
+.fortune__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sh-mute);
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------
+   Editor -- replaces the quote in place
+   --------------------------------------------------------- */
+
+.fortune__editor {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fortune__editor-label {
+  color: var(--sh-dim);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.fortune__editor textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: var(--sh-body);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.fortune__editor-actions {
+  display: flex;
+  gap: 10px;
+}
+.fortune__editor-actions button {
+  margin: 0;
+}
+
+/* Found: the prophecy is fulfilled, so the card steps back. */
+.fortune.is-found {
+  border-color: var(--sh-gold-deep);
+}
+.fortune.is-found .fortune__lines {
+  color: var(--sh-mute);
+}

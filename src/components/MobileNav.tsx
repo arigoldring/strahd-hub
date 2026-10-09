@@ -17,9 +17,12 @@ import "./mobileNav.css";
 export function MobileNav({
   campaign,
   items,
+  navClass,
 }: {
   campaign: Campaign;
   items: NavItem[];
+  /** The rail's DM styling, decided once in Layout. */
+  navClass: (item: NavItem) => string | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -108,7 +111,7 @@ export function MobileNav({
                 key={item.to}
                 to={item.to}
                 end={item.end}
-                className={item.dmOnly ? "app-nav__dm" : undefined}
+                className={navClass(item)}
                 // Same-page taps don't change pathname, so the effect above
                 // would leave the sheet open over the page you asked for.
                 onClick={() => setOpen(false)}
