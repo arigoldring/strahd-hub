@@ -156,8 +156,18 @@ export function Npcs() {
           return (
             <article
               key={npc.id}
-              className={"npc-card" + (!npc.isRevealed ? " is-hidden" : "")}
+              className={
+                "npc-card" +
+                (!npc.isRevealed ? " is-hidden" : "") +
+                (npc.isDead ? " is-dead" : "")
+              }
             >
+              {/* Top-left, opposite the hidden seal: an NPC can be both, and
+                  the two tags must not stack on the same corner. */}
+              {npc.isDead && (
+                <span className="npc-card__dead-tag">Deceased</span>
+              )}
+
               {/* First child, because the tag is positioned against the card
                   itself and overhangs its top edge — it is not part of any of
                   the rows below it. */}
@@ -208,8 +218,16 @@ export function Npcs() {
                   <>
                     <h3 className="npc-card__name">{npc.name}</h3>
                     <div className="npc-card__rule"></div>
-                    {npc.locationName && (
-                      <p className="npc-card__location">{npc.locationName}</p>
+                    {/* Death replaces the home on the card only. locationId is
+                        still stored, so reviving restores it. */}
+                    {npc.isDead ? (
+                      <p className="npc-card__location npc-card__location--dead">
+                        Deceased
+                      </p>
+                    ) : (
+                      npc.locationName && (
+                        <p className="npc-card__location">{npc.locationName}</p>
+                      )
                     )}
                     <p className="npc-card__desc">
                       {npc.description ?? (
@@ -287,7 +305,10 @@ export function Npcs() {
                 key={npc.id}
                 className={`visibility-panel__item${npc.isRevealed ? "" : " is-hidden"}`}
               >
-                <span className="visibility-panel__name">{npc.name}</span>
+                <span className="visibility-panel__name">
+                  {npc.name}
+                  {npc.isDead && " †"}
+                </span>
                 <button
                   className="visibility-panel__toggle"
                   onClick={() =>
@@ -356,6 +377,7 @@ function NpcEditor({
   const [name, setName] = useState(npc.name);
   const [description, setDescription] = useState(npc.description ?? "");
   const [locationId, setLocationId] = useState(npc.locationId ?? "");
+  const [isDead, setIsDead] = useState(npc.isDead);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -376,6 +398,7 @@ function NpcEditor({
           description,
           // "" is the placeholder option, and it means no known home.
           location_id: locationId === "" ? null : locationId,
+          is_dead: isDead,
         },
       });
       onClose();
@@ -422,6 +445,18 @@ function NpcEditor({
           </option>
         ))}
       </select>
+
+      {/* In the form rather than a button on the card: saved with everything
+          else, so a misclick mid-session can't kill anyone. */}
+      <label className="npc-edit__check">
+        <input
+          type="checkbox"
+          checked={isDead}
+          onChange={(e) => setIsDead(e.target.checked)}
+          disabled={saving}
+        />
+        Dead
+      </label>
 
       <label className="npc-edit__label" htmlFor={`npc-desc-${npc.id}`}>
         Description

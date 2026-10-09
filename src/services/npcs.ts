@@ -29,6 +29,7 @@ const NPC_SELECT = `
   location_id,
   portrait_key,
   is_revealed,
+  is_dead,
   locations!npcs_campaign_id_location_id_fkey ( name ),
   npc_dm_notes ( notes )
 `;
@@ -58,6 +59,9 @@ export interface Npc {
   locationName: string | null;
   portraitKey: string | null;
   isRevealed: boolean;
+  // Public, unlike dmNotes: anyone who can see the NPC sees that they are dead.
+  // locationId survives a death, so un-ticking it brings the home back.
+  isDead: boolean;
   // Present only for DMs, and only where a note has actually been written.
   // Missing notes are the normal case rather than an error, so this is optional
   // and never a throw.
@@ -73,6 +77,7 @@ function toNpc(row: NpcRow): Npc {
     locationName: row.locations?.name ?? null,
     portraitKey: row.portrait_key,
     isRevealed: row.is_revealed,
+    isDead: row.is_dead,
   };
   // Only attached when a note exists, so the key is genuinely ABSENT otherwise
   // rather than present-but-undefined. That keeps the object honest to the
@@ -103,7 +108,7 @@ export async function getNpcs(campaignId: string): Promise<Npc[]> {
 // reported as a success. The type refuses it instead.
 export type NpcEdit = Pick<
   TablesUpdate<"npcs">,
-  "name" | "description" | "location_id" | "is_revealed"
+  "name" | "description" | "location_id" | "is_revealed" | "is_dead"
 >;
 
 // Trimmed, and a description that is blank or all whitespace stored as null

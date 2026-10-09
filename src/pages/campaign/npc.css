@@ -245,6 +245,74 @@
   color: rgba(255, 220, 200, 0.75);
 }
 
+/* ---------- dead ----------
+   Public, unlike .is-hidden: a player sees this card exactly as the DM does.
+   CSS only, no second image per portrait -- the filter turns any portrait,
+   present or future, into the same blood-red monochrome. */
+
+/* the tag's positioning context; .is-hidden sets this too, and an NPC can be
+   both */
+.npcs .npc-card.is-dead {
+  position: relative;
+  border-color: rgba(138, 13, 13, 0.7);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 0 40px -10px rgba(138, 13, 13, 0.45),
+    0 24px 60px -28px rgba(0, 0, 0, 0.9);
+}
+
+/* grey out the colour first, then re-tint the grey: sepia gives a warm base,
+   saturate pushes it hard, and the hue shift drags it from brown to red */
+.npcs .npc-card.is-dead .npc-card__portrait,
+.npcs .npc-card.is-dead .npc-card__portrait-frame:hover .npc-card__portrait {
+  filter: grayscale(1) sepia(1) saturate(4) hue-rotate(-50deg) brightness(0.7)
+    contrast(1.1);
+}
+
+/* the fade into the card goes to clotted red instead of black, with a pool
+   spreading up from the bottom edge */
+.npcs .npc-card.is-dead .npc-card__portrait-frame::after {
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 105%, rgba(110, 6, 6, 0.85), transparent 70%),
+    linear-gradient(180deg, rgba(60, 0, 0, 0.15) 30%, rgba(30, 4, 6, 0.9));
+}
+
+/* no portrait to tint, so the placeholder's stripes go red instead */
+.npcs .npc-card.is-dead .npc-card__portrait-empty {
+  background: repeating-linear-gradient(135deg, #2a0d0f 0 7px, #3a1215 7px 14px);
+}
+
+.npcs .npc-card.is-dead .npc-card__name {
+  color: var(--sh-mute);
+  text-decoration: line-through;
+  text-decoration-color: var(--sh-blood-bright);
+  text-decoration-thickness: 2px;
+}
+
+.npcs .npc-card.is-dead .npc-card__rule {
+  background: linear-gradient(90deg, rgba(138, 13, 13, 0.8), transparent 85%);
+}
+
+.npcs .npc-card__location--dead {
+  color: var(--sh-blood-ink);
+}
+
+/* the hidden tag's shape, mirrored to the left edge and inked in reverse */
+.npcs .npc-card__dead-tag {
+  position: absolute;
+  top: -11px;
+  left: 16px;
+  z-index: 3;
+  font: 500 9px/1 var(--sh-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sh-bone);
+  background: radial-gradient(circle at 34% 28%, #a01414, #6a0a0a 70%);
+  border: 1px solid rgba(214, 202, 178, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  padding: 6px 10px 5px;
+}
+
 .npcs .npc-card__rule {
   height: 1px;
   margin: 10px 0 11px;
@@ -356,6 +424,23 @@
 
 .npcs .npc-edit__label:first-child {
   margin-top: 0;
+}
+
+/* a checkbox row, so it reads like the labels above it but sits inline */
+.npcs .npc-edit__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  font: 400 13px/1 var(--sh-body);
+  font-variant: small-caps;
+  letter-spacing: 0.14em;
+  color: var(--sh-dim);
+  cursor: pointer;
+}
+
+.npcs .npc-edit__check input {
+  accent-color: var(--sh-blood-bright);
 }
 
 .npcs .npc-edit__field {

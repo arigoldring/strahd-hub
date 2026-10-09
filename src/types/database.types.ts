@@ -817,6 +817,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_dead: boolean
           is_revealed: boolean
           location_id: string | null
           name: string
@@ -827,6 +828,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_dead?: boolean
           is_revealed?: boolean
           location_id?: string | null
           name: string
@@ -837,6 +839,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_dead?: boolean
           is_revealed?: boolean
           location_id?: string | null
           name?: string
