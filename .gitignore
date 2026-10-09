@@ -29,3 +29,10 @@ src/pages/campaign/audit/
 
 # Local planning notes (not for the repo)
 NEXT_STEPS.md
+
+# Build artifacts
+*.tsbuildinfo
+
+# Private AI-assistant notes
+CLAUDE.md
+.claude/
