@@ -664,7 +664,9 @@ campaign on every write.
 
 054 ships SELECT and INSERT policies on all three, so a DM is allowed to
 create homebrew, but there is no form for it yet, and no UPDATE policy at all.
-Subclasses are not seeded (055 leaves them for class features).
+A homebrew class also needs its `subclass_title` set (066), or its picker
+reads "Subclass". The shared subclasses are seeded (067-078), Artificer
+excepted: it's a class 055 never seeded, so it has nothing to hang them on.
 
 **Fix:** a CreateFeat-style form; 053's homebrew-edit policy plus a pin
 trigger for editing.

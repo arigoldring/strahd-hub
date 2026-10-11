@@ -119,6 +119,24 @@
   width: 70px;
 }
 
+/* Subclass names run long ("Path of the Ancestral Guardian (Xanathar's)"). */
+.sm-classline select.sm-classline__wide {
+  width: 300px;
+}
+
+/* ---------- class features band (subclass placeholder) ---------- */
+
+.sm-subclass {
+  margin: 12px 0 0;
+  font: 400 15px/1.5 var(--sh-body);
+  color: var(--sh-bone);
+}
+
+.sm-subclass__name {
+  font-weight: 600;
+  color: var(--sh-gold);
+}
+
 /* ---------- derived stats strip ---------- */
 
 .sm-derived {

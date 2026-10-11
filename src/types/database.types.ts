@@ -564,6 +564,7 @@ export type Database = {
           save_proficiencies: string[]
           spell_ability: string | null
           subclass_level: number
+          subclass_title: string
           unarmored_ability: string | null
           weapon_training: string
         }
@@ -577,6 +578,7 @@ export type Database = {
           save_proficiencies: string[]
           spell_ability?: string | null
           subclass_level?: number
+          subclass_title?: string
           unarmored_ability?: string | null
           weapon_training: string
         }
@@ -590,6 +592,7 @@ export type Database = {
           save_proficiencies?: string[]
           spell_ability?: string | null
           subclass_level?: number
+          subclass_title?: string
           unarmored_ability?: string | null
           weapon_training?: string
         }
@@ -1239,6 +1242,7 @@ export type Database = {
           description: string
           id: string
           name: string
+          source: string | null
           spell_ability: string | null
         }
         Insert: {
@@ -1248,6 +1252,7 @@ export type Database = {
           description?: string
           id?: string
           name: string
+          source?: string | null
           spell_ability?: string | null
         }
         Update: {
@@ -1257,6 +1262,7 @@ export type Database = {
           description?: string
           id?: string
           name?: string
+          source?: string | null
           spell_ability?: string | null
         }
         Relationships: [

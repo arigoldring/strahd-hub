@@ -265,6 +265,27 @@ export async function setClassLevel(entryId: string, level: number): Promise<voi
   if (!data) throw new Error("You can't change this character's level.");
 }
 
+/**
+ * Null clears it. 056's composite FK refuses a subclass of a different class,
+ * so a stale picker can't attach one; that surfaces as a 23503 error here.
+ */
+export async function setSubclass(
+  entryId: string,
+  subclassId: string | null,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("character_classes")
+    .update({ subclass_id: subclassId })
+    .eq("id", entryId)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+  if (!data) throw new Error("You can't change this character's subclass.");
+}
+
 async function replaceSaves(characterId: string, saves: readonly Ability[]) {
   const { error: delError } = await supabase
     .from("character_proficiencies")

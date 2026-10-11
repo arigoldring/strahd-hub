@@ -7,6 +7,7 @@ import { useCharacterInventory } from "../../hooks/useCharacterInventory";
 import { useCharacterSheet } from "../../hooks/useCharacterSheet";
 import { useClasses } from "../../hooks/useClasses";
 import { useRaces } from "../../hooks/useRaces";
+import { useSubclasses } from "../../hooks/useSubclasses";
 import {
   ABILITIES,
   ABILITY_LABELS,
@@ -31,7 +32,10 @@ import {
   type CharacterStatsPatch,
   type Proficiency,
 } from "../../services/characterSheet";
-import type { CharacterClass } from "../../services/classes";
+import {
+  SUBCLASS_SOURCE_LABELS,
+  type CharacterClass,
+} from "../../services/classes";
 import type { Character as CharacterModel } from "../../services/characters";
 import type { CharacterInventoryEntry } from "../../services/characterInventory";
 import type { Armor, Weapon } from "../../services/items";
@@ -140,6 +144,7 @@ function FullSheet({
 
   const sheetQuery = useCharacterSheet(character.id);
   const { data: classCatalog = [] } = useClasses(campaign.id);
+  const { data: subclassCatalog = [] } = useSubclasses(campaign.id);
   const { data: races = [] } = useRaces(campaign.id);
   // Same key as the Carried section below, so this is a cache hit.
   const { data: gear = [], setEquipped } = useCharacterInventory(character.id);
@@ -165,6 +170,25 @@ function FullSheet({
   // ---- derived, every render ----
   const startingEntry = classes.find((c) => c.isStarting) ?? classes[0];
   const cls = classCatalog.find((c) => c.id === startingEntry?.classId) ?? null;
+  const classSubclasses = subclassCatalog.filter(
+    (s) => s.classId === startingEntry?.classId,
+  );
+  const subclass =
+    classSubclasses.find((s) => s.id === startingEntry?.subclassId) ?? null;
+  // Opens at the class's own level, not the total (a multiclass Fighter 2 /
+  // Wizard 2 has no archetype yet). A subclass already chosen stays editable
+  // below that level, so one kept after a level drop can still be cleared.
+  const subclassReached =
+    !!startingEntry && !!cls && startingEntry.level >= cls.subclassLevel;
+  const canPickSubclass =
+    canEdit &&
+    classSubclasses.length > 0 &&
+    (subclassReached || startingEntry?.subclassId != null);
+  const subclassHint = !cls
+    ? "Pick a class first"
+    : classSubclasses.length > 0 && !subclassReached && !subclass
+      ? `Chosen at level ${cls.subclassLevel}`
+      : undefined;
   const race = races.find((r) => r.id === stats.raceId) ?? null;
   const level = totalLevel(classes);
   const pb = proficiencyBonus(level);
@@ -175,7 +199,8 @@ function FullSheet({
     const skill = SKILLS.find((s) => s.key === key)!;
     return skillBonus(mod(skill.ability), pb, skills[key]);
   };
-  const spellAbility = cls?.spellAbility ?? null;
+  // Eldritch Knight and Arcane Trickster cast through a class that doesn't.
+  const spellAbility = cls?.spellAbility ?? subclass?.spellAbility ?? null;
 
   const armors = gear.filter((i): i is ArmorEntry => i.kind === "armor");
   const weapons = gear.filter((i): i is WeaponEntry => i.kind === "weapon");
@@ -277,6 +302,35 @@ function FullSheet({
                 run(sheetQuery.setLevel({ entryId: startingEntry.id, level: n }), "level")
               }
             />
+          </label>
+          <label>
+            <span>{cls?.subclassTitle ?? "Subclass"}</span>
+            <select
+              className="sm-classline__wide"
+              value={startingEntry?.subclassId ?? ""}
+              disabled={!canPickSubclass}
+              title={subclassHint}
+              onChange={(e) =>
+                startingEntry &&
+                run(
+                  sheetQuery.setSubclass({
+                    entryId: startingEntry.id,
+                    subclassId: e.target.value || null,
+                  }),
+                  "subclass",
+                )
+              }
+            >
+              <option value="">
+                {cls && classSubclasses.length === 0 ? "None available" : "None"}
+              </option>
+              {classSubclasses.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                  {s.source ? ` (${SUBCLASS_SOURCE_LABELS[s.source]})` : " (Homebrew)"}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
         {saveError && <p className="ch-error sm-save-error">{saveError}</p>}
@@ -455,7 +509,17 @@ function FullSheet({
 
           <Band label="Class Features" />
           <div className="ch-body">
-            <p className="ch-empty">Coming later.</p>
+            {/* Placeholder until class features land: the features catalogue
+                will render here, grouped under the subclass. */}
+            {subclass && cls && (
+              <p className="sm-subclass">
+                <span className="sm-subclass__name">
+                  {cls.subclassTitle}: {subclass.name}
+                </span>{" "}
+                {subclass.description}
+              </p>
+            )}
+            <p className="ch-empty">Features coming later.</p>
           </div>
         </div>
       </div>

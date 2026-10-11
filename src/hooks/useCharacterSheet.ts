@@ -4,6 +4,7 @@ import {
   setClassLevel,
   setProficiency,
   setStartingClass,
+  setSubclass,
   updateCharacterStats,
   type CharacterClassEntry,
   type CharacterSheetData,
@@ -123,6 +124,20 @@ export function useCharacterSheet(characterId: string) {
     onSettled: invalidate,
   });
 
+  const setSubclassMutation = useMutation({
+    mutationFn: (vars: { entryId: string; subclassId: string | null }) =>
+      setSubclass(vars.entryId, vars.subclassId),
+    onMutate: ({ entryId, subclassId }) =>
+      patchCache((sheet) => ({
+        ...sheet,
+        classes: sheet.classes.map((c) =>
+          c.id === entryId ? { ...c, subclassId } : c,
+        ),
+      })),
+    onError: restore,
+    onSettled: invalidate,
+  });
+
   return {
     data,
     isLoading,
@@ -132,5 +147,6 @@ export function useCharacterSheet(characterId: string) {
     adjustHp: adjustHpMutation.mutateAsync,
     setClass: setClassMutation.mutateAsync,
     setLevel: setLevelMutation.mutateAsync,
+    setSubclass: setSubclassMutation.mutateAsync,
   };
 }
