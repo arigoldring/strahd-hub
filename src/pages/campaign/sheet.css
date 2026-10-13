@@ -174,8 +174,10 @@
   color: var(--sh-dim);
 }
 
+/* pre-line: 082's long texts (the maneuver list) are \n-separated. */
 .sm-feature__text {
   margin: 4px 0 0;
+  white-space: pre-line;
   font: 400 14px/1.5 var(--sh-body);
   color: var(--sh-bone);
 }

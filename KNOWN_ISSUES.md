@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 080. Last updated 2026-10-11.**
+**Current through migration 082. Last updated 2026-10-13.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -671,31 +671,56 @@ excepted: it's a class 055 never seeded, so it has nothing to hang them on.
 **Fix:** a CreateFeat-style form; 053's homebrew-edit policy plus a pin
 trigger for editing.
 
-### Fighting styles are display only (noted 2026-10-11)
+### Fighter features are display only (noted 2026-10-11, widened by 081/082)
 
-079/080 store and show the pick, but nothing reads it: Defense doesn't add
-+1 to the AC tile, Archery doesn't add +2 to ranged to-hit, Dueling and
-Thrown Weapon Fighting don't add +2 damage. Second Wind's use isn't tracked
-either.
+079-082 store and show the text, but nothing reads it.
 
-**Trigger:** picking any style whose effect is a number the sheet derives.
+- **Fighting style:** Defense doesn't add +1 to the AC tile, Archery doesn't
+  add +2 to ranged to-hit, Dueling and Thrown Weapon Fighting don't add +2
+  damage.
+- **Derived numbers nothing applies:** Improved/Superior Critical's crit range,
+  Remarkable Athlete's half proficiency on Str/Dex/Con checks, Extra Attack's
+  attack count.
+- **Uses nothing tracks:** Second Wind, Action Surge, Indomitable, superiority
+  dice.
+
+**Trigger:** any feature whose effect is a number the sheet derives or a use
+that recharges on a rest.
 
 **Cost:** the sheet shows "Defense" beside an AC that ignores it, and the
-player adds the bonus in their head.
+player adds the bonus and counts the uses in their head.
 
 **Fix:** pass the starting entry's `fightingStyle` into `armorClass` (Defense,
 only when armour is worn) and `AttacksBlock` (Archery on ranged rows;
 Dueling needs "one weapon in hand", which the sheet doesn't model, so it may
-stay manual).
+stay manual). Use tracking wants a `character_feature_uses` table, or
+counters on the class entry, plus a short/long rest action; that is a design
+of its own.
 
-### A character can hold only one fighting style per class (noted 2026-10-11)
+### Eldritch Knight spellcasting has no slot or school model (noted 2026-10-13)
+
+082's Spellcasting row is text. The spell DC and attack already use 071's
+`spell_ability = 'int'`, but the spell picker offers every spell, the
+abjuration/evocation restriction is enforced by nobody, and slots aren't
+tracked. The same is true of every caster today; the EK is just the first
+whose restriction is narrower than its class list.
+
+**Fix:** spell slots as a derived table in `rules.ts` keyed on caster type,
+and a school filter in the picker driven by the subclass. Wait for a second
+third-caster (Arcane Trickster) before designing it.
+
+### Features with many picks have nowhere to store them (noted 2026-10-11, widened by 082)
 
 `character_classes.fighting_style` is one column. Champion's Additional
-Fighting Style (Fighter 10) has nowhere to go, and CoS reaches level 10.
+Fighting Style (Fighter 10, seeded by 082 as text with no picker) has nowhere
+to go, and CoS reaches level 10. Battle Master maneuvers (082) are listed in
+Combat Superiority's text but can't be picked; the player notes them by hand.
+That row deliberately carries no `choice`: a second 'fighting_style' picker
+would write the same column and overwrite the first pick.
 
 **Fix:** a `character_feature_choices (character_class_id, feature_id,
-choice)` table, migrating the column into it. Worth doing when Battle Master
-maneuvers or Warlock invocations need many picks per feature anyway.
+choice)` table, migrating the column into it. Maneuvers are now the trigger;
+Arcane Shots (XGtE) and runes (TCoE) will want it too.
 
 ### The fighting-style list isn't filtered by class (noted 2026-10-11)
 
