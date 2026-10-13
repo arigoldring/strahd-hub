@@ -56,6 +56,96 @@ export const SKILLS = [
 ] as const satisfies readonly { key: string; label: string; ability: Ability }[];
 export type SkillKey = (typeof SKILLS)[number]["key"];
 
+/**
+ * The Fighting Style options (079). One list in two places with the CHECK on
+ * character_classes.fighting_style: change them together, as with SKILLS.
+ * Display only for now: nothing below feeds armorClass or the attack rows yet.
+ */
+export const FIGHTING_STYLES = [
+  {
+    key: "archery",
+    name: "Archery",
+    source: "phb",
+    description: "You gain a +2 bonus to attack rolls you make with ranged weapons.",
+  },
+  {
+    key: "defense",
+    name: "Defense",
+    source: "phb",
+    description: "While you are wearing armor, you gain a +1 bonus to AC.",
+  },
+  {
+    key: "dueling",
+    name: "Dueling",
+    source: "phb",
+    description:
+      "When you are wielding a melee weapon in one hand and no other weapons, you gain a +2 bonus to damage rolls with that weapon.",
+  },
+  {
+    key: "great_weapon",
+    name: "Great Weapon Fighting",
+    source: "phb",
+    description:
+      "When you roll a 1 or 2 on a damage die for an attack you make with a melee weapon that you are wielding with two hands, you can reroll the die and must use the new roll. The weapon must have the two-handed or versatile property.",
+  },
+  {
+    key: "protection",
+    name: "Protection",
+    source: "phb",
+    description:
+      "When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield.",
+  },
+  {
+    key: "two_weapon",
+    name: "Two-Weapon Fighting",
+    source: "phb",
+    description:
+      "When you engage in two-weapon fighting, you can add your ability modifier to the damage of the second attack.",
+  },
+  {
+    key: "blind_fighting",
+    name: "Blind Fighting",
+    source: "tcoe",
+    description:
+      "You have blindsight with a range of 10 feet. Within that range, you can effectively see anything that isn't behind total cover, even if you're blinded or in darkness, and you can see an invisible creature unless it successfully hides from you.",
+  },
+  {
+    key: "interception",
+    name: "Interception",
+    source: "tcoe",
+    description:
+      "When a creature you can see hits a target, other than you, within 5 feet of you with an attack, you can use your reaction to reduce the damage by 1d10 + your proficiency bonus. You must be wielding a shield or a simple or martial weapon.",
+  },
+  {
+    key: "superior_technique",
+    name: "Superior Technique",
+    source: "tcoe",
+    description:
+      "You learn one maneuver from the Battle Master archetype (save DC 8 + proficiency bonus + Strength or Dexterity modifier). You gain one superiority die, a d6, regained on a short or long rest.",
+  },
+  {
+    key: "thrown_weapon",
+    name: "Thrown Weapon Fighting",
+    source: "tcoe",
+    description:
+      "You can draw a weapon that has the thrown property as part of the attack you make with it. When you hit with a ranged attack using a thrown weapon, you gain a +2 bonus to the damage roll.",
+  },
+  {
+    key: "unarmed",
+    name: "Unarmed Fighting",
+    source: "tcoe",
+    description:
+      "Your unarmed strikes deal 1d6 + Strength bludgeoning damage on a hit, or 1d8 if you aren't wielding any weapons or a shield. At the start of each of your turns, you can deal 1d4 bludgeoning damage to one creature grappled by you.",
+  },
+] as const satisfies readonly {
+  key: string;
+  name: string;
+  source: "phb" | "tcoe";
+  description: string;
+}[];
+export type FightingStyle = (typeof FIGHTING_STYLES)[number]["key"];
+export const FIGHTING_STYLE_KEYS = FIGHTING_STYLES.map((s) => s.key);
+
 /** 0 = untrained, 1 = proficient, 2 = expertise (proficiency bonus doubled). */
 export type ProficiencyLevel = 0 | 1 | 2;
 

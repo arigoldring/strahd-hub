@@ -8,9 +8,11 @@ import { useCharacterSheet } from "../../hooks/useCharacterSheet";
 import { useClasses } from "../../hooks/useClasses";
 import { useRaces } from "../../hooks/useRaces";
 import { useSubclasses } from "../../hooks/useSubclasses";
+import { useClassFeatures } from "../../hooks/useClassFeatures";
 import {
   ABILITIES,
   ABILITY_LABELS,
+  FIGHTING_STYLES,
   SKILLS,
   abilityModifier,
   armorClass,
@@ -22,12 +24,14 @@ import {
   totalLevel,
   weaponAbility,
   type Ability,
+  type FightingStyle,
   type ProficiencyLevel,
   type SkillKey,
 } from "../../data/rules";
 import {
   saveSet,
   skillLevels,
+  type CharacterClassEntry,
   type CharacterStats,
   type CharacterStatsPatch,
   type Proficiency,
@@ -35,6 +39,7 @@ import {
 import {
   SUBCLASS_SOURCE_LABELS,
   type CharacterClass,
+  type ClassFeature,
 } from "../../services/classes";
 import type { Character as CharacterModel } from "../../services/characters";
 import type { CharacterInventoryEntry } from "../../services/characterInventory";
@@ -145,6 +150,7 @@ function FullSheet({
   const sheetQuery = useCharacterSheet(character.id);
   const { data: classCatalog = [] } = useClasses(campaign.id);
   const { data: subclassCatalog = [] } = useSubclasses(campaign.id);
+  const { data: featureCatalog = [] } = useClassFeatures(campaign.id);
   const { data: races = [] } = useRaces(campaign.id);
   // Same key as the Carried section below, so this is a cache hit.
   const { data: gear = [], setEquipped } = useCharacterInventory(character.id);
@@ -509,8 +515,6 @@ function FullSheet({
 
           <Band label="Class Features" />
           <div className="ch-body">
-            {/* Placeholder until class features land: the features catalogue
-                will render here, grouped under the subclass. */}
             {subclass && cls && (
               <p className="sm-subclass">
                 <span className="sm-subclass__name">
@@ -519,7 +523,18 @@ function FullSheet({
                 {subclass.description}
               </p>
             )}
-            <p className="ch-empty">Features coming later.</p>
+            <ClassFeatures
+              entry={startingEntry}
+              catalog={featureCatalog}
+              canEdit={canEdit}
+              setFightingStyle={(style) =>
+                startingEntry &&
+                run(
+                  sheetQuery.setFightingStyle({ entryId: startingEntry.id, style }),
+                  "fighting style",
+                )
+              }
+            />
           </div>
         </div>
       </div>
@@ -727,6 +742,83 @@ function CombatBlock({
         {!cls && <span className="sm-combat__note">Pick a class.</span>}
       </div>
     </div>
+  );
+}
+
+/**
+ * The class's features up to the class's own level (079), plus its
+ * archetype's once one is picked. Same level rule as the subclass picker: a
+ * Fighter 2 / Wizard 3 sees Fighter features through level 2, not 5.
+ *
+ * A feature with a `choice` carries a picker under its text. Only
+ * 'fighting_style' exists so far; the pick is stored on the class entry, and
+ * the chosen style's own text comes from FIGHTING_STYLES. Display only: no
+ * style changes a derived number yet (see KNOWN_ISSUES).
+ */
+function ClassFeatures({
+  entry,
+  catalog,
+  canEdit,
+  setFightingStyle,
+}: {
+  entry: CharacterClassEntry | undefined;
+  catalog: ClassFeature[];
+  canEdit: boolean;
+  setFightingStyle: (style: FightingStyle | null) => void;
+}) {
+  // Already ordered by level, then name, by getClassFeatures.
+  const features = entry
+    ? catalog.filter(
+        (f) =>
+          f.classId === entry.classId &&
+          f.level <= entry.level &&
+          (f.subclassId == null || f.subclassId === entry.subclassId),
+      )
+    : [];
+
+  if (features.length === 0) {
+    return (
+      <p className="ch-empty">
+        {entry ? "No features recorded for this class yet." : "Pick a class first."}
+      </p>
+    );
+  }
+
+  const style = FIGHTING_STYLES.find((s) => s.key === entry?.fightingStyle) ?? null;
+
+  return (
+    <ul className="sm-features">
+      {features.map((f) => (
+        <li key={f.id} className="sm-feature">
+          <div className="sm-feature__head">
+            <span className="sm-feature__name">{f.name}</span>
+            <span className="sm-feature__level">Level {f.level}</span>
+          </div>
+          <p className="sm-feature__text">{f.description}</p>
+          {f.choice === "fighting_style" && (
+            <div className="sm-feature__choice">
+              <select
+                aria-label="Fighting style"
+                value={entry?.fightingStyle ?? ""}
+                disabled={!canEdit}
+                onChange={(e) =>
+                  setFightingStyle((e.target.value || null) as FightingStyle | null)
+                }
+              >
+                <option value="">Choose a style...</option>
+                {FIGHTING_STYLES.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.name}
+                    {s.source === "tcoe" ? ` (${SUBCLASS_SOURCE_LABELS.tcoe})` : ""}
+                  </option>
+                ))}
+              </select>
+              {style && <p className="sm-feature__text">{style.description}</p>}
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 

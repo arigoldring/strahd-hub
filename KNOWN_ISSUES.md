@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 053. Last updated 2026-09-30.**
+**Current through migration 080. Last updated 2026-10-11.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -670,6 +670,39 @@ excepted: it's a class 055 never seeded, so it has nothing to hang them on.
 
 **Fix:** a CreateFeat-style form; 053's homebrew-edit policy plus a pin
 trigger for editing.
+
+### Fighting styles are display only (noted 2026-10-11)
+
+079/080 store and show the pick, but nothing reads it: Defense doesn't add
++1 to the AC tile, Archery doesn't add +2 to ranged to-hit, Dueling and
+Thrown Weapon Fighting don't add +2 damage. Second Wind's use isn't tracked
+either.
+
+**Trigger:** picking any style whose effect is a number the sheet derives.
+
+**Cost:** the sheet shows "Defense" beside an AC that ignores it, and the
+player adds the bonus in their head.
+
+**Fix:** pass the starting entry's `fightingStyle` into `armorClass` (Defense,
+only when armour is worn) and `AttacksBlock` (Archery on ranged rows;
+Dueling needs "one weapon in hand", which the sheet doesn't model, so it may
+stay manual).
+
+### A character can hold only one fighting style per class (noted 2026-10-11)
+
+`character_classes.fighting_style` is one column. Champion's Additional
+Fighting Style (Fighter 10) has nowhere to go, and CoS reaches level 10.
+
+**Fix:** a `character_feature_choices (character_class_id, feature_id,
+choice)` table, migrating the column into it. Worth doing when Battle Master
+maneuvers or Warlock invocations need many picks per feature anyway.
+
+### The fighting-style list isn't filtered by class (noted 2026-10-11)
+
+The picker offers all eleven styles. Correct for the Fighter, the only class
+with a seeded Fighting Style feature. Paladins and Rangers each get a subset
+(plus a few of their own in Tasha's), so seeding their features needs a
+per-class list in `FIGHTING_STYLES`, and the CHECK widened for the extras.
 
 ### The demo characters start with default stats (noted 2026-10-05)
 

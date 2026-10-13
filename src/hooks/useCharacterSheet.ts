@@ -2,6 +2,7 @@ import {
   adjustCharacterHp,
   getCharacterSheet,
   setClassLevel,
+  setFightingStyle,
   setProficiency,
   setStartingClass,
   setSubclass,
@@ -11,7 +12,7 @@ import {
   type CharacterStatsPatch,
   type ProficiencyKind,
 } from "../services/characterSheet";
-import type { Ability, ProficiencyLevel } from "../data/rules";
+import type { Ability, FightingStyle, ProficiencyLevel } from "../data/rules";
 import { errorMessage } from "../lib/errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -138,6 +139,20 @@ export function useCharacterSheet(characterId: string) {
     onSettled: invalidate,
   });
 
+  const setFightingStyleMutation = useMutation({
+    mutationFn: (vars: { entryId: string; style: FightingStyle | null }) =>
+      setFightingStyle(vars.entryId, vars.style),
+    onMutate: ({ entryId, style }) =>
+      patchCache((sheet) => ({
+        ...sheet,
+        classes: sheet.classes.map((c) =>
+          c.id === entryId ? { ...c, fightingStyle: style } : c,
+        ),
+      })),
+    onError: restore,
+    onSettled: invalidate,
+  });
+
   return {
     data,
     isLoading,
@@ -148,5 +163,6 @@ export function useCharacterSheet(characterId: string) {
     setClass: setClassMutation.mutateAsync,
     setLevel: setLevelMutation.mutateAsync,
     setSubclass: setSubclassMutation.mutateAsync,
+    setFightingStyle: setFightingStyleMutation.mutateAsync,
   };
 }

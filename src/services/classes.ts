@@ -43,6 +43,26 @@ export interface Subclass {
   isHomebrew: boolean;
 }
 
+/**
+ * A class or subclass feature (079). subclassId null means the base class's
+ * own (Second Wind); otherwise it belongs to that archetype. `choice` says
+ * the feature carries a picker, and which kind.
+ */
+export interface ClassFeature {
+  id: string;
+  classId: string;
+  subclassId: string | null;
+  level: number;
+  name: string;
+  description: string;
+  choice: FeatureChoice | null;
+  isHomebrew: boolean;
+}
+
+// One list in two places with 079's CHECK on class_features.choice.
+export const FEATURE_CHOICES = ["fighting_style"] as const;
+export type FeatureChoice = (typeof FEATURE_CHOICES)[number];
+
 const WEAPON_TRAINING = ["simple", "martial"] as const;
 
 // One list in two places with 066's CHECK on subclasses.source; change them
@@ -136,4 +156,37 @@ export async function getSubclasses(campaignId: string): Promise<Subclass[]> {
     throw error;
   }
   return data.map(toSubclass);
+}
+
+export function toClassFeature(row: Tables<"class_features">): ClassFeature {
+  const subject = `Class feature ${row.id}`;
+  return {
+    id: row.id,
+    classId: row.class_id,
+    subclassId: row.subclass_id,
+    level: row.level,
+    name: row.name,
+    description: row.description,
+    choice:
+      row.choice == null
+        ? null
+        : parseOneOf(row.choice, FEATURE_CHOICES, "choice", subject),
+    isHomebrew: row.campaign_id !== null,
+  };
+}
+
+// getSubclasses' shape: every class's features in one read, filtered per class
+// on the client, with the same .or() keeping other campaigns' homebrew out.
+export async function getClassFeatures(campaignId: string): Promise<ClassFeature[]> {
+  const { data, error } = await supabase
+    .from("class_features")
+    .select("*")
+    .or(`campaign_id.is.null,campaign_id.eq.${campaignId}`)
+    .order("level")
+    .order("name");
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+  return data.map(toClassFeature);
 }

@@ -162,6 +162,7 @@ export type Database = {
           character_id: string
           class_id: string
           created_at: string
+          fighting_style: string | null
           id: string
           is_starting: boolean
           level: number
@@ -171,6 +172,7 @@ export type Database = {
           character_id: string
           class_id: string
           created_at?: string
+          fighting_style?: string | null
           id?: string
           is_starting?: boolean
           level?: number
@@ -180,6 +182,7 @@ export type Database = {
           character_id?: string
           class_id?: string
           created_at?: string
+          fighting_style?: string | null
           id?: string
           is_starting?: boolean
           level?: number
@@ -550,6 +553,64 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "campaign_members"
             referencedColumns: ["campaign_id", "user_id"]
+          },
+        ]
+      }
+      class_features: {
+        Row: {
+          campaign_id: string | null
+          choice: string | null
+          class_id: string
+          created_at: string
+          description: string
+          id: string
+          level: number
+          name: string
+          subclass_id: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          choice?: string | null
+          class_id: string
+          created_at?: string
+          description: string
+          id?: string
+          level: number
+          name: string
+          subclass_id?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          choice?: string | null
+          class_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          level?: number
+          name?: string
+          subclass_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_features_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_features_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_features_subclass_id_class_id_fkey"
+            columns: ["subclass_id", "class_id"]
+            isOneToOne: false
+            referencedRelation: "subclasses"
+            referencedColumns: ["id", "class_id"]
           },
         ]
       }

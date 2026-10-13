@@ -2,8 +2,10 @@ import { supabase } from "../lib/supabase";
 import { parseOneOf } from "../lib/parse";
 import {
   ABILITIES,
+  FIGHTING_STYLE_KEYS,
   SKILLS,
   type Ability,
+  type FightingStyle,
   type ProficiencyLevel,
   type SkillKey,
 } from "../data/rules";
@@ -36,6 +38,8 @@ export interface CharacterClassEntry {
   id: string;
   classId: string;
   subclassId: string | null;
+  /** The Fighting Style pick (079); null until chosen, or for a class without one. */
+  fightingStyle: FightingStyle | null;
   level: number;
   isStarting: boolean;
 }
@@ -141,6 +145,15 @@ export async function getCharacterSheet(
       id: row.id,
       classId: row.class_id,
       subclassId: row.subclass_id,
+      fightingStyle:
+        row.fighting_style == null
+          ? null
+          : parseOneOf(
+              row.fighting_style,
+              FIGHTING_STYLE_KEYS,
+              "fighting_style",
+              `Class entry ${row.id}`,
+            ),
       level: row.level,
       isStarting: row.is_starting,
     })),
@@ -221,7 +234,8 @@ export async function adjustCharacterHp(
  * toggle) repairs; an RPC would make it atomic if that ever matters.
  *
  * subclass_id is cleared with the class: 056's composite FK refuses a subclass
- * of a different class.
+ * of a different class. fighting_style is cleared too, though nothing in the
+ * database would refuse it (079): a Wizard holding "Defense" is just wrong.
  */
 export async function setStartingClass(
   characterId: string,
@@ -232,7 +246,7 @@ export async function setStartingClass(
   const write = existing
     ? supabase
         .from("character_classes")
-        .update({ class_id: classId, subclass_id: null })
+        .update({ class_id: classId, subclass_id: null, fighting_style: null })
         .eq("id", existing.id)
         .select("id")
         .maybeSingle()
@@ -284,6 +298,24 @@ export async function setSubclass(
     throw error;
   }
   if (!data) throw new Error("You can't change this character's subclass.");
+}
+
+/** Null clears it. 079's CHECK refuses a key FIGHTING_STYLES doesn't know. */
+export async function setFightingStyle(
+  entryId: string,
+  style: FightingStyle | null,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("character_classes")
+    .update({ fighting_style: style })
+    .eq("id", entryId)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+  if (!data) throw new Error("You can't change this character's fighting style.");
 }
 
 async function replaceSaves(characterId: string, saves: readonly Ability[]) {
