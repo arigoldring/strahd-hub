@@ -1,6 +1,13 @@
 import { supabase } from "../lib/supabase";
 import { parseOneOf, requireField } from "../lib/parse";
-import { ABILITIES, SPELL_ABILITIES, type Ability, type SpellAbility } from "../data/rules";
+import {
+  ABILITIES,
+  FIGHTING_STYLE_KEYS,
+  SPELL_ABILITIES,
+  type Ability,
+  type FightingStyle,
+  type SpellAbility,
+} from "../data/rules";
 import type { Tables } from "../types/database.types";
 
 /**
@@ -56,6 +63,12 @@ export interface ClassFeature {
   name: string;
   description: string;
   choice: FeatureChoice | null;
+  /**
+   * The styles a 'fighting_style' picker offers (083). Set exactly when
+   * choice is 'fighting_style'; 083's CHECK says so. The sheet lists them in
+   * FIGHTING_STYLES' order, not this array's.
+   */
+  fightingStyleOptions: FightingStyle[] | null;
   isHomebrew: boolean;
 }
 
@@ -171,6 +184,12 @@ export function toClassFeature(row: Tables<"class_features">): ClassFeature {
       row.choice == null
         ? null
         : parseOneOf(row.choice, FEATURE_CHOICES, "choice", subject),
+    fightingStyleOptions:
+      row.fighting_style_options == null
+        ? null
+        : row.fighting_style_options.map((s) =>
+            parseOneOf(s, FIGHTING_STYLE_KEYS, "fighting_style_options", subject),
+          ),
     isHomebrew: row.campaign_id !== null,
   };
 }

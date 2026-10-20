@@ -23,15 +23,17 @@ export function requireField<T>(
 // Returns the narrowed value rather than narrowing in place, hence "parse" not
 // "assert" — TS assertion functions return void, which this does not.
 // The cast is on `allowed`, not `value`: widening readonly T[] to readonly
-// string[] is always sound, so it sits on something known-true while the actual
-// check stays honest.
+// unknown[] is always sound, so it sits on something known-true while the
+// actual check stays honest. `value` is unknown because the generator types an
+// array of a domain as unknown[] (083's fighting_style_options); only a string
+// in the list can pass, so nothing else needs checking first.
 export function parseOneOf<T extends string>(
-  value: string,
+  value: unknown,
   allowed: readonly T[],
   field: string,
   subject: string,
 ): T {
-  if (!(allowed as readonly string[]).includes(value)) {
+  if (!(allowed as readonly unknown[]).includes(value)) {
     throw new Error(`${subject}: invalid ${field} "${value}"`);
   }
   return value as T;

@@ -563,6 +563,7 @@ export type Database = {
           class_id: string
           created_at: string
           description: string
+          fighting_style_options: unknown[] | null
           id: string
           level: number
           name: string
@@ -574,6 +575,7 @@ export type Database = {
           class_id: string
           created_at?: string
           description: string
+          fighting_style_options?: unknown[] | null
           id?: string
           level: number
           name: string
@@ -585,6 +587,7 @@ export type Database = {
           class_id?: string
           created_at?: string
           description?: string
+          fighting_style_options?: unknown[] | null
           id?: string
           level?: number
           name?: string
@@ -1408,6 +1411,10 @@ export type Database = {
       generate_player_invite: {
         Args: { invite_label?: string; target_campaign: string }
         Returns: string
+      }
+      insert_campaign_fortunes: {
+        Args: { p_campaign_id: string }
+        Returns: undefined
       }
       is_campaign_dm: { Args: { target_campaign: string }; Returns: boolean }
       is_campaign_member: {

@@ -752,8 +752,12 @@ function CombatBlock({
  *
  * A feature with a `choice` carries a picker under its text. Only
  * 'fighting_style' exists so far; the pick is stored on the class entry, and
- * the chosen style's own text comes from FIGHTING_STYLES. Display only: no
- * style changes a derived number yet (see KNOWN_ISSUES).
+ * the chosen style's own text comes from FIGHTING_STYLES. The row's own
+ * fightingStyleOptions (083) decides which styles are offered, so a Paladin
+ * isn't shown Archery. A stored pick outside that list (nothing in the
+ * database prevents one) is still offered, so the select never shows "Choose"
+ * over a style that is actually saved. Display only: no style changes a
+ * derived number yet (see KNOWN_ISSUES).
  */
 function ClassFeatures({
   entry,
@@ -806,7 +810,11 @@ function ClassFeatures({
                 }
               >
                 <option value="">Choose a style...</option>
-                {FIGHTING_STYLES.map((s) => (
+                {FIGHTING_STYLES.filter(
+                  (s) =>
+                    f.fightingStyleOptions?.includes(s.key) ||
+                    s.key === entry?.fightingStyle,
+                ).map((s) => (
                   <option key={s.key} value={s.key}>
                     {s.name}
                     {s.source === "tcoe" ? ` (${SUBCLASS_SOURCE_LABELS.tcoe})` : ""}

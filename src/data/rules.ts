@@ -57,9 +57,11 @@ export const SKILLS = [
 export type SkillKey = (typeof SKILLS)[number]["key"];
 
 /**
- * The Fighting Style options (079). One list in two places with the CHECK on
- * character_classes.fighting_style: change them together, as with SKILLS.
- * Display only for now: nothing below feeds armorClass or the attack rows yet.
+ * The Fighting Style options (079, widened by 083). One list in two places
+ * with 083's public.fighting_style domain: change them together, as with
+ * SKILLS. Which of these a picker offers is the feature row's own
+ * fighting_style_options, not this list. Display only for now: nothing below
+ * feeds armorClass or the attack rows yet.
  */
 export const FIGHTING_STYLES = [
   {
@@ -136,6 +138,20 @@ export const FIGHTING_STYLES = [
     source: "tcoe",
     description:
       "Your unarmed strikes deal 1d6 + Strength bludgeoning damage on a hit, or 1d8 if you aren't wielding any weapons or a shield. At the start of each of your turns, you can deal 1d4 bludgeoning damage to one creature grappled by you.",
+  },
+  {
+    key: "blessed_warrior",
+    name: "Blessed Warrior",
+    source: "tcoe",
+    description:
+      "You learn two cantrips of your choice from the cleric spell list. They count as paladin spells for you, and Charisma is your spellcasting ability for them. Whenever you gain a paladin level, you can replace one of them with another cleric cantrip.",
+  },
+  {
+    key: "druidic_warrior",
+    name: "Druidic Warrior",
+    source: "tcoe",
+    description:
+      "You learn two cantrips of your choice from the druid spell list. They count as ranger spells for you, and Wisdom is your spellcasting ability for them. Whenever you gain a ranger level, you can replace one of them with another druid cantrip.",
   },
 ] as const satisfies readonly {
   key: string;
