@@ -671,18 +671,25 @@ excepted: it's a class 055 never seeded, so it has nothing to hang them on.
 **Fix:** a CreateFeat-style form; 053's homebrew-edit policy plus a pin
 trigger for editing.
 
-### Fighter features are display only (noted 2026-10-11, widened by 081/082)
+### Class features are display only (noted 2026-10-11, widened by 081/082 and 084-094)
 
-079-082 store and show the text, but nothing reads it.
+079-094 store and show the text for every class, but nothing reads it.
 
 - **Fighting style:** Defense doesn't add +1 to the AC tile, Archery doesn't
   add +2 to ranged to-hit, Dueling and Thrown Weapon Fighting don't add +2
-  damage.
+  damage. Same for the Paladin's and Ranger's picks.
 - **Derived numbers nothing applies:** Improved/Superior Critical's crit range,
-  Remarkable Athlete's half proficiency on Str/Dex/Con checks, Extra Attack's
-  attack count.
+  Remarkable Athlete and Jack of All Trades on ability checks, Extra Attack's
+  attack count, Rage's damage bonus and resistances, Sneak Attack dice, the
+  Martial Arts die, Fast Movement and Unarmored Movement's speed, Draconic
+  Resilience's hit points and AC 13 + Dex, Aura of Protection on saves,
+  Primal Champion's +4, Slippery Mind and Diamond Soul's save proficiencies
+  (the player can add those by hand), Potent Spellcasting and Agonizing
+  Blast on cantrip damage.
 - **Uses nothing tracks:** Second Wind, Action Surge, Indomitable, superiority
-  dice.
+  dice, Rage, Bardic Inspiration, Channel Divinity, Wild Shape, ki, Lay on
+  Hands' pool, sorcery points, Pact Magic slots, Arcane Recovery, and every
+  "once per short or long rest" feature.
 
 **Trigger:** any feature whose effect is a number the sheet derives or a use
 that recharges on a rest.
@@ -697,37 +704,51 @@ stay manual). Use tracking wants a `character_feature_uses` table, or
 counters on the class entry, plus a short/long rest action; that is a design
 of its own.
 
-### Eldritch Knight spellcasting has no slot or school model (noted 2026-10-13)
+### Spellcasting has no slot or school model (noted 2026-10-13, widened by 084-094)
 
-082's Spellcasting row is text. The spell DC and attack already use 071's
-`spell_ability = 'int'`, but the spell picker offers every spell, the
-abjuration/evocation restriction is enforced by nobody, and slots aren't
-tracked. The same is true of every caster today; the EK is just the first
-whose restriction is narrower than its class list.
+Every caster's Spellcasting row (and the Warlock's Pact Magic) is text, with
+its slot table written out. The spell DC and attack use the class's or
+subclass's `spell_ability`, but slots aren't tracked, prepared and known
+counts aren't checked, and the spell picker offers every spell. Domain,
+oath, circle and patron spells are listed in their rows' text and nothing
+marks them always prepared. The Eldritch Knight (082) and Arcane Trickster
+(091) both have a school restriction nobody enforces.
 
-**Fix:** spell slots as a derived table in `rules.ts` keyed on caster type,
-and a school filter in the picker driven by the subclass. Wait for a second
-third-caster (Arcane Trickster) before designing it.
+**Fix:** spell slots as a derived table in `rules.ts` keyed on caster type
+(full, half, third, pact), and a school filter in the picker driven by the
+subclass. The second third-caster this entry was waiting for has now
+arrived, so the design can start.
 
-### Features with many picks have nowhere to store them (noted 2026-10-11, widened by 082)
+### Features with many picks have nowhere to store them (noted 2026-10-11, widened by 082 and 084-094)
 
 `character_classes.fighting_style` is one column. Champion's Additional
 Fighting Style (Fighter 10, seeded by 082 as text with no picker) has nowhere
-to go, and CoS reaches level 10. Battle Master maneuvers (082) are listed in
-Combat Superiority's text but can't be picked; the player notes them by hand.
-That row deliberately carries no `choice`: a second 'fighting_style' picker
-would write the same column and overwrite the first pick.
+to go, and CoS reaches level 10. That row deliberately carries no `choice`: a
+second 'fighting_style' picker would write the same column and overwrite the
+first pick.
+
+Every other pick is text the player notes by hand, with the options listed
+in the row: Battle Master maneuvers (082), Expertise (Bard, Rogue), Magical
+Secrets, Favored Enemy and Natural Explorer, the Hunter's four picks, Totem
+animals (three picks, which can differ), the Circle of the Land's terrain,
+the Four Elements disciplines, Metamagic, Dragon Ancestor, Eldritch
+Invocations, Pact Boon and Mystic Arcanum.
 
 **Fix:** a `character_feature_choices (character_class_id, feature_id,
-choice)` table, migrating the column into it. Maneuvers are now the trigger;
-Arcane Shots (XGtE) and runes (TCoE) will want it too.
+choice)` table, migrating the column into it. Maneuvers and invocations are
+the triggers; Arcane Shots (XGtE) and runes (TCoE) will want it too.
 
-### The fighting-style list isn't filtered by class (noted 2026-10-11)
+### XGtE and TCoE subclasses have no features (noted 2026-10-20)
 
-The picker offers all eleven styles. Correct for the Fighter, the only class
-with a seeded Fighting Style feature. Paladins and Rangers each get a subset
-(plus a few of their own in Tasha's), so seeding their features needs a
-per-class list in `FIGHTING_STYLES`, and the CHECK widened for the extras.
+084-094 seeded the PHB subclasses' features only, by decision. The 57
+Xanathar's (31) and Tasha's (26) subclasses (067-078), including the
+Fighter's five,
+can still be picked, but the sheet shows only the subclass description and
+the base class's features. Tasha's optional class features (Primal
+Knowledge, Deft Explorer and the rest) are also unseeded.
+
+**Fix:** one file per book per class, in 082's shape, e.g.
+`095_class_features_xgte_fighter.sql`. Seed the ones the party uses first.
 
 ### The demo characters start with default stats (noted 2026-10-05)
 
@@ -1158,6 +1179,15 @@ Small, understood, not worth an entry of their own.
 ---
 
 ## Resolved
+
+### The fighting-style list wasn't filtered by class (noted 2026-10-11, resolved 2026-10-20 by 083)
+
+The picker offered all eleven styles to any Fighting Style feature. 083 gave
+each feature row a `fighting_style_options` array (typed by a new
+`fighting_style` domain, which replaced 079's CHECK), and the sheet offers
+only that row's list. The Fighter keeps its eleven; 089 and 090 seed the
+Paladin's and Ranger's seven each, including Tasha's Blessed Warrior and
+Druidic Warrior.
 
 ### No portraits existed (noted 2026-08-14, resolved by 048–050)
 
