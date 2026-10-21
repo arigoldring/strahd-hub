@@ -45,8 +45,12 @@ export interface Subclass {
 
 /**
  * A class or subclass feature (079). subclassId null means the base class's
- * own (Second Wind); otherwise it belongs to that archetype. `choice` says
- * the feature carries a picker, and which kind.
+ * own (Second Wind); otherwise it belongs to that archetype.
+ *
+ * A feature carries a picker when optionIds is non-empty (083): those are the
+ * options it offers. They can include another campaign's homebrew for a
+ * member of both, so the sheet keeps only ids present in getFeatureOptions,
+ * which narrows to the campaign being viewed.
  */
 export interface ClassFeature {
   id: string;
@@ -55,13 +59,46 @@ export interface ClassFeature {
   level: number;
   name: string;
   description: string;
-  choice: FeatureChoice | null;
+  optionIds: string[];
+  /** 083's step function: from class level `level` on, `total` picks. */
+  picks: { level: number; total: number }[];
   isHomebrew: boolean;
 }
 
-// One list in two places with 079's CHECK on class_features.choice.
-export const FEATURE_CHOICES = ["fighting_style"] as const;
-export type FeatureChoice = (typeof FEATURE_CHOICES)[number];
+/**
+ * One thing a feature lets you pick (083): a fighting style now; maneuvers,
+ * invocations and metamagic later. `key` is what code gives an effect to;
+ * null on homebrew, which then has none. `kind` stays a string: nothing here
+ * branches on it, so it needn't be a third copy of 083's CHECK.
+ */
+export interface FeatureOption {
+  id: string;
+  kind: string;
+  key: string | null;
+  name: string;
+  description: string;
+  prerequisite: string | null;
+  /** Null for homebrew. */
+  source: SubclassSource | null;
+  isHomebrew: boolean;
+}
+
+/**
+ * How many picks a feature allows at a class level: the latest step at or
+ * below it, or one when the feature has no steps (Fighting Style). The count
+ * is advice the sheet displays; nothing enforces it (083).
+ */
+export function picksAllowed(feature: ClassFeature, classLevel: number): number {
+  let total = 1;
+  let at = 0;
+  for (const p of feature.picks) {
+    if (p.level <= classLevel && p.level > at) {
+      at = p.level;
+      total = p.total;
+    }
+  }
+  return total;
+}
 
 const WEAPON_TRAINING = ["simple", "martial"] as const;
 
@@ -158,8 +195,12 @@ export async function getSubclasses(campaignId: string): Promise<Subclass[]> {
   return data.map(toSubclass);
 }
 
-export function toClassFeature(row: Tables<"class_features">): ClassFeature {
-  const subject = `Class feature ${row.id}`;
+type ClassFeatureRow = Tables<"class_features"> & {
+  class_feature_options: Pick<Tables<"class_feature_options">, "option_id">[];
+  class_feature_picks: Pick<Tables<"class_feature_picks">, "level" | "total">[];
+};
+
+export function toClassFeature(row: ClassFeatureRow): ClassFeature {
   return {
     id: row.id,
     classId: row.class_id,
@@ -167,20 +208,20 @@ export function toClassFeature(row: Tables<"class_features">): ClassFeature {
     level: row.level,
     name: row.name,
     description: row.description,
-    choice:
-      row.choice == null
-        ? null
-        : parseOneOf(row.choice, FEATURE_CHOICES, "choice", subject),
+    optionIds: row.class_feature_options.map((l) => l.option_id),
+    picks: row.class_feature_picks,
     isHomebrew: row.campaign_id !== null,
   };
 }
 
 // getSubclasses' shape: every class's features in one read, filtered per class
 // on the client, with the same .or() keeping other campaigns' homebrew out.
+// The links and pick steps are embedded: they hang off the feature, and their
+// own policies already require the feature to be visible.
 export async function getClassFeatures(campaignId: string): Promise<ClassFeature[]> {
   const { data, error } = await supabase
     .from("class_features")
-    .select("*")
+    .select("*, class_feature_options(option_id), class_feature_picks(level, total)")
     .or(`campaign_id.is.null,campaign_id.eq.${campaignId}`)
     .order("level")
     .order("name");
@@ -189,4 +230,36 @@ export async function getClassFeatures(campaignId: string): Promise<ClassFeature
     throw error;
   }
   return data.map(toClassFeature);
+}
+
+export function toFeatureOption(row: Tables<"feature_options">): FeatureOption {
+  const subject = `Feature option ${row.id}`;
+  return {
+    id: row.id,
+    kind: row.kind,
+    key: row.key,
+    name: row.name,
+    description: row.description,
+    prerequisite: row.prerequisite,
+    source:
+      row.source == null
+        ? null
+        : parseOneOf(row.source, SUBCLASS_SOURCES, "source", subject),
+    isHomebrew: row.campaign_id !== null,
+  };
+}
+
+// getFeats' .or() again. This, not the links, is what decides which options
+// a viewer is offered.
+export async function getFeatureOptions(campaignId: string): Promise<FeatureOption[]> {
+  const { data, error } = await supabase
+    .from("feature_options")
+    .select("*")
+    .or(`campaign_id.is.null,campaign_id.eq.${campaignId}`)
+    .order("name");
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+  return data.map(toFeatureOption);
 }

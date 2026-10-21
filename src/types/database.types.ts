@@ -248,6 +248,61 @@ export type Database = {
           },
         ]
       }
+      character_feature_choices: {
+        Row: {
+          character_class_id: string
+          character_id: string
+          class_id: string
+          created_at: string
+          detail: string | null
+          feature_id: string
+          id: string
+          option_id: string
+        }
+        Insert: {
+          character_class_id: string
+          character_id: string
+          class_id: string
+          created_at?: string
+          detail?: string | null
+          feature_id: string
+          id?: string
+          option_id: string
+        }
+        Update: {
+          character_class_id?: string
+          character_id?: string
+          class_id?: string
+          created_at?: string
+          detail?: string | null
+          feature_id?: string
+          id?: string
+          option_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_feature_choices_character_class_id_character_id__fkey"
+            columns: ["character_class_id", "character_id", "class_id"]
+            isOneToOne: false
+            referencedRelation: "character_classes"
+            referencedColumns: ["id", "character_id", "class_id"]
+          },
+          {
+            foreignKeyName: "character_feature_choices_feature_id_class_id_fkey"
+            columns: ["feature_id", "class_id"]
+            isOneToOne: false
+            referencedRelation: "class_features"
+            referencedColumns: ["id", "class_id"]
+          },
+          {
+            foreignKeyName: "character_feature_choices_feature_id_option_id_fkey"
+            columns: ["feature_id", "option_id"]
+            isOneToOne: false
+            referencedRelation: "class_feature_options"
+            referencedColumns: ["feature_id", "option_id"]
+          },
+        ]
+      }
       character_inventory: {
         Row: {
           added_by: string | null
@@ -556,6 +611,62 @@ export type Database = {
           },
         ]
       }
+      class_feature_options: {
+        Row: {
+          feature_id: string
+          option_id: string
+        }
+        Insert: {
+          feature_id: string
+          option_id: string
+        }
+        Update: {
+          feature_id?: string
+          option_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_feature_options_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "class_features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_feature_options_option_id_fkey"
+            columns: ["option_id"]
+            isOneToOne: false
+            referencedRelation: "feature_options"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_feature_picks: {
+        Row: {
+          feature_id: string
+          level: number
+          total: number
+        }
+        Insert: {
+          feature_id: string
+          level: number
+          total: number
+        }
+        Update: {
+          feature_id?: string
+          level?: number
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_feature_picks_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "class_features"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       class_features: {
         Row: {
           campaign_id: string | null
@@ -745,6 +856,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "feats_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feature_options: {
+        Row: {
+          campaign_id: string | null
+          created_at: string
+          description: string
+          id: string
+          key: string | null
+          kind: string
+          name: string
+          prerequisite: string | null
+          source: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          key?: string | null
+          kind: string
+          name: string
+          prerequisite?: string | null
+          source?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          key?: string | null
+          kind?: string
+          name?: string
+          prerequisite?: string | null
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_options_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"

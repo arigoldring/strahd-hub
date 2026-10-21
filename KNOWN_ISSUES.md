@@ -5,7 +5,8 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 082. Last updated 2026-10-13.**
+**Current through migration 083 (084 written; apply it once the client that
+reads `character_feature_choices` is live). Last updated 2026-10-21.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -669,11 +670,14 @@ reads "Subclass". The shared subclasses are seeded (067-078), Artificer
 excepted: it's a class 055 never seeded, so it has nothing to hang them on.
 
 **Fix:** a CreateFeat-style form; 053's homebrew-edit policy plus a pin
-trigger for editing.
+trigger for editing. 083's `feature_options`, `class_feature_options` and
+`class_feature_picks` are in the same state: INSERT policies for a DM's
+homebrew, no form.
 
 ### Fighter features are display only (noted 2026-10-11, widened by 081/082)
 
-079-082 store and show the text, but nothing reads it.
+079-082 store and show the text, and 083 stores the fighting-style picks, but
+nothing reads them.
 
 - **Fighting style:** Defense doesn't add +1 to the AC tile, Archery doesn't
   add +2 to ranged to-hit, Dueling and Thrown Weapon Fighting don't add +2
@@ -690,8 +694,9 @@ that recharges on a rest.
 **Cost:** the sheet shows "Defense" beside an AC that ignores it, and the
 player adds the bonus and counts the uses in their head.
 
-**Fix:** pass the starting entry's `fightingStyle` into `armorClass` (Defense,
-only when armour is worn) and `AttacksBlock` (Archery on ranged rows;
+**Fix:** look up the entry's `choices` in the option catalogue by `key`, so
+Champion's second style counts too, and pass the result into `armorClass`
+(Defense, only when armour is worn) and `AttacksBlock` (Archery on ranged rows;
 Dueling needs "one weapon in hand", which the sheet doesn't model, so it may
 stay manual). Use tracking wants a `character_feature_uses` table, or
 counters on the class entry, plus a short/long rest action; that is a design
@@ -709,25 +714,49 @@ whose restriction is narrower than its class list.
 and a school filter in the picker driven by the subclass. Wait for a second
 third-caster (Arcane Trickster) before designing it.
 
-### Features with many picks have nowhere to store them (noted 2026-10-11, widened by 082)
+### Feature pick counts are advice, not a limit (noted 2026-10-21)
 
-`character_classes.fighting_style` is one column. Champion's Additional
-Fighting Style (Fighter 10, seeded by 082 as text with no picker) has nowhere
-to go, and CoS reaches level 10. Battle Master maneuvers (082) are listed in
-Combat Superiority's text but can't be picked; the player notes them by hand.
-That row deliberately carries no `choice`: a second 'fighting_style' picker
-would write the same column and overwrite the first pick.
+083's `class_feature_picks` says how many picks a feature allows at a class
+level, and the sheet shows "2 of 3 chosen", turning the count gold when it's
+exceeded. Nothing refuses a fourth. Deliberately client-only: retraining on
+level-up (invocations, maneuvers) and DM fiat both pass through "more than
+allowed" for a moment, and a hard cap would make the swap order matter.
 
-**Fix:** a `character_feature_choices (character_class_id, feature_id,
-choice)` table, migrating the column into it. Maneuvers are now the trigger;
-Arcane Shots (XGtE) and runes (TCoE) will want it too.
+**Cost:** a sheet can hold more picks than the rules allow, visibly.
 
-### The fighting-style list isn't filtered by class (noted 2026-10-11)
+**Fix:** a constraint trigger counting picks against the step function. Not
+wanted.
 
-The picker offers all eleven styles. Correct for the Fighter, the only class
-with a seeded Fighting Style feature. Paladins and Rangers each get a subset
-(plus a few of their own in Tasha's), so seeding their features needs a
-per-class list in `FIGHTING_STYLES`, and the CHECK widened for the extras.
+### Picks outlive a level drop (noted 2026-10-21)
+
+083's trigger clears picks when the class or subclass changes, but not when
+the level goes down. Picks of features above the new level stay stored and
+the sheet hides them, since it lists features up to the entry's level.
+
+**Trigger:** lowering a level, usually to correct a mistake.
+
+**Cost:** none visible; raising the level again brings them back, which is
+the point.
+
+### A fighting style can repeat across a multiclass (noted 2026-10-21)
+
+083's unique index is per class entry. The PHB says a Fighting Style option
+can't be taken twice "even if you later get to choose again", which a
+Fighter/Ranger holding Archery on both entries breaks. Nobody in the party
+multiclasses.
+
+**Fix:** a per-character check, client-side (a warning on the second
+entry's picker) or a trigger.
+
+### Superior Technique's maneuver has nowhere to go (noted 2026-10-21)
+
+A pick that grants another pick: the Tasha's style gives one Battle Master
+maneuver. 083 models one level of choice. The player notes the maneuver by
+hand.
+
+**Fix:** a `grants_feature_id` on `feature_options`, pointing at a feature
+row that then carries its own options. Wait for a second case (the Pact of
+the Tome's cantrips are spells, so not that).
 
 ### The demo characters start with default stats (noted 2026-10-05)
 
@@ -1158,6 +1187,22 @@ Small, understood, not worth an entry of their own.
 ---
 
 ## Resolved
+
+### Features with many picks had nowhere to store them (noted 2026-10-11, resolved by 083/084)
+
+`character_classes.fighting_style` was one column, so Champion's Additional
+Fighting Style and Battle Master maneuvers couldn't be picked. 083 replaced it
+with `character_feature_choices`, an option catalogue (`feature_options`) and
+per-feature links (`class_feature_options`); 084 drops the column. A
+feature's picker is now data: the maneuver, invocation and metamagic seeds
+need no schema or picker change.
+
+### The fighting-style list wasn't filtered by class (noted 2026-10-11, resolved by 083)
+
+The picker offered all eleven styles to any class with the feature. Options
+are now linked per feature, so the Ranger's Fighting Style links its own
+subset (plus Druidic Warrior, a new option row) when its features are seeded.
+No CHECK or code list to widen.
 
 ### No portraits existed (noted 2026-08-14, resolved by 048–050)
 

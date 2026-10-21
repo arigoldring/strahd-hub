@@ -191,6 +191,45 @@
   max-width: 280px;
 }
 
+.sm-feature__count {
+  margin: 0 0 6px;
+  font: 400 10px/1 var(--sh-mono);
+  text-transform: uppercase;
+  color: var(--sh-dim);
+}
+
+/* Over the count is allowed (083), just made noticeable. */
+.sm-feature__count--over {
+  color: var(--sh-gold);
+}
+
+.sm-feature__options {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sm-feature__options > li {
+  padding: 3px 0;
+}
+
+.sm-feature__option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 400 14px/1.4 var(--sh-body);
+  color: var(--sh-bone-bright);
+}
+
+.sm-feature__options .sm-feature__text {
+  margin-left: 22px;
+}
+
+.sm-feature__prereq {
+  font-size: 12px;
+  color: var(--sh-dim);
+}
+
 /* ---------- derived stats strip ---------- */
 
 .sm-derived {

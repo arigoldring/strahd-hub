@@ -9,10 +9,10 @@ import { useClasses } from "../../hooks/useClasses";
 import { useRaces } from "../../hooks/useRaces";
 import { useSubclasses } from "../../hooks/useSubclasses";
 import { useClassFeatures } from "../../hooks/useClassFeatures";
+import { useFeatureOptions } from "../../hooks/useFeatureOptions";
 import {
   ABILITIES,
   ABILITY_LABELS,
-  FIGHTING_STYLES,
   SKILLS,
   abilityModifier,
   armorClass,
@@ -24,7 +24,6 @@ import {
   totalLevel,
   weaponAbility,
   type Ability,
-  type FightingStyle,
   type ProficiencyLevel,
   type SkillKey,
 } from "../../data/rules";
@@ -33,13 +32,16 @@ import {
   skillLevels,
   type CharacterClassEntry,
   type CharacterStats,
+  type FeatureChoice,
   type CharacterStatsPatch,
   type Proficiency,
 } from "../../services/characterSheet";
 import {
   SUBCLASS_SOURCE_LABELS,
+  picksAllowed,
   type CharacterClass,
   type ClassFeature,
+  type FeatureOption,
 } from "../../services/classes";
 import type { Character as CharacterModel } from "../../services/characters";
 import type { CharacterInventoryEntry } from "../../services/characterInventory";
@@ -151,6 +153,7 @@ function FullSheet({
   const { data: classCatalog = [] } = useClasses(campaign.id);
   const { data: subclassCatalog = [] } = useSubclasses(campaign.id);
   const { data: featureCatalog = [] } = useClassFeatures(campaign.id);
+  const { data: optionCatalog = [] } = useFeatureOptions(campaign.id);
   const { data: races = [] } = useRaces(campaign.id);
   // Same key as the Carried section below, so this is a cache hit.
   const { data: gear = [], setEquipped } = useCharacterInventory(character.id);
@@ -526,13 +529,33 @@ function FullSheet({
             <ClassFeatures
               entry={startingEntry}
               catalog={featureCatalog}
+              options={optionCatalog}
               canEdit={canEdit}
-              setFightingStyle={(style) =>
+              addChoice={(featureId, optionId) =>
                 startingEntry &&
                 run(
-                  sheetQuery.setFightingStyle({ entryId: startingEntry.id, style }),
-                  "fighting style",
+                  sheetQuery.addChoice({ entry: startingEntry, featureId, optionId }),
+                  "feature choice",
                 )
+              }
+              replaceChoice={(featureId, old, optionId) =>
+                startingEntry &&
+                run(
+                  (async () => {
+                    if (old) await sheetQuery.removeChoice(old.id);
+                    if (optionId) {
+                      await sheetQuery.addChoice({
+                        entry: startingEntry,
+                        featureId,
+                        optionId,
+                      });
+                    }
+                  })(),
+                  "feature choice",
+                )
+              }
+              removeChoice={(choice) =>
+                run(sheetQuery.removeChoice(choice.id), "feature choice")
               }
             />
           </div>
@@ -750,21 +773,32 @@ function CombatBlock({
  * archetype's once one is picked. Same level rule as the subclass picker: a
  * Fighter 2 / Wizard 3 sees Fighter features through level 2, not 5.
  *
- * A feature with a `choice` carries a picker under its text. Only
- * 'fighting_style' exists so far; the pick is stored on the class entry, and
- * the chosen style's own text comes from FIGHTING_STYLES. Display only: no
- * style changes a derived number yet (see KNOWN_ISSUES).
+ * A feature that offers options (083) carries a picker under its text: a
+ * dropdown when it allows one pick at this level, a checklist with a count
+ * when it allows more. The count is advice: going over is allowed and shown,
+ * not blocked, for retraining and DM fiat. Display only: no pick changes a
+ * derived number yet (see KNOWN_ISSUES).
  */
 function ClassFeatures({
   entry,
   catalog,
+  options,
   canEdit,
-  setFightingStyle,
+  addChoice,
+  replaceChoice,
+  removeChoice,
 }: {
   entry: CharacterClassEntry | undefined;
   catalog: ClassFeature[];
+  options: FeatureOption[];
   canEdit: boolean;
-  setFightingStyle: (style: FightingStyle | null) => void;
+  addChoice: (featureId: string, optionId: string) => void;
+  replaceChoice: (
+    featureId: string,
+    old: FeatureChoice | undefined,
+    optionId: string | null,
+  ) => void;
+  removeChoice: (choice: FeatureChoice) => void;
 }) {
   // Already ordered by level, then name, by getClassFeatures.
   const features = entry
@@ -776,7 +810,7 @@ function ClassFeatures({
       )
     : [];
 
-  if (features.length === 0) {
+  if (!entry || features.length === 0) {
     return (
       <p className="ch-empty">
         {entry ? "No features recorded for this class yet." : "Pick a class first."}
@@ -784,41 +818,170 @@ function ClassFeatures({
     );
   }
 
-  const style = FIGHTING_STYLES.find((s) => s.key === entry?.fightingStyle) ?? null;
+  const byId = new Map(options.map((o) => [o.id, o]));
+  // Options already taken anywhere on this class entry: 083's unique index
+  // refuses a repeat, so they're offered only where they're already picked.
+  const taken = new Set(entry.choices.map((c) => c.optionId));
 
   return (
     <ul className="sm-features">
-      {features.map((f) => (
-        <li key={f.id} className="sm-feature">
-          <div className="sm-feature__head">
-            <span className="sm-feature__name">{f.name}</span>
-            <span className="sm-feature__level">Level {f.level}</span>
-          </div>
-          <p className="sm-feature__text">{f.description}</p>
-          {f.choice === "fighting_style" && (
-            <div className="sm-feature__choice">
-              <select
-                aria-label="Fighting style"
-                value={entry?.fightingStyle ?? ""}
-                disabled={!canEdit}
-                onChange={(e) =>
-                  setFightingStyle((e.target.value || null) as FightingStyle | null)
-                }
-              >
-                <option value="">Choose a style...</option>
-                {FIGHTING_STYLES.map((s) => (
-                  <option key={s.key} value={s.key}>
-                    {s.name}
-                    {s.source === "tcoe" ? ` (${SUBCLASS_SOURCE_LABELS.tcoe})` : ""}
-                  </option>
-                ))}
-              </select>
-              {style && <p className="sm-feature__text">{style.description}</p>}
+      {features.map((f) => {
+        // byId is the campaign-narrowed catalogue, so this drops another
+        // campaign's homebrew that the embedded links let through.
+        const offered = sortOptions(
+          f.optionIds.flatMap((id) => byId.get(id) ?? []),
+        );
+        const picks = entry.choices.filter((c) => c.featureId === f.id);
+        const allowed = picksAllowed(f, entry.level);
+
+        return (
+          <li key={f.id} className="sm-feature">
+            <div className="sm-feature__head">
+              <span className="sm-feature__name">{f.name}</span>
+              <span className="sm-feature__level">Level {f.level}</span>
             </div>
-          )}
-        </li>
-      ))}
+            <p className="sm-feature__text">{f.description}</p>
+            {offered.length > 0 &&
+              (allowed === 1 && picks.length <= 1 ? (
+                <SinglePick
+                  feature={f}
+                  offered={offered}
+                  pick={picks[0]}
+                  taken={taken}
+                  byId={byId}
+                  canEdit={canEdit}
+                  onChange={(optionId) => replaceChoice(f.id, picks[0], optionId)}
+                />
+              ) : (
+                <MultiPick
+                  offered={offered}
+                  picks={picks}
+                  allowed={allowed}
+                  taken={taken}
+                  canEdit={canEdit}
+                  onAdd={(optionId) => addChoice(f.id, optionId)}
+                  onRemove={removeChoice}
+                />
+              ))}
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+// Book order, then homebrew, each by name: the PHB styles first, as the
+// dropdown always showed them.
+const SOURCE_ORDER = { phb: 0, xgte: 1, tcoe: 2 } as const;
+function sortOptions(list: FeatureOption[]): FeatureOption[] {
+  const rank = (o: FeatureOption) => (o.source ? SOURCE_ORDER[o.source] : 3);
+  return [...list].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+}
+
+function optionLabel(o: FeatureOption): string {
+  if (o.source == null) return `${o.name} (Homebrew)`;
+  if (o.source === "phb") return o.name;
+  return `${o.name} (${SUBCLASS_SOURCE_LABELS[o.source]})`;
+}
+
+function SinglePick({
+  feature,
+  offered,
+  pick,
+  taken,
+  byId,
+  canEdit,
+  onChange,
+}: {
+  feature: ClassFeature;
+  offered: FeatureOption[];
+  pick: FeatureChoice | undefined;
+  taken: Set<string>;
+  byId: Map<string, FeatureOption>;
+  canEdit: boolean;
+  onChange: (optionId: string | null) => void;
+}) {
+  const chosen = pick ? byId.get(pick.optionId) : undefined;
+  return (
+    <div className="sm-feature__choice">
+      <select
+        aria-label={feature.name}
+        value={pick?.optionId ?? ""}
+        disabled={!canEdit || pick?.id.startsWith("pending:")}
+        onChange={(e) => onChange(e.target.value || null)}
+      >
+        <option value="">Choose...</option>
+        {offered.map((o) => (
+          <option
+            key={o.id}
+            value={o.id}
+            disabled={taken.has(o.id) && o.id !== pick?.optionId}
+          >
+            {optionLabel(o)}
+          </option>
+        ))}
+      </select>
+      {chosen && <p className="sm-feature__text">{chosen.description}</p>}
+    </div>
+  );
+}
+
+function MultiPick({
+  offered,
+  picks,
+  allowed,
+  taken,
+  canEdit,
+  onAdd,
+  onRemove,
+}: {
+  offered: FeatureOption[];
+  picks: FeatureChoice[];
+  allowed: number;
+  taken: Set<string>;
+  canEdit: boolean;
+  onAdd: (optionId: string) => void;
+  onRemove: (choice: FeatureChoice) => void;
+}) {
+  const pickOf = new Map(picks.map((p) => [p.optionId, p]));
+  const over = picks.length > allowed;
+  return (
+    <div className="sm-feature__choice">
+      <p className={`sm-feature__count${over ? " sm-feature__count--over" : ""}`}>
+        {picks.length} of {allowed} chosen
+      </p>
+      <ul className="sm-feature__options">
+        {offered.map((o) => {
+          const pick = pickOf.get(o.id);
+          return (
+            <li key={o.id}>
+              <label className="sm-feature__option">
+                <input
+                  type="checkbox"
+                  checked={!!pick}
+                  disabled={
+                    !canEdit ||
+                    pick?.id.startsWith("pending:") ||
+                    (!pick && taken.has(o.id))
+                  }
+                  onChange={() => (pick ? onRemove(pick) : onAdd(o.id))}
+                />
+                <span>
+                  {optionLabel(o)}
+                  {o.prerequisite && (
+                    <span className="sm-feature__prereq">
+                      {" "}
+                      Prerequisite: {o.prerequisite}
+                    </span>
+                  )}
+                </span>
+              </label>
+              {pick && <p className="sm-feature__text">{o.description}</p>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

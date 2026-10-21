@@ -1,8 +1,9 @@
 import {
+  addFeatureChoice,
   adjustCharacterHp,
   getCharacterSheet,
+  removeFeatureChoice,
   setClassLevel,
-  setFightingStyle,
   setProficiency,
   setStartingClass,
   setSubclass,
@@ -12,7 +13,7 @@ import {
   type CharacterStatsPatch,
   type ProficiencyKind,
 } from "../services/characterSheet";
-import type { Ability, FightingStyle, ProficiencyLevel } from "../data/rules";
+import type { Ability, ProficiencyLevel } from "../data/rules";
 import { errorMessage } from "../lib/errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -139,15 +140,42 @@ export function useCharacterSheet(characterId: string) {
     onSettled: invalidate,
   });
 
-  const setFightingStyleMutation = useMutation({
-    mutationFn: (vars: { entryId: string; style: FightingStyle | null }) =>
-      setFightingStyle(vars.entryId, vars.style),
-    onMutate: ({ entryId, style }) =>
+  // Optimistic like the toggles above: the pick shows at once under a
+  // placeholder id, and the settle-time refetch swaps in the real row.
+  const addChoiceMutation = useMutation({
+    mutationFn: (vars: {
+      entry: CharacterClassEntry;
+      featureId: string;
+      optionId: string;
+    }) => addFeatureChoice(characterId, vars.entry, vars.featureId, vars.optionId),
+    onMutate: ({ entry, featureId, optionId }) =>
       patchCache((sheet) => ({
         ...sheet,
         classes: sheet.classes.map((c) =>
-          c.id === entryId ? { ...c, fightingStyle: style } : c,
+          c.id === entry.id
+            ? {
+                ...c,
+                choices: [
+                  ...c.choices,
+                  { id: `pending:${optionId}`, featureId, optionId, detail: null },
+                ],
+              }
+            : c,
         ),
+      })),
+    onError: restore,
+    onSettled: invalidate,
+  });
+
+  const removeChoiceMutation = useMutation({
+    mutationFn: (choiceId: string) => removeFeatureChoice(choiceId),
+    onMutate: (choiceId) =>
+      patchCache((sheet) => ({
+        ...sheet,
+        classes: sheet.classes.map((c) => ({
+          ...c,
+          choices: c.choices.filter((ch) => ch.id !== choiceId),
+        })),
       })),
     onError: restore,
     onSettled: invalidate,
@@ -163,6 +191,7 @@ export function useCharacterSheet(characterId: string) {
     setClass: setClassMutation.mutateAsync,
     setLevel: setLevelMutation.mutateAsync,
     setSubclass: setSubclassMutation.mutateAsync,
-    setFightingStyle: setFightingStyleMutation.mutateAsync,
+    addChoice: addChoiceMutation.mutateAsync,
+    removeChoice: removeChoiceMutation.mutateAsync,
   };
 }
