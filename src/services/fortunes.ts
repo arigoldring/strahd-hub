@@ -21,6 +21,18 @@ export interface Fortune {
   isFound: boolean;
 }
 
+/**
+ * A stanza in [square brackets] is a vision note -- narration, not Madam Eva
+ * speaking (128). Returns the note without its brackets, or null for verse.
+ * The one place the convention is read; the stored text keeps the brackets so
+ * the editor round-trips it as typed.
+ */
+export function visionText(stanza: string): string | null {
+  return stanza.startsWith("[") && stanza.endsWith("]")
+    ? stanza.slice(1, -1).trim()
+    : null;
+}
+
 function toFortune(row: FortuneRow): Fortune {
   return {
     id: row.id,

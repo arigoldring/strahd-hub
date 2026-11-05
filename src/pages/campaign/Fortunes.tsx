@@ -2,7 +2,7 @@ import { SubmitEvent, useEffect, useState } from "react";
 import { useCampaign } from "../../components/CampaignLayout";
 import { usePlayerPreview } from "../../components/PlayerPreviewContext";
 import { useFortunes } from "../../hooks/useFortunes";
-import { Fortune } from "../../services/fortunes";
+import { Fortune, visionText } from "../../services/fortunes";
 import { errorMessage } from "../../lib/errors";
 import "./fortunes.css";
 
@@ -53,7 +53,7 @@ export function Fortunes() {
     <div className="fortunes">
       <h1 className="fortunes__heading">Fortunes</h1>
       <p className="fortunes__intro">
-        As read by Madam Eva at Tser Pool.
+        As read by Madam Eva.
       </p>
 
       {showDmUi && (
@@ -146,10 +146,18 @@ function FortuneCard({
         />
       ) : (
         <blockquote className="fortune__lines">
-          {/* One <p> per stanza; pre-line in the CSS breaks its verse lines. */}
-          {fortune.stanzas.map((stanza, i) => (
-            <p key={i}>{stanza}</p>
-          ))}
+          {/* One <p> per stanza; pre-line in the CSS breaks its verse lines.
+              A [bracketed] stanza is a vision note, set as narration. */}
+          {fortune.stanzas.map((stanza, i) => {
+            const vision = visionText(stanza);
+            return vision === null ? (
+              <p key={i}>{stanza}</p>
+            ) : (
+              <p key={i} className="fortune__vision">
+                {vision}
+              </p>
+            );
+          })}
         </blockquote>
       )}
 
@@ -215,7 +223,8 @@ function FortuneEditor({
   return (
     <form className="fortune__editor" onSubmit={handleSubmit}>
       <label className="fortune__editor-label" htmlFor={`fortune-${fortune.id}`}>
-        One line per line; a blank line between stanzas.
+        One line per line; a blank line between stanzas. Put a vision note in
+        [square brackets].
       </label>
       <textarea
         id={`fortune-${fortune.id}`}

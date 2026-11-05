@@ -117,6 +117,15 @@
   margin: 0 0 14px;
   white-space: pre-line;
 }
+/* A [bracketed] stanza (128): what the vision showed, in the narrator's
+   voice rather than hers -- upright, smaller, set off by a rule. */
+.fortune__lines p.fortune__vision {
+  padding-left: 12px;
+  border-left: 2px solid var(--sh-rule-strong);
+  font-style: normal;
+  font-size: 0.92rem;
+  color: var(--sh-mute);
+}
 .fortune__lines p:last-child {
   margin-bottom: 0;
 }
