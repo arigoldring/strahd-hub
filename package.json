@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "gen:types": "supabase gen types typescript --linked > src/types/database.types.ts"
+    "gen:types": "supabase gen types typescript --linked > src/types/database.types.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
@@ -31,6 +32,7 @@
     "sharp": "^0.35.3",
     "supabase": "^2.109.1",
     "typescript": "^7.0.2",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vitest": "^5.1.0"
   }
 }
