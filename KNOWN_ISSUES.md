@@ -14,48 +14,6 @@ and invariants and deliberately does not duplicate anything below.
 
 ## Open
 
-### 029 was never applied, so `added_by` is client-supplied (noted 2026-08-31)
-
-`db/029_character_inventory_added_by.sql` creates
-`stamp_character_inventory_added_by` and the BEFORE INSERT OR UPDATE trigger that
-runs it. Neither exists in the live database. Checked directly rather than
-inferred: the function is absent from `pg_proc` and the trigger from `pg_trigger`,
-while every other trigger the migrations define is present —
-`pin_character_row`, `stamp_session_recap`, `pin_npc_row`, both 046/047
-description pins, `pin_location_note_row`, `pin_npc_note_row` and
-`seed_locations_on_campaign_create`. `character_inventory` has no triggers at
-all, and `added_by` has no default.
-
-So the column is exactly what 029 was written to stop it being: a value the
-client sends. Both halves of that migration's argument are currently live — a
-player who can edit a sheet can insert a stack stamped with the DM's id, and
-because nothing pins the column, any existing row's byline can be rewritten
-after the fact by anyone `can_edit_character` admits. Since 2026-08-31 that set
-includes the public demo account, on all six sheets in its campaign.
-
-**Trigger:** none needed — it is the current state. It surfaced when
-`demo_campaign_reset.sql` produced 45 stacks with `added_by` null: the
-`request.jwt.claims` technique both fixtures use sets a claim that, with no
-trigger present, nothing reads.
-
-**Cost:** the provenance field is decorative rather than trustworthy. Nothing
-crashes and no sheet renders wrong — the app writes an honest value
-(`useCharacterInventory` reads `user.id` from AuthContext), so what is on screen
-today is correct. What is missing is any guarantee that it stays correct.
-`public.schema_migrations` records nothing either way: 036 started the ledger, so
-029 is one of the eleven files that predate it and the table cannot answer
-whether it ran. This is the first case of `db/` and the database actually
-disagreeing since that ledger was built.
-
-**Fix:** run 029. It appears applicable as written and nothing has been built on
-its absence. It predates the ledger convention, so it carries no
-`schema_migrations` insert; add one in the same transaction if the eleven older
-files are ever backfilled. `db/fixtures/demo_campaign_reset.sql` needs no edit
-afterwards — it names `added_by` **and** sets the GUC, so it produces identical
-rows either way. `test_campaign_seed.sql` does not: it omits the column on
-purpose, so its bylines are null today and would only start landing once 029 is
-applied.
-
 ### The demo account can rewrite its own sheet, and the reset is the only undo (noted 2026-08-31)
 
 The public `/demo` login is a shared `'player'` seat, and a player's ordinary
@@ -738,6 +696,15 @@ Invocations, Pact Boon and Mystic Arcanum.
 choice)` table, migrating the column into it. Maneuvers and invocations are
 the triggers; Arcane Shots (XGtE) and runes (TCoE) will want it too.
 
+**The remote branch `feat/feature-choices` is superseded, not rebased.** It
+was written against 082. Its files are numbered 083/084, numbers the live
+database has since used for other migrations. It replaces a column without
+knowing about 083's `class_features.fighting_style_options`, and its header
+says "RUN 082 FIRST". Its design (an options catalogue, a feature-to-option
+link table, a picks table, and an expand-then-contract mirror trigger) is
+being rebuilt as 095/096 against the current schema, without its
+`class_feature_picks` table. Delete the remote branch once 096 lands.
+
 ### XGtE and TCoE subclasses have no features (noted 2026-10-20)
 
 084-094 seeded the PHB subclasses' features only, by decision. The 57
@@ -1179,6 +1146,20 @@ Small, understood, not worth an entry of their own.
 ---
 
 ## Resolved
+
+### 029 was never applied, so `added_by` was client-supplied (noted 2026-08-31, resolved 2026-11-05 by 029)
+
+The trigger that stamps `character_inventory.added_by` from the JWT on insert
+and pins it on update had never run. It was worse than the entry first said:
+030's `add_character_inventory_item` names no `added_by` and relies on this
+trigger, so every stack added through the app since then has a null byline.
+Those rows stay null, because the true adder was never recorded.
+
+The ledger had claimed 029 all along. 036's backfill guard checked for
+`character_inventory.added_by`, which is 028's column, not 029's trigger. 029
+now corrects its row's `applied_at` instead of inserting one. Its BLOCK 1
+runs the header's four cases, plus the RPC's `on conflict` increment, through
+RLS as a real player and DM.
 
 ### The fighting-style list wasn't filtered by class (noted 2026-10-11, resolved 2026-10-20 by 083)
 

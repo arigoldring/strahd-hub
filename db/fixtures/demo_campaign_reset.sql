@@ -731,19 +731,15 @@ cross join target t;
 -- column list entirely, and says naming it "would only be a value for the
 -- trigger to discard."
 --
--- **029 has not been applied to this database.** Checked directly rather than
--- inferred: `stamp_character_inventory_added_by` exists in neither pg_proc nor
--- pg_trigger, while every other trigger the migrations define is present. So
--- added_by has no trigger, no default, and is plain client-supplied today.
+-- **When this file was written, 029 had not been applied** (it landed
+-- 2026-11-05). With no trigger present the GUC technique was a silent no-op on
+-- its own: the first run of this file produced null bylines on all 45 stacks,
+-- because nothing was reading the claim it went to the trouble of setting. So
+-- this file does BOTH, and is correct either way round:
 --
--- That makes the GUC technique a silent no-op on its own -- the first run of
--- this file produced null bylines on all 45 stacks, because nothing was reading
--- the claim it went to the trouble of setting. So this file does BOTH, and is
--- correct either way round:
---
---   029 not applied (today)   added_by is named in the insert, and the named
+--   029 not applied (before)  added_by is named in the insert, and the named
 --                             value lands.
---   029 applied (later)       the trigger overwrites added_by with auth.uid(),
+--   029 applied (now)         the trigger overwrites added_by with auth.uid(),
 --                             which the GUC has already set to that same
 --                             adder_id. Identical rows, no edit needed here.
 --
@@ -807,7 +803,7 @@ begin
     );
 
     -- added_by IS named, unlike test_campaign_seed.sql -- see the block above.
-    -- With 029 unapplied this value is what lands; with 029 applied the trigger
+    -- Before 029 landed this value was what landed; now the trigger
     -- replaces it with auth.uid(), which the set_config above has just set to
     -- the same adder. The GUC and the column agree by construction, so the row
     -- is the same under either regime.
