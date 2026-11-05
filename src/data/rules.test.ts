@@ -4,10 +4,24 @@
 import { describe, expect, it } from "vitest";
 import {
   armorClass,
+  attacksPerAction,
+  collectEffects,
+  critThreshold,
+  hpBonus,
+  initiative,
+  isMonkWeapon,
   isRangedWeapon,
+  martialArtsDie,
+  martialArtsWeapon,
+  saveAura,
+  sneakAttackDice,
+  speedBonus,
   styleAttackBonus,
+  untrainedCheckBonus,
   weaponAbility,
   type ArmorLike,
+  type EffectLevels,
+  type FeatureEffect,
   type WeaponLike,
 } from "./rules";
 
@@ -73,5 +87,159 @@ describe("ranged weapons", () => {
     expect(weaponAbility(dagger, 3, 1)).toBe("str");
     expect(weaponAbility(dagger, 1, 3)).toBe("dex");
     expect(weaponAbility(longsword, 1, 3)).toBe("str");
+  });
+});
+
+// ---------- class feature effects (121) ----------
+
+const fx = (pairs: [FeatureEffect, number][]): EffectLevels => new Map(pairs);
+const none = fx([]);
+const mods = { str: 3, dex: 2, con: 1, int: 0, wis: 4, cha: -1 };
+
+describe("collectEffects", () => {
+  const features = [
+    { classId: "fighter", subclassId: null, level: 5, effect: "extra_attack_fighter" as const },
+    { classId: "fighter", subclassId: "champion", level: 3, effect: "improved_critical" as const },
+    { classId: "rogue", subclassId: null, level: 1, effect: "sneak_attack" as const },
+    { classId: "fighter", subclassId: null, level: 1, effect: null },
+  ];
+
+  it("takes only features at or below the class's own level", () => {
+    const e = collectEffects([{ classId: "fighter", subclassId: null, level: 4 }], features);
+    expect(e.size).toBe(0);
+  });
+
+  it("takes subclass features only for the picked subclass", () => {
+    const e = collectEffects(
+      [{ classId: "fighter", subclassId: "battle_master", level: 5 }],
+      features,
+    );
+    expect([...e.keys()]).toEqual(["extra_attack_fighter"]);
+  });
+
+  it("records the granting class's level, not the total", () => {
+    const e = collectEffects(
+      [
+        { classId: "fighter", subclassId: "champion", level: 5 },
+        { classId: "rogue", subclassId: null, level: 3 },
+      ],
+      features,
+    );
+    expect(e.get("sneak_attack")).toBe(3);
+    expect(e.get("extra_attack_fighter")).toBe(5);
+    expect(e.get("improved_critical")).toBe(5);
+  });
+});
+
+describe("attacks", () => {
+  it("counts the Fighter's tiers, and doesn't stack Extra Attack", () => {
+    expect(attacksPerAction(none)).toBe(1);
+    expect(attacksPerAction(fx([["extra_attack", 5]]))).toBe(2);
+    expect(attacksPerAction(fx([["extra_attack_fighter", 11]]))).toBe(3);
+    expect(attacksPerAction(fx([["extra_attack_fighter", 20]]))).toBe(4);
+    expect(attacksPerAction(fx([["extra_attack", 5], ["extra_attack_fighter", 5]]))).toBe(2);
+  });
+
+  it("widens the crit range for the Champion", () => {
+    expect(critThreshold(none)).toBe(20);
+    expect(critThreshold(fx([["improved_critical", 3]]))).toBe(19);
+    expect(critThreshold(fx([["improved_critical", 15], ["superior_critical", 15]]))).toBe(18);
+  });
+
+  it("scales Sneak Attack with rogue level", () => {
+    expect(sneakAttackDice(none)).toBe(0);
+    expect(sneakAttackDice(fx([["sneak_attack", 1]]))).toBe(1);
+    expect(sneakAttackDice(fx([["sneak_attack", 6]]))).toBe(3);
+    expect(sneakAttackDice(fx([["sneak_attack", 19]]))).toBe(10);
+  });
+
+  it("grows the Martial Arts die at 5th, 11th and 17th", () => {
+    expect(martialArtsDie(none)).toBeNull();
+    expect([1, 5, 11, 17].map((l) => martialArtsDie(fx([["martial_arts", l]])))).toEqual([4, 6, 8, 10]);
+  });
+});
+
+describe("Martial Arts on weapons", () => {
+  const shortsword = { name: "Shortsword", category: "martial", damageDice: "1d6", properties: ["finesse", "light"] };
+  const quarterstaff = { name: "Quarterstaff", category: "simple", damageDice: "1d6", properties: ["versatile"] };
+  const greatclub = { name: "Greatclub", category: "simple", damageDice: "1d8", properties: ["two-handed"] };
+  const longsword = { name: "Longsword", category: "martial", damageDice: "1d8", properties: ["versatile"] };
+  const shortbow = { name: "Shortbow", category: "simple", damageDice: "1d6", properties: ["ammunition", "two-handed"], rangeNormal: 80 };
+
+  it("knows which weapons are monk weapons", () => {
+    expect([shortsword, quarterstaff, greatclub, longsword, shortbow].map(isMonkWeapon)).toEqual([
+      true, true, false, false, false,
+    ]);
+  });
+
+  it("swaps in the die only when it is bigger, and only unarmoured", () => {
+    expect(martialArtsWeapon(quarterstaff, 4, true)).toEqual({ finesse: true, dice: "1d6" });
+    expect(martialArtsWeapon(quarterstaff, 8, true)).toEqual({ finesse: true, dice: "1d8" });
+    expect(martialArtsWeapon(quarterstaff, 8, false)).toEqual({ finesse: false, dice: "1d6" });
+    expect(martialArtsWeapon(longsword, 8, true)).toEqual({ finesse: false, dice: "1d8" });
+    expect(martialArtsWeapon(quarterstaff, null, true)).toEqual({ finesse: false, dice: "1d6" });
+  });
+});
+
+describe("checks and initiative", () => {
+  it("gives Jack of All Trades half proficiency, rounded down, on any check", () => {
+    expect(untrainedCheckBonus("int", 3, fx([["jack_of_all_trades", 2]]))).toEqual({
+      bonus: 1, source: "Jack of All Trades",
+    });
+  });
+
+  it("gives Remarkable Athlete half, rounded up, on STR, DEX and CON only", () => {
+    const e = fx([["remarkable_athlete", 7]]);
+    expect(untrainedCheckBonus("str", 3, e).bonus).toBe(2);
+    expect(untrainedCheckBonus("wis", 3, e).bonus).toBe(0);
+  });
+
+  it("doesn't stack the two; the better applies", () => {
+    const e = fx([["jack_of_all_trades", 2], ["remarkable_athlete", 7]]);
+    expect(untrainedCheckBonus("dex", 3, e)).toEqual({ bonus: 2, source: "Remarkable Athlete" });
+    expect(untrainedCheckBonus("cha", 3, e)).toEqual({ bonus: 1, source: "Jack of All Trades" });
+  });
+
+  it("adds each subclass ability to initiative", () => {
+    expect(initiative(mods, 2, none)).toEqual({ total: 2, parts: ["DEX +2"] });
+    const e = fx([["dread_ambusher", 3], ["jack_of_all_trades", 2]]);
+    expect(initiative(mods, 2, e)).toEqual({
+      total: 7,
+      parts: ["DEX +2", "Jack of All Trades +1", "Dread Ambusher +4"],
+    });
+    expect(initiative(mods, 2, fx([["rakish_audacity", 3]])).total).toBe(1);
+  });
+});
+
+describe("saves, speed and hit points", () => {
+  it("gives Aura of Protection CHA, minimum +1", () => {
+    expect(saveAura(3, fx([["aura_of_protection", 6]]))).toBe(3);
+    expect(saveAura(-1, fx([["aura_of_protection", 6]]))).toBe(1);
+    expect(saveAura(3, none)).toBe(0);
+  });
+
+  it("gives Fast Movement +10 without heavy armour", () => {
+    const e = fx([["fast_movement", 5]]);
+    expect(speedBonus(e, { armorCategory: "medium", shield: true }).bonus).toBe(10);
+    expect(speedBonus(e, { armorCategory: "heavy", shield: false }).bonus).toBe(0);
+  });
+
+  it("scales Unarmored Movement, and loses it to armour or a shield", () => {
+    const at = (l: number) => speedBonus(fx([["unarmored_movement", l]]), { armorCategory: null, shield: false }).bonus;
+    expect([2, 6, 10, 14, 18].map(at)).toEqual([10, 15, 20, 25, 30]);
+    expect(speedBonus(fx([["unarmored_movement", 2]]), { armorCategory: null, shield: true }).bonus).toBe(0);
+  });
+
+  it("adds a hit point per sorcerer level for Draconic Resilience", () => {
+    expect(hpBonus(fx([["draconic_resilience", 4]]))).toBe(4);
+    expect(hpBonus(none)).toBe(0);
+  });
+
+  it("takes the better of Draconic Resilience and Unarmored Defense", () => {
+    expect(ac({ natural: { name: "Draconic Resilience", base: 13 } }).total).toBe(15);
+    expect(ac({ natural: { name: "Draconic Resilience", base: 13 }, shield }).total).toBe(17);
+    const unarmored = { ability: "con" as const, mod: 3, allowsShield: true };
+    expect(ac({ natural: { name: "Draconic Resilience", base: 13 }, unarmored }).total).toBe(15);
+    expect(ac({ natural: { name: "Draconic Resilience", base: 13 }, armor: chainMail }).total).toBe(16);
   });
 });

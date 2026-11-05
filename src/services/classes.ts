@@ -2,8 +2,10 @@ import { supabase } from "../lib/supabase";
 import { parseOneOf, requireField } from "../lib/parse";
 import {
   ABILITIES,
+  FEATURE_EFFECTS,
   SPELL_ABILITIES,
   type Ability,
+  type FeatureEffect,
   type SpellAbility,
 } from "../data/rules";
 import type { Tables } from "../types/database.types";
@@ -66,6 +68,11 @@ export interface ClassFeature {
    * The sheet lists them in the catalogue's order, not this array's.
    */
   optionIds: string[];
+  /**
+   * The derived number this feature changes (121), or null for a display-only
+   * feature. rules.ts holds the maths for each key.
+   */
+  effect: FeatureEffect | null;
   isHomebrew: boolean;
 }
 
@@ -200,6 +207,10 @@ export function toClassFeature(row: ClassFeatureRow): ClassFeature {
     name: row.name,
     description: row.description,
     optionIds: row.class_feature_options.map((l) => l.option_id),
+    effect:
+      row.effect == null
+        ? null
+        : parseOneOf(row.effect, FEATURE_EFFECTS, "effect", `Class feature ${row.id}`),
     isHomebrew: row.campaign_id !== null,
   };
 }

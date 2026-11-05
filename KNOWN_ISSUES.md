@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 120. Last updated 2026-11-05.**
+**Current through migration 121. Last updated 2026-11-05.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -629,10 +629,11 @@ excepted: it's a class 055 never seeded, so it has nothing to hang them on.
 **Fix:** a CreateFeat-style form; 053's homebrew-edit policy plus a pin
 trigger for editing.
 
-### Class features are display only (noted 2026-10-11, widened by 081/082, 084-094 and 097-120, narrowed 2026-11-05)
+### Class features are mostly display only (noted 2026-10-11, widened by 081/082, 084-094 and 097-120, narrowed 2026-11-05 by 095 and 121)
 
-079-094 and 097-120 store and show the text for every class and subclass. Apart from two fighting
-styles, nothing reads it.
+079-094 and 097-120 store and show the text for every class and subclass.
+The sheet computes from two fighting styles and from the 21 rows that carry
+a 121 `effect` key; every other row is text.
 
 - **Fighting style:** Defense (+1 AC while body armour is worn) and Archery
   (+2 to-hit on ranged weapons) are applied by `armorClass` and
@@ -649,14 +650,27 @@ styles, nothing reads it.
   20/60, 1d4), so nothing but the name tells them apart. Fix: a
   melee/ranged column on weapon items, or a `ranged` property on the Dart's
   row.
-- **Derived numbers nothing applies:** Improved/Superior Critical's crit range,
-  Remarkable Athlete and Jack of All Trades on ability checks, Extra Attack's
-  attack count, Rage's damage bonus and resistances, Sneak Attack dice, the
-  Martial Arts die, Fast Movement and Unarmored Movement's speed, Draconic
-  Resilience's hit points and AC 13 + Dex, Aura of Protection on saves,
-  Primal Champion's +4, Slippery Mind and Diamond Soul's save proficiencies
-  (the player can add those by hand), Potent Spellcasting and Agonizing
-  Blast on cantrip damage.
+- **Computed since 121:** attacks per Attack action, crit range, Sneak
+  Attack dice, Martial Arts (DEX and its die on monk weapons and unarmed
+  strikes), Jack of All Trades and Remarkable Athlete on untrained skills,
+  passives and initiative, Dread Ambusher, Tactical Wit and Rakish Audacity
+  on initiative, Aura of Protection on saves, Fast Movement and Unarmored
+  Movement on speed, and Draconic Resilience's AC 13 + DEX.
+- **Shown, but the condition is the player's:** Sneak Attack still needs
+  advantage or an ally beside the target; Aura of Protection needs the
+  paladin conscious and within range; Dread Ambusher's first-turn extra
+  attack isn't shown. Draconic Resilience's hit points appear only in the
+  "Average for level" hint, because max HP is a number the player types.
+- **The Dart counts as a monk weapon.** `isMonkWeapon` uses the same
+  "thrown, so not ranged" test as Archery, so it accepts the Dart, which the
+  PHB lists as a ranged weapon. The same fix as above corrects both.
+- **Derived numbers nothing applies:** Rage's damage bonus and resistances
+  (rage is a state the sheet doesn't track), Brutal Critical's dice, Primal
+  Champion's +4 (the player edits the scores), Slippery Mind and Diamond
+  Soul's save proficiencies (the player can add those by hand), Potent
+  Spellcasting and Agonizing Blast on cantrip damage (the sheet shows no
+  cantrip damage), Extra Attack from an invocation (Thirsting Blade), and
+  every racial trait and feat (Alert's +5 initiative among them).
 - **Uses nothing tracks:** Second Wind, Action Surge, Indomitable, superiority
   dice, Rage, Bardic Inspiration, Channel Divinity, Wild Shape, ki, Lay on
   Hands' pool, sorcery points, Pact Magic slots, Arcane Recovery, and every

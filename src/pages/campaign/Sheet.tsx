@@ -16,15 +16,27 @@ import {
   SKILLS,
   abilityModifier,
   armorClass,
+  attacksPerAction,
   averageHp,
+  collectEffects,
+  critThreshold,
   damageString,
   formatModifier,
+  hpBonus,
+  initiative,
+  martialArtsDie,
+  martialArtsWeapon,
   proficiencyBonus,
+  saveAura,
   skillBonus,
+  sneakAttackDice,
+  speedBonus,
   styleAttackBonus,
   totalLevel,
+  untrainedCheckBonus,
   weaponAbility,
   type Ability,
+  type EffectLevels,
   type FightingStyleKey,
   type ProficiencyLevel,
   type SkillKey,
@@ -206,10 +218,21 @@ function FullSheet({
   const mod = (a: Ability) => abilityModifier(stats.scores[a]);
   const saves = saveSet(proficiencies);
   const skills = skillLevels(proficiencies);
+  // Every class feature effect the character has (121), from every class
+  // entry, each with the level of the class that grants it. The numbers
+  // below read from this; a feature with no effect key is display only.
+  const effects = collectEffects(classes, featureCatalog);
+  // Untrained skills take Jack of All Trades or Remarkable Athlete, and so
+  // do the passives, which are built from this.
   const skillTotal = (key: SkillKey) => {
     const skill = SKILLS.find((s) => s.key === key)!;
-    return skillBonus(mod(skill.ability), pb, skills[key]);
+    const prof = skills[key];
+    const untrained = prof === 0 ? untrainedCheckBonus(skill.ability, pb, effects).bonus : 0;
+    return skillBonus(mod(skill.ability), pb, prof) + untrained;
   };
+  const mods = Object.fromEntries(ABILITIES.map((a) => [a, mod(a)])) as Record<Ability, number>;
+  const init = initiative(mods, pb, effects);
+  const aura = saveAura(mod("cha"), effects);
   // Eldritch Knight and Arcane Trickster cast through a class that doesn't.
   const spellAbility = cls?.spellAbility ?? subclass?.spellAbility ?? null;
 
@@ -242,6 +265,9 @@ function FullSheet({
       : null,
     styles,
     bonus: stats.acBonus,
+    natural: effects.has("draconic_resilience")
+      ? { name: "Draconic Resilience", base: 13 }
+      : null,
   });
 
   // Equip one of a kind (body armour, or shield) and un-equip the rest of
@@ -372,11 +398,20 @@ function FullSheet({
         shield={shield}
         armors={armors}
         equip={equip}
+        featureSpeed={speedBonus(effects, {
+          armorCategory: armor?.category ?? null,
+          shield: shield != null,
+        })}
+        featureHp={hpBonus(effects)}
       />
 
       <div className="sm-derived">
         <Stat label="Proficiency" value={formatModifier(pb)} />
-        <Stat label="Initiative" value={formatModifier(mod("dex"))} />
+        <Stat
+          label="Initiative"
+          value={formatModifier(init.total)}
+          title={init.parts.join(" · ")}
+        />
         <Stat label="Passive Perception" value={String(10 + skillTotal("perception"))} />
         <Stat
           label="Passive Investigation"
@@ -443,8 +478,11 @@ function FullSheet({
                         }
                       />
                       <span className="sm-row__name">{ABILITY_LABELS[a]}</span>
-                      <span className="sm-row__total">
-                        {formatModifier(mod(a) + (saves.has(a) ? pb : 0))}
+                      <span
+                        className="sm-row__total"
+                        title={aura ? `Includes Aura of Protection ${formatModifier(aura)}` : undefined}
+                      >
+                        {formatModifier(mod(a) + (saves.has(a) ? pb : 0) + aura)}
                       </span>
                     </label>
                   </li>
@@ -524,6 +562,8 @@ function FullSheet({
             strMod={mod("str")}
             dexMod={mod("dex")}
             styles={styles}
+            effects={effects}
+            unarmored={armor == null && shield == null}
           />
           <CharacterSpells characterId={character.id} isOwn={isOwn} />
           <CharacterFeats characterId={character.id} isOwn={isOwn} />
@@ -581,6 +621,8 @@ function CombatBlock({
   shield,
   armors,
   equip,
+  featureSpeed,
+  featureHp,
 }: {
   stats: CharacterStats;
   canEdit: boolean;
@@ -595,6 +637,10 @@ function CombatBlock({
   shield: ArmorEntry | null;
   armors: ArmorEntry[];
   equip: (pool: ArmorEntry[], entryId: string) => void;
+  /** Speed from class features (121), already checked against what's worn. */
+  featureSpeed: { bonus: number; parts: string[] };
+  /** Max HP class features add (Draconic Resilience), for the average hint. */
+  featureHp: number;
 }) {
   const bodyArmors = armors.filter((a) => a.category !== "shield");
   const shields = armors.filter((a) => a.category === "shield");
@@ -605,7 +651,7 @@ function CombatBlock({
   const tooHeavy =
     armor?.strengthRequirement != null &&
     stats.scores.str < armor.strengthRequirement;
-  const speed = Math.max(0, baseSpeed - (tooHeavy ? 10 : 0));
+  const speed = Math.max(0, baseSpeed - (tooHeavy ? 10 : 0) + featureSpeed.bonus);
 
   const applyHp = (sign: 1 | -1) => {
     const n = Number.parseInt(hpDelta, 10);
@@ -718,7 +764,8 @@ function CombatBlock({
         )}
         {cls && (
           <span className="sm-combat__note">
-            Average for level {level}: {averageHp(cls.hitDie, level, conMod)}
+            Average for level {level}: {averageHp(cls.hitDie, level, conMod) + featureHp}
+            {featureHp > 0 && ` (incl. Draconic Resilience +${featureHp})`}
           </span>
         )}
       </div>
@@ -743,6 +790,9 @@ function CombatBlock({
             }
           />
         </label>
+        {featureSpeed.parts.length > 0 && (
+          <span className="sm-combat__note">{featureSpeed.parts.join(" · ")}</span>
+        )}
         {stats.speedOverride != null && raceSpeed != null && (
           <span className="sm-combat__note">Race speed {raceSpeed} ft</span>
         )}
@@ -883,6 +933,8 @@ function AttacksBlock({
   strMod,
   dexMod,
   styles,
+  effects,
+  unarmored,
 }: {
   weapons: WeaponEntry[];
   proficiencies: Proficiency[];
@@ -893,21 +945,48 @@ function AttacksBlock({
   strMod: number;
   dexMod: number;
   styles: readonly FightingStyleKey[];
+  effects: EffectLevels;
+  /** No body armour and no shield: the condition Martial Arts needs. */
+  unarmored: boolean;
 }) {
   const extra = new Set(
     proficiencies.filter((p) => p.kind === "weapon").map((p) => p.key),
   );
   const fromClass = (w: WeaponEntry) =>
     w.category === "simple" || cls?.weaponTraining === "martial";
+  const better = Math.max(strMod, dexMod);
+
+  // The facts that apply to every attack, shown once above the rows.
+  const attacks = attacksPerAction(effects);
+  const crit = critThreshold(effects);
+  const sneak = sneakAttackDice(effects);
+  const maDie = martialArtsDie(effects);
+  const martial = maDie != null && unarmored;
+  const summary = [
+    attacks > 1 && `${attacks} attacks per Attack action`,
+    crit < 20 && `crit on ${crit}–20`,
+    sneak > 0 && `Sneak Attack ${sneak}d6 once per turn (finesse or ranged)`,
+    maDie != null &&
+      (martial
+        ? `Martial Arts d${maDie}`
+        : `Martial Arts d${maDie} needs no armour or shield`),
+  ].filter(Boolean);
 
   return (
     <>
       <Band label="Attacks" count={`${weapons.length} carried`} />
       <div className="ch-body">
+        {summary.length > 0 && <p className="sm-legend">{summary.join(" · ")}</p>}
         <table className="ch-table sm-attacks">
           <tbody>
             {weapons.map((w) => {
-              const ability = weaponAbility(w, strMod, dexMod);
+              // Martial Arts lets a monk weapon use DEX and its die.
+              const ma = martialArtsWeapon(w, maDie, unarmored);
+              const ability = ma.finesse
+                ? dexMod > strMod
+                  ? "dex"
+                  : "str"
+                : weaponAbility(w, strMod, dexMod);
               const abilityMod = ability === "dex" ? dexMod : strMod;
               const classProf = fromClass(w);
               const proficient = classProf || extra.has(w.id);
@@ -951,7 +1030,7 @@ function AttacksBlock({
                     {formatModifier(toHit)}
                   </td>
                   <td className="sm-attacks__dmg">
-                    {damageString(w.damageDice, abilityMod)} {w.damageType}
+                    {damageString(ma.dice, abilityMod)} {w.damageType}
                     {w.versatileDice && (
                       <span className="sm-attacks__meta">
                         two-handed {damageString(w.versatileDice, abilityMod)}
@@ -961,17 +1040,27 @@ function AttacksBlock({
                 </tr>
               );
             })}
-            {/* Everyone is proficient with unarmed strikes: 1 + STR. */}
+            {/* Everyone is proficient with unarmed strikes: 1 + STR, or with
+                Martial Arts the die + the better of STR and DEX. */}
             <tr>
               <td className="sm-attacks__prof">
                 <span className="sm-pip sm-pip--1" />
               </td>
               <td>
                 Unarmed Strike
-                <span className="sm-attacks__meta">always proficient</span>
+                <span className="sm-attacks__meta">
+                  {martial ? "Martial Arts" : "always proficient"}
+                </span>
               </td>
-              <td className="sm-attacks__hit">{formatModifier(strMod + pb)}</td>
-              <td className="sm-attacks__dmg">{Math.max(1, 1 + strMod)} bludgeoning</td>
+              <td className="sm-attacks__hit">
+                {formatModifier((martial ? better : strMod) + pb)}
+              </td>
+              <td className="sm-attacks__dmg">
+                {martial
+                  ? damageString(`1d${maDie}`, better)
+                  : Math.max(1, 1 + strMod)}{" "}
+                bludgeoning
+              </td>
             </tr>
           </tbody>
         </table>
@@ -1070,9 +1159,9 @@ const PROF_LABELS: Record<ProficiencyLevel, string> = {
   2: "Expertise",
 };
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
-    <div className="sm-stat">
+    <div className="sm-stat" title={title}>
       <span className="sm-stat__label">{label}</span>
       <span className="sm-stat__value">{value}</span>
     </div>

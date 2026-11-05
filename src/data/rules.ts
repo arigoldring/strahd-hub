@@ -124,8 +124,14 @@ export function armorClass(opts: {
   unarmored: { ability: Ability; mod: number; allowsShield: boolean } | null;
   styles: readonly FightingStyleKey[];
   bonus: number;
+  /**
+   * A fixed base that replaces 10 with no armour on, shield or not: Draconic
+   * Resilience's 13 + DEX. When a character also has Unarmored Defense, the
+   * higher of the two applies; they never stack.
+   */
+  natural?: { name: string; base: number } | null;
 }): { total: number; parts: string[] } {
-  const { armor, shield, dexMod, unarmored, styles, bonus } = opts;
+  const { armor, shield, dexMod, unarmored, styles, bonus, natural = null } = opts;
   const parts: string[] = [];
   let total: number;
 
@@ -141,9 +147,15 @@ export function armorClass(opts: {
     if (armor.category !== "heavy") parts.push(`DEX ${formatModifier(dex)}`);
   } else {
     const ud = unarmored && (unarmored.allowsShield || !shield) ? unarmored : null;
-    total = 10 + dexMod + (ud?.mod ?? 0);
-    parts.push("10", `DEX ${formatModifier(dexMod)}`);
-    if (ud) parts.push(`${ud.ability.toUpperCase()} ${formatModifier(ud.mod)}`);
+    const udTotal = 10 + dexMod + (ud?.mod ?? 0);
+    if (natural && natural.base + dexMod > udTotal) {
+      total = natural.base + dexMod;
+      parts.push(`${natural.name} ${natural.base}`, `DEX ${formatModifier(dexMod)}`);
+    } else {
+      total = udTotal;
+      parts.push("10", `DEX ${formatModifier(dexMod)}`);
+      if (ud) parts.push(`${ud.ability.toUpperCase()} ${formatModifier(ud.mod)}`);
+    }
   }
 
   if (shield) {
@@ -218,4 +230,224 @@ export function damageString(dice: string, mod: number): string {
 /** A character's level is the sum of their class levels; 1 before any class. */
 export function totalLevel(classes: readonly { level: number }[]): number {
   return Math.max(1, classes.reduce((sum, c) => sum + c.level, 0));
+}
+
+// ---------- class feature effects (121) ----------
+//
+// A feature row that changes a derived number carries an `effect` key
+// (class_features.effect). The sheet collects the keys of every feature a
+// character has, with the level of the class that grants each one, and the
+// functions below turn that into numbers. A feature with no key is display
+// only. Conditions the sheet can't see (advantage, an ally beside the target,
+// being conscious) are left to the player.
+
+/** One list in two places with 121's CHECK on class_features.effect. */
+export const FEATURE_EFFECTS = [
+  "extra_attack",
+  "extra_attack_fighter",
+  "improved_critical",
+  "superior_critical",
+  "sneak_attack",
+  "martial_arts",
+  "jack_of_all_trades",
+  "remarkable_athlete",
+  "dread_ambusher",
+  "tactical_wit",
+  "rakish_audacity",
+  "aura_of_protection",
+  "fast_movement",
+  "unarmored_movement",
+  "draconic_resilience",
+] as const;
+export type FeatureEffect = (typeof FEATURE_EFFECTS)[number];
+
+/** Each effect the character has, with the level of the class granting it. */
+export type EffectLevels = ReadonlyMap<FeatureEffect, number>;
+
+/**
+ * The effects a character has: every class entry's features up to that
+ * class's own level, plus its subclass's (the sheet's level rule). The value
+ * is the granting class's level, which the scaling effects read (Sneak
+ * Attack by rogue level, not total level). If two entries grant the same
+ * key, the higher level wins.
+ */
+export function collectEffects(
+  entries: readonly { classId: string; subclassId: string | null; level: number }[],
+  features: readonly {
+    classId: string;
+    subclassId: string | null;
+    level: number;
+    effect: FeatureEffect | null;
+  }[],
+): Map<FeatureEffect, number> {
+  const out = new Map<FeatureEffect, number>();
+  for (const e of entries) {
+    for (const f of features) {
+      if (
+        f.effect &&
+        f.classId === e.classId &&
+        f.level <= e.level &&
+        (f.subclassId == null || f.subclassId === e.subclassId)
+      ) {
+        out.set(f.effect, Math.max(out.get(f.effect) ?? 0, e.level));
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Attacks per Attack action. Extra Attack from two classes doesn't stack
+ * (PHB multiclassing), so this is the best single source: 2 for Extra
+ * Attack, or the Fighter's 3 at 11th and 4 at 20th.
+ */
+export function attacksPerAction(effects: EffectLevels): number {
+  const fighter = effects.get("extra_attack_fighter");
+  const fromFighter = fighter == null ? 1 : fighter >= 20 ? 4 : fighter >= 11 ? 3 : 2;
+  return Math.max(fromFighter, effects.has("extra_attack") ? 2 : 1);
+}
+
+/** The lowest d20 roll that crits with a weapon: 20, 19 or 18 (Champion). */
+export function critThreshold(effects: EffectLevels): number {
+  if (effects.has("superior_critical")) return 18;
+  if (effects.has("improved_critical")) return 19;
+  return 20;
+}
+
+/** Sneak Attack d6s: half the rogue level, rounded up. 0 without it. */
+export function sneakAttackDice(effects: EffectLevels): number {
+  const rogue = effects.get("sneak_attack");
+  return rogue == null ? 0 : Math.ceil(rogue / 2);
+}
+
+/** The Martial Arts die's size: d4, d6 at 5th, d8 at 11th, d10 at 17th. */
+export function martialArtsDie(effects: EffectLevels): number | null {
+  const monk = effects.get("martial_arts");
+  if (monk == null) return null;
+  return monk >= 17 ? 10 : monk >= 11 ? 8 : monk >= 5 ? 6 : 4;
+}
+
+export interface MonkWeaponLike extends WeaponLike {
+  name: string;
+  category: string;
+}
+
+/**
+ * A monk weapon: the shortsword, or a simple melee weapon that is neither
+ * heavy nor two-handed. The shortsword is matched by name because the PHB
+ * names it; nothing else in a weapon's columns sets it apart.
+ */
+export function isMonkWeapon(weapon: MonkWeaponLike): boolean {
+  if (weapon.name === "Shortsword") return true;
+  return (
+    weapon.category === "simple" &&
+    !isRangedWeapon(weapon) &&
+    !weapon.properties.includes("heavy") &&
+    !weapon.properties.includes("two-handed")
+  );
+}
+
+/**
+ * Martial Arts on one weapon: whether it may use DEX, and the damage dice to
+ * show. Applies only while the monk wears no armour and holds no shield.
+ * The die replaces a weapon's own when it is bigger ("1d6" vs d8).
+ */
+export function martialArtsWeapon(
+  weapon: MonkWeaponLike,
+  die: number | null,
+  unarmored: boolean,
+): { finesse: boolean; dice: string } {
+  if (die == null || !unarmored || !isMonkWeapon(weapon)) {
+    return { finesse: false, dice: weapon.damageDice };
+  }
+  const own = /^1d(\d+)$/.exec(weapon.damageDice);
+  const bigger = own == null || die > Number(own[1]);
+  return { finesse: true, dice: bigger ? `1d${die}` : weapon.damageDice };
+}
+
+/**
+ * The bonus an untrained ability check gets: Jack of All Trades' half
+ * proficiency (rounded down) on any check, or Remarkable Athlete's half
+ * (rounded up) on STR, DEX and CON checks. They don't stack; the better one
+ * applies. Callers add it only where the check has no proficiency already.
+ */
+export function untrainedCheckBonus(
+  ability: Ability,
+  pb: number,
+  effects: EffectLevels,
+): { bonus: number; source: string | null } {
+  const jack = effects.has("jack_of_all_trades") ? Math.floor(pb / 2) : 0;
+  const athlete =
+    effects.has("remarkable_athlete") && ["str", "dex", "con"].includes(ability)
+      ? Math.ceil(pb / 2)
+      : 0;
+  if (athlete === 0 && jack === 0) return { bonus: 0, source: null };
+  return athlete >= jack
+    ? { bonus: athlete, source: "Remarkable Athlete" }
+    : { bonus: jack, source: "Jack of All Trades" };
+}
+
+/**
+ * Initiative is a DEX check: DEX, plus Jack of All Trades or Remarkable
+ * Athlete, plus any ability a subclass adds (Dread Ambusher WIS, Tactical
+ * Wit INT, Rakish Audacity CHA). Parts name each piece for the tooltip.
+ */
+export function initiative(
+  mods: Record<Ability, number>,
+  pb: number,
+  effects: EffectLevels,
+): { total: number; parts: string[] } {
+  const parts = [`DEX ${formatModifier(mods.dex)}`];
+  let total = mods.dex;
+  const untrained = untrainedCheckBonus("dex", pb, effects);
+  if (untrained.source) {
+    total += untrained.bonus;
+    parts.push(`${untrained.source} ${formatModifier(untrained.bonus)}`);
+  }
+  const added: [FeatureEffect, Ability, string][] = [
+    ["dread_ambusher", "wis", "Dread Ambusher"],
+    ["tactical_wit", "int", "Tactical Wit"],
+    ["rakish_audacity", "cha", "Rakish Audacity"],
+  ];
+  for (const [effect, ability, name] of added) {
+    if (effects.has(effect)) {
+      total += mods[ability];
+      parts.push(`${name} ${formatModifier(mods[ability])}`);
+    }
+  }
+  return { total, parts };
+}
+
+/** Aura of Protection: CHA modifier, minimum +1, on every saving throw. */
+export function saveAura(chaMod: number, effects: EffectLevels): number {
+  return effects.has("aura_of_protection") ? Math.max(1, chaMod) : 0;
+}
+
+/**
+ * Speed from features. Fast Movement: +10 ft without heavy armour.
+ * Unarmored Movement: +10 ft at 2nd, rising by 5 every four monk levels to
+ * +30 at 18th, with no armour and no shield.
+ */
+export function speedBonus(
+  effects: EffectLevels,
+  worn: { armorCategory: ArmorLike["category"] | null; shield: boolean },
+): { bonus: number; parts: string[] } {
+  let bonus = 0;
+  const parts: string[] = [];
+  if (effects.has("fast_movement") && worn.armorCategory !== "heavy") {
+    bonus += 10;
+    parts.push("Fast Movement +10");
+  }
+  const monk = effects.get("unarmored_movement");
+  if (monk != null && worn.armorCategory == null && !worn.shield) {
+    const ft = monk >= 18 ? 30 : monk >= 14 ? 25 : monk >= 10 ? 20 : monk >= 6 ? 15 : 10;
+    bonus += ft;
+    parts.push(`Unarmored Movement +${ft}`);
+  }
+  return { bonus, parts };
+}
+
+/** Hit points features add to the maximum: Draconic Resilience, +1 per sorcerer level. */
+export function hpBonus(effects: EffectLevels): number {
+  return effects.get("draconic_resilience") ?? 0;
 }

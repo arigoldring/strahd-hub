@@ -641,6 +641,7 @@ export type Database = {
           class_id: string
           created_at: string
           description: string
+          effect: string | null
           id: string
           level: number
           name: string
@@ -651,6 +652,7 @@ export type Database = {
           class_id: string
           created_at?: string
           description: string
+          effect?: string | null
           id?: string
           level: number
           name: string
@@ -661,6 +663,7 @@ export type Database = {
           class_id?: string
           created_at?: string
           description?: string
+          effect?: string | null
           id?: string
           level?: number
           name?: string
