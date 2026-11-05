@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 121. Last updated 2026-11-05.**
+**Current through migration 122. Last updated 2026-11-05.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -701,15 +701,13 @@ marks them always prepared. The Eldritch Knight (082) and Arcane Trickster
 subclass. The second third-caster this entry was waiting for has now
 arrived, so the design can start.
 
-### Features with many picks have nowhere to store them (noted 2026-10-11, widened by 082 and 084-094, narrowed 2026-11-05 by 095)
+### Many-pick features without a picker yet (noted 2026-10-11, widened by 082 and 084-094, narrowed 2026-11-05 by 095 and 122)
 
-095's `character_feature_choices` allows one pick per feature per class
-entry. That covers every Fighting Style row, including Champion's Additional
-Fighting Style, which is a real picker now. It doesn't cover a feature that
-grants several picks from one list.
-
-Every such pick is still text the player notes by hand, with the options
-listed in the row: Battle Master maneuvers (082), Expertise (Bard, Rogue),
+122 added the machinery: `class_feature_picks` says how many picks a
+feature allows per class level, and the sheet shows a checklist picker for
+any feature with linked options and steps. Battle Master maneuvers (all 23,
+Tasha's included) are the first list on it. Every other such pick is still
+text the player notes by hand, with the options listed in the row: Expertise (Bard, Rogue),
 Magical Secrets, Favored Enemy and Natural Explorer, the Hunter's four
 picks, Totem animals (three picks, which can differ), the Circle of the
 Land's terrain, the Four Elements disciplines, Metamagic, Dragon Ancestor,
@@ -722,20 +720,22 @@ type (097), Divine Magic's affinity (115), the Genie's kind (118), and the
 bonus skill, tool, save or language several subclasses grant. Those are the
 cheapest next pickers: one row per feature, which 095 already supports.
 
-**Fix:** the old branch's `class_feature_picks (feature_id, level, total)`
-table, saying how many picks a feature allows from each class level on.
-Then relax `unique (character_class_id, feature_id)`, and seed the options
-(maneuvers first) as new `feature_options` kinds. Favored Enemy's humanoid
-races also want the old branch's free-text `detail` column. Maneuvers and
-invocations are the triggers; Arcane Shots (XGtE) and runes (TCoE) will want
-it too.
+**Fix:** per list, one migration: a new `feature_options` kind, its options
+(text in our own words), the links, and the feature's steps. Metamagic,
+Arcane Shot, runes and invocations are next. Expertise and skill picks
+want to write `character_proficiencies` instead, and Favored Enemy's
+humanoid races want the old branch's free-text `detail` column.
+
+**Not linkable:** the Superior Technique fighting style and the Martial
+Adept feat each teach a maneuver, but neither is a `class_features` row, so
+the player notes that maneuver by hand.
 
 **The remote branch `feat/feature-choices` is superseded, not rebased.** It
 was written against 082. Its files are numbered 083/084, numbers the live
 database has since used for other migrations. It replaces a column without
 knowing about 083's `class_features.fighting_style_options`, and its header
 says "RUN 082 FIRST". 095/096 rebuild its design against the current schema,
-without its `class_feature_picks` table and `detail` column. The remote
+without its `class_feature_picks` table and `detail` column (122 brought its picks table back). The remote
 branch is kept on purpose (decided 2026-11-05), as the reference for those
 two pieces when many-pick features arrive.
 

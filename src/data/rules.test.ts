@@ -13,6 +13,7 @@ import {
   isRangedWeapon,
   martialArtsDie,
   martialArtsWeapon,
+  picksAllowed,
   saveAura,
   sneakAttackDice,
   speedBonus,
@@ -241,5 +242,22 @@ describe("saves, speed and hit points", () => {
     const unarmored = { ability: "con" as const, mod: 3, allowsShield: true };
     expect(ac({ natural: { name: "Draconic Resilience", base: 13 }, unarmored }).total).toBe(15);
     expect(ac({ natural: { name: "Draconic Resilience", base: 13 }, armor: chainMail }).total).toBe(16);
+  });
+});
+
+describe("picksAllowed", () => {
+  const combatSuperiority = [
+    { level: 3, total: 3 },
+    { level: 7, total: 5 },
+    { level: 10, total: 7 },
+    { level: 15, total: 9 },
+  ];
+  it("allows one pick when a feature has no steps", () => {
+    expect(picksAllowed([], 1)).toBe(1);
+  });
+  it("follows the steps, and allows none before the first", () => {
+    expect([2, 3, 6, 7, 10, 14, 15, 20].map((l) => picksAllowed(combatSuperiority, l))).toEqual([
+      0, 3, 3, 5, 7, 7, 9, 9,
+    ]);
   });
 });

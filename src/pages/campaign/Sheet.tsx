@@ -26,6 +26,7 @@ import {
   initiative,
   martialArtsDie,
   martialArtsWeapon,
+  picksAllowed,
   proficiencyBonus,
   saveAura,
   skillBonus,
@@ -890,7 +891,17 @@ function ClassFeatures({
               <span className="sm-feature__level">Level {f.level}</span>
             </div>
             <p className="sm-feature__text">{f.description}</p>
-            {offered.length > 0 && (
+            {offered.length > 0 && f.pickSteps.length > 0 && entry && (
+              <FeaturePickList
+                feature={f}
+                entry={entry}
+                offered={offered}
+                picks={picks}
+                canEdit={canEdit}
+                writePick={writePick}
+              />
+            )}
+            {offered.length > 0 && f.pickSteps.length === 0 && (
               <div className="sm-feature__choice">
                 <select
                   aria-label={`${f.name}: ${kindLabel}`}
@@ -902,11 +913,7 @@ function ClassFeatures({
                   {offered.map((o) => (
                     <option key={o.id} value={o.id} disabled={takenElsewhere.has(o.id)}>
                       {o.name}
-                      {o.source && o.source !== "phb"
-                        ? ` (${SUBCLASS_SOURCE_LABELS[o.source]})`
-                        : o.isHomebrew
-                          ? " (Homebrew)"
-                          : ""}
+                      {optionSourceLabel(o)}
                       {takenElsewhere.has(o.id) ? " (already taken)" : ""}
                     </option>
                   ))}
@@ -918,6 +925,106 @@ function ClassFeatures({
         );
       })}
     </ul>
+  );
+}
+
+/** "(Tasha's)", "(Homebrew)" or nothing for the PHB, after an option's name. */
+function optionSourceLabel(o: FeatureOption): string {
+  if (o.source && o.source !== "phb") return ` (${SUBCLASS_SOURCE_LABELS[o.source]})`;
+  return o.isHomebrew ? " (Homebrew)" : "";
+}
+
+/**
+ * A feature that grants several picks from one list (122): Combat
+ * Superiority's maneuvers. The chosen ones are listed with their text and a
+ * remove button; a select adds another while the count is under the
+ * allowance for this class's level. Options the character already holds,
+ * here or on any other feature, aren't offered (095's option-once unique).
+ * A level drop keeps every pick, so the count can read "4 of 3"; adding is
+ * then closed until enough are removed.
+ */
+function FeaturePickList({
+  feature,
+  entry,
+  offered,
+  picks,
+  canEdit,
+  writePick,
+}: {
+  feature: ClassFeature;
+  entry: CharacterClassEntry;
+  offered: FeatureOption[];
+  picks: FeaturePick[];
+  canEdit: boolean;
+  writePick: (write: FeaturePickWrite) => void;
+}) {
+  const mine = picks.filter(
+    (p) => p.characterClassId === entry.id && p.featureId === feature.id,
+  );
+  const allowed = picksAllowed(feature.pickSteps, entry.level);
+  const held = new Set(picks.map((p) => p.optionId));
+  const byId = new Map(offered.map((o) => [o.id, o]));
+  const kind = FEATURE_OPTION_KIND_LABELS[offered[0].kind].toLowerCase();
+
+  return (
+    <div className="sm-feature__choice">
+      <p className="sm-feature__count">
+        {mine.length} of {allowed} {kind}s chosen
+      </p>
+      {mine.length > 0 && (
+        <ul className="sm-picks">
+          {mine.map((p) => {
+            const o = byId.get(p.optionId);
+            return (
+              <li key={p.id} className="sm-pick">
+                <div className="sm-pick__head">
+                  <span className="sm-pick__name">
+                    {o ? o.name + optionSourceLabel(o) : "Unknown option"}
+                  </span>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="sm-pick__remove"
+                      aria-label={`Remove ${o?.name ?? "this pick"}`}
+                      onClick={() => writePick({ kind: "remove", pickId: p.id })}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                {o && <p className="sm-feature__text">{o.description}</p>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {mine.length > allowed && (
+        <p className="sm-legend">
+          More than this level allows: remove {mine.length - allowed} to match.
+        </p>
+      )}
+      {canEdit && mine.length < allowed && (
+        <select
+          aria-label={`${feature.name}: add a ${kind}`}
+          value=""
+          onChange={(e) =>
+            e.target.value &&
+            writePick({ kind: "add", entry, featureId: feature.id, optionId: e.target.value })
+          }
+        >
+          <option value="">Add a {kind}...</option>
+          {offered
+            .filter((o) => !held.has(o.id))
+            .map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+                {optionSourceLabel(o)}
+                {o.prerequisite ? ` (${o.prerequisite})` : ""}
+              </option>
+            ))}
+        </select>
+      )}
+    </div>
   );
 }
 

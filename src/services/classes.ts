@@ -69,6 +69,11 @@ export interface ClassFeature {
    */
   optionIds: string[];
   /**
+   * How many picks the feature allows from each class level on (122). Empty
+   * means one pick; picksAllowed in rules.ts reads it.
+   */
+  pickSteps: { level: number; total: number }[];
+  /**
    * The derived number this feature changes (121), or null for a display-only
    * feature. rules.ts holds the maths for each key.
    */
@@ -88,15 +93,18 @@ export interface FeatureOption {
   description: string;
   /** Null for homebrew. */
   source: SubclassSource | null;
+  /** Display only (122): "7th level", "Pact of the Blade". */
+  prerequisite: string | null;
   isHomebrew: boolean;
 }
 
-// One list in two places with 095's CHECK on feature_options.kind.
-export const FEATURE_OPTION_KINDS = ["fighting_style"] as const;
+// One list in two places with the CHECK on feature_options.kind (095, 122).
+export const FEATURE_OPTION_KINDS = ["fighting_style", "maneuver"] as const;
 export type FeatureOptionKind = (typeof FEATURE_OPTION_KINDS)[number];
 
 export const FEATURE_OPTION_KIND_LABELS: Record<FeatureOptionKind, string> = {
   fighting_style: "Fighting style",
+  maneuver: "Maneuver",
 };
 
 const WEAPON_TRAINING = ["simple", "martial"] as const;
@@ -196,6 +204,7 @@ export async function getSubclasses(campaignId: string): Promise<Subclass[]> {
 
 type ClassFeatureRow = Tables<"class_features"> & {
   class_feature_options: Pick<Tables<"class_feature_options">, "option_id">[];
+  class_feature_picks: Pick<Tables<"class_feature_picks">, "level" | "total">[];
 };
 
 export function toClassFeature(row: ClassFeatureRow): ClassFeature {
@@ -207,6 +216,7 @@ export function toClassFeature(row: ClassFeatureRow): ClassFeature {
     name: row.name,
     description: row.description,
     optionIds: row.class_feature_options.map((l) => l.option_id),
+    pickSteps: row.class_feature_picks.map((p) => ({ level: p.level, total: p.total })),
     effect:
       row.effect == null
         ? null
@@ -223,7 +233,7 @@ export function toClassFeature(row: ClassFeatureRow): ClassFeature {
 export async function getClassFeatures(campaignId: string): Promise<ClassFeature[]> {
   const { data, error } = await supabase
     .from("class_features")
-    .select("*, class_feature_options(option_id)")
+    .select("*, class_feature_options(option_id), class_feature_picks(level, total)")
     .or(`campaign_id.is.null,campaign_id.eq.${campaignId}`)
     .order("level")
     .order("name");
@@ -246,6 +256,7 @@ export function toFeatureOption(row: Tables<"feature_options">): FeatureOption {
       row.source == null
         ? null
         : parseOneOf(row.source, SUBCLASS_SOURCES, "source", subject),
+    prerequisite: row.prerequisite,
     isHomebrew: row.campaign_id !== null,
   };
 }

@@ -635,6 +635,32 @@ export type Database = {
           },
         ]
       }
+      class_feature_picks: {
+        Row: {
+          feature_id: string
+          level: number
+          total: number
+        }
+        Insert: {
+          feature_id: string
+          level: number
+          total: number
+        }
+        Update: {
+          feature_id?: string
+          level?: number
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_feature_picks_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "class_features"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       class_features: {
         Row: {
           campaign_id: string | null
@@ -840,6 +866,7 @@ export type Database = {
           key: string | null
           kind: string
           name: string
+          prerequisite: string | null
           source: string | null
         }
         Insert: {
@@ -850,6 +877,7 @@ export type Database = {
           key?: string | null
           kind: string
           name: string
+          prerequisite?: string | null
           source?: string | null
         }
         Update: {
@@ -860,6 +888,7 @@ export type Database = {
           key?: string | null
           kind?: string
           name?: string
+          prerequisite?: string | null
           source?: string | null
         }
         Relationships: [
@@ -1523,6 +1552,10 @@ export type Database = {
       decrement_party_inventory_item: {
         Args: { target_entry: string }
         Returns: undefined
+      }
+      feature_picks_allowed: {
+        Args: { class_level: number; target_feature: string }
+        Returns: number
       }
       generate_dm_invite: { Args: { invite_label?: string }; Returns: string }
       generate_player_invite: {

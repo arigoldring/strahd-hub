@@ -573,3 +573,49 @@
 .sm-pip:disabled {
   cursor: default;
 }
+
+/* ---------- many-pick features (122) ---------- */
+
+.sm-feature__count {
+  margin: 0 0 6px;
+  font: 400 10px/1 var(--sh-mono);
+  text-transform: uppercase;
+  color: var(--sh-dim);
+}
+
+.sm-picks {
+  margin: 0 0 8px;
+  padding: 0 0 0 10px;
+  list-style: none;
+  border-left: 2px solid var(--sh-rule-faint);
+}
+
+.sm-pick {
+  padding: 4px 0;
+}
+
+.sm-pick__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sm-pick__name {
+  font: 600 14px/1.3 var(--sh-body);
+  color: var(--sh-bone-bright);
+}
+
+.sm-pick__remove {
+  padding: 0 6px;
+  border: none;
+  background: none;
+  font: 400 18px/1 var(--sh-body);
+  color: var(--sh-dim);
+  cursor: pointer;
+}
+
+.sm-pick__remove:hover,
+.sm-pick__remove:focus-visible {
+  color: var(--sh-gold);
+}

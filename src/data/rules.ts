@@ -451,3 +451,21 @@ export function speedBonus(
 export function hpBonus(effects: EffectLevels): number {
   return effects.get("draconic_resilience") ?? 0;
 }
+
+// ---------- feature pick allowances (122) ----------
+
+/**
+ * How many picks a feature allows at a class level. No allowance rows means
+ * one pick (a Fighting Style). Otherwise the total of the highest row at or
+ * below the level, or 0 before the first. One rule in two places with 122's
+ * feature_picks_allowed(); change them together.
+ */
+export function picksAllowed(
+  steps: readonly { level: number; total: number }[],
+  classLevel: number,
+): number {
+  if (steps.length === 0) return 1;
+  const reached = steps.filter((s) => s.level <= classLevel);
+  if (reached.length === 0) return 0;
+  return reached.reduce((a, b) => (b.level > a.level ? b : a)).total;
+}
