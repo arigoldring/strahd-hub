@@ -721,8 +721,9 @@ was written against 082. Its files are numbered 083/084, numbers the live
 database has since used for other migrations. It replaces a column without
 knowing about 083's `class_features.fighting_style_options`, and its header
 says "RUN 082 FIRST". 095/096 rebuild its design against the current schema,
-without its `class_feature_picks` table and `detail` column. Delete the
-remote branch: 096 has landed (2026-11-05).
+without its `class_feature_picks` table and `detail` column. The remote
+branch is kept on purpose (decided 2026-11-05), as the reference for those
+two pieces when many-pick features arrive.
 
 ### Tasha's optional class features are unseeded (noted 2026-10-20)
 
