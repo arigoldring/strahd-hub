@@ -1,8 +1,10 @@
 import {
+  addFeaturePick,
   adjustCharacterHp,
+  changeFeaturePick,
   getCharacterSheet,
+  removeFeaturePick,
   setClassLevel,
-  setFeaturePick,
   setProficiency,
   setStartingClass,
   setSubclass,
@@ -139,34 +141,46 @@ export function useCharacterSheet(characterId: string) {
     onSettled: invalidate,
   });
 
-  // Optimistic like the other selects. The cached pick gets a placeholder id
-  // until the refetch on settle brings the real row.
-  const setFeaturePickMutation = useMutation({
-    mutationFn: (vars: {
-      entry: Pick<CharacterClassEntry, "id" | "classId">;
-      featureId: string;
-      optionId: string | null;
-    }) => setFeaturePick(characterId, vars.entry, vars.featureId, vars.optionId),
-    onMutate: ({ entry, featureId, optionId }) =>
+  // One mutation for the three pick writes, so a picker can't fire two that
+  // race on the same row. Optimistic like the other selects: an added pick
+  // gets a placeholder id until the refetch on settle brings the real row.
+  const featurePickMutation = useMutation({
+    mutationFn: (vars: FeaturePickWrite) => {
+      switch (vars.kind) {
+        case "add":
+          return addFeaturePick(characterId, vars.entry, vars.featureId, vars.optionId);
+        case "change":
+          return changeFeaturePick(vars.pickId, vars.optionId);
+        case "remove":
+          return removeFeaturePick(vars.pickId);
+      }
+    },
+    onMutate: (vars) =>
       patchCache((sheet) => {
-        const rest = sheet.picks.filter(
-          (p) => !(p.characterClassId === entry.id && p.featureId === featureId),
-        );
-        return {
-          ...sheet,
-          picks:
-            optionId === null
-              ? rest
-              : [
-                  ...rest,
-                  {
-                    id: `pending-${entry.id}-${featureId}`,
-                    characterClassId: entry.id,
-                    featureId,
-                    optionId,
-                  },
-                ],
-        };
+        switch (vars.kind) {
+          case "add":
+            return {
+              ...sheet,
+              picks: [
+                ...sheet.picks,
+                {
+                  id: `pending-${vars.entry.id}-${vars.optionId}`,
+                  characterClassId: vars.entry.id,
+                  featureId: vars.featureId,
+                  optionId: vars.optionId,
+                },
+              ],
+            };
+          case "change":
+            return {
+              ...sheet,
+              picks: sheet.picks.map((p) =>
+                p.id === vars.pickId ? { ...p, optionId: vars.optionId } : p,
+              ),
+            };
+          case "remove":
+            return { ...sheet, picks: sheet.picks.filter((p) => p.id !== vars.pickId) };
+        }
       }),
     onError: restore,
     onSettled: invalidate,
@@ -182,6 +196,17 @@ export function useCharacterSheet(characterId: string) {
     setClass: setClassMutation.mutateAsync,
     setLevel: setLevelMutation.mutateAsync,
     setSubclass: setSubclassMutation.mutateAsync,
-    setFeaturePick: setFeaturePickMutation.mutateAsync,
+    writeFeaturePick: featurePickMutation.mutateAsync,
   };
 }
+
+/** The three ways a picker changes picks (095, 122). */
+export type FeaturePickWrite =
+  | {
+      kind: "add";
+      entry: Pick<CharacterClassEntry, "id" | "classId">;
+      featureId: string;
+      optionId: string;
+    }
+  | { kind: "change"; pickId: string; optionId: string }
+  | { kind: "remove"; pickId: string };

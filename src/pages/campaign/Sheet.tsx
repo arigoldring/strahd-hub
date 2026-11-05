@@ -4,7 +4,7 @@ import { useAuth } from "../../services/AuthContext";
 import { useCharacter } from "../../hooks/useCharacter";
 import { useParty } from "../../hooks/useParty";
 import { useCharacterInventory } from "../../hooks/useCharacterInventory";
-import { useCharacterSheet } from "../../hooks/useCharacterSheet";
+import { useCharacterSheet, type FeaturePickWrite } from "../../hooks/useCharacterSheet";
 import { useClasses } from "../../hooks/useClasses";
 import { useRaces } from "../../hooks/useRaces";
 import { useSubclasses } from "../../hooks/useSubclasses";
@@ -586,13 +586,7 @@ function FullSheet({
               options={featureOptions}
               picks={picks}
               canEdit={canEdit}
-              setPick={(featureId, optionId) =>
-                startingEntry &&
-                run(
-                  sheetQuery.setFeaturePick({ entry: startingEntry, featureId, optionId }),
-                  "your choice",
-                )
-              }
+              writePick={(write) => run(sheetQuery.writeFeaturePick(write), "your choice")}
             />
           </div>
         </div>
@@ -835,15 +829,27 @@ function ClassFeatures({
   options,
   picks,
   canEdit,
-  setPick,
+  writePick,
 }: {
   entry: CharacterClassEntry | undefined;
   catalog: ClassFeature[];
   options: FeatureOption[];
   picks: FeaturePick[];
   canEdit: boolean;
-  setPick: (featureId: string, optionId: string | null) => void;
+  writePick: (write: FeaturePickWrite) => void;
 }) {
+  // A single pick changes by updating its own row, so the select's three
+  // outcomes are three different writes.
+  const setSingle = (featureId: string, pick: FeaturePick | undefined, optionId: string) => {
+    if (!entry) return;
+    if (!optionId) {
+      if (pick) writePick({ kind: "remove", pickId: pick.id });
+    } else if (pick) {
+      writePick({ kind: "change", pickId: pick.id, optionId });
+    } else {
+      writePick({ kind: "add", entry, featureId, optionId });
+    }
+  };
   // Already ordered by level, then name, by getClassFeatures.
   const features = entry
     ? catalog.filter(
@@ -890,7 +896,7 @@ function ClassFeatures({
                   aria-label={`${f.name}: ${kindLabel}`}
                   value={pick?.optionId ?? ""}
                   disabled={!canEdit}
-                  onChange={(e) => setPick(f.id, e.target.value || null)}
+                  onChange={(e) => setSingle(f.id, pick, e.target.value)}
                 >
                   <option value="">Choose a {kindLabel}...</option>
                   {offered.map((o) => (

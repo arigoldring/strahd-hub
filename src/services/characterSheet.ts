@@ -315,53 +315,34 @@ export async function setSubclass(
 }
 
 /**
- * Set or clear the pick on one feature of one class entry (095).
+ * Feature picks (095), three writes keyed on what they change.
  *
- * Setting is an upsert on (character_class_id, feature_id) WITHOUT
- * ignoreDuplicates, because changing a pick must change the stored option.
- * The second save is an UPDATE, which is why 095 ships an UPDATE policy
- * (CLAUDE.md's upsert gotcha). Its pin trigger lets the update change
- * option_id and nothing else.
+ * A pick is added by INSERT, changed by UPDATE of its own row, and removed by
+ * DELETE of its own row. There is no upsert: a feature can allow many picks
+ * (122), so "the pick on this feature" is no longer one row a conflict
+ * target could name. Changing a single pick is an UPDATE of option_id, which
+ * 095's allowlist pin lets through and nothing else.
  *
- * The FKs refuse an option the feature doesn't offer (23503), and the unique
- * (character_id, option_id) refuses a style the character already holds on
- * another feature (23505). The picker doesn't offer either, so seeing one
- * means a stale page.
- *
- * Clearing is a DELETE. Zero rows back is not treated as a refusal, because
- * "there was no pick to clear" is an ordinary answer too.
+ * The database refuses an option the feature doesn't offer (23503), an
+ * option the character already holds (23505), and a pick past the feature's
+ * allowance (23514, from 122's trigger). The sheet doesn't offer any of
+ * those, so seeing one means a stale page.
  */
-export async function setFeaturePick(
+export async function addFeaturePick(
   characterId: string,
   entry: Pick<CharacterClassEntry, "id" | "classId">,
   featureId: string,
-  optionId: string | null,
+  optionId: string,
 ): Promise<void> {
-  if (optionId === null) {
-    const { error } = await supabase
-      .from("character_feature_choices")
-      .delete()
-      .eq("character_class_id", entry.id)
-      .eq("feature_id", featureId);
-    if (error) {
-      console.error(error);
-      throw error;
-    }
-    return;
-  }
-
   const { data, error } = await supabase
     .from("character_feature_choices")
-    .upsert(
-      {
-        character_id: characterId,
-        character_class_id: entry.id,
-        class_id: entry.classId,
-        feature_id: featureId,
-        option_id: optionId,
-      },
-      { onConflict: "character_class_id,feature_id" },
-    )
+    .insert({
+      character_id: characterId,
+      character_class_id: entry.id,
+      class_id: entry.classId,
+      feature_id: featureId,
+      option_id: optionId,
+    })
     .select("id")
     .maybeSingle();
   if (error) {
@@ -369,6 +350,36 @@ export async function setFeaturePick(
     throw error;
   }
   if (!data) throw new Error("You can't change this character's choices.");
+}
+
+/** A refused UPDATE is a zero-row success (CLAUDE.md), so no row back is a refusal. */
+export async function changeFeaturePick(pickId: string, optionId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("character_feature_choices")
+    .update({ option_id: optionId })
+    .eq("id", pickId)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+  if (!data) throw new Error("You can't change this character's choices.");
+}
+
+/**
+ * Zero rows back is not treated as a refusal: "already gone" (another tab
+ * removed it) is an ordinary answer too.
+ */
+export async function removeFeaturePick(pickId: string): Promise<void> {
+  const { error } = await supabase
+    .from("character_feature_choices")
+    .delete()
+    .eq("id", pickId);
+  if (error) {
+    console.error(error);
+    throw error;
+  }
 }
 
 async function replaceSaves(characterId: string, saves: readonly Ability[]) {
