@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 096. Last updated 2026-11-05.**
+**Current through migration 120. Last updated 2026-11-05.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -629,9 +629,9 @@ excepted: it's a class 055 never seeded, so it has nothing to hang them on.
 **Fix:** a CreateFeat-style form; 053's homebrew-edit policy plus a pin
 trigger for editing.
 
-### Class features are display only (noted 2026-10-11, widened by 081/082 and 084-094, narrowed 2026-11-05)
+### Class features are display only (noted 2026-10-11, widened by 081/082, 084-094 and 097-120, narrowed 2026-11-05)
 
-079-094 store and show the text for every class. Apart from two fighting
+079-094 and 097-120 store and show the text for every class and subclass. Apart from two fighting
 styles, nothing reads it.
 
 - **Fighting style:** Defense (+1 AC while body armour is worn) and Archery
@@ -699,7 +699,14 @@ listed in the row: Battle Master maneuvers (082), Expertise (Bard, Rogue),
 Magical Secrets, Favored Enemy and Natural Explorer, the Hunter's four
 picks, Totem animals (three picks, which can differ), the Circle of the
 Land's terrain, the Four Elements disciplines, Metamagic, Dragon Ancestor,
-Eldritch Invocations, Pact Boon and Mystic Arcanum.
+Eldritch Invocations, Pact Boon and Mystic Arcanum. 097-120 add Arcane Shot
+options (105), Rune Carver's runes (106) and the Kensei's weapons (107).
+
+Some single picks are also noted by hand, because each one would need a new
+`feature_options` kind: Storm Aura's environment and Divine Fury's damage
+type (097), Divine Magic's affinity (115), the Genie's kind (118), and the
+bonus skill, tool, save or language several subclasses grant. Those are the
+cheapest next pickers: one row per feature, which 095 already supports.
 
 **Fix:** the old branch's `class_feature_picks (feature_id, level, total)`
 table, saying how many picks a feature allows from each class level on.
@@ -717,17 +724,19 @@ says "RUN 082 FIRST". 095/096 rebuild its design against the current schema,
 without its `class_feature_picks` table and `detail` column. Delete the
 remote branch: 096 has landed (2026-11-05).
 
-### XGtE and TCoE subclasses have no features (noted 2026-10-20)
+### Tasha's optional class features are unseeded (noted 2026-10-20)
 
-084-094 seeded the PHB subclasses' features only, by decision. The 57
-Xanathar's (31) and Tasha's (26) subclasses (067-078), including the
-Fighter's five,
-can still be picked, but the sheet shows only the subclass description and
-the base class's features. Tasha's optional class features (Primal
-Knowledge, Deft Explorer and the rest) are also unseeded.
+097-120 seeded every Xanathar's and Tasha's subclass's features, but not
+Tasha's optional base-class features (Primal Knowledge, Deft Explorer,
+Harness Divine Power, Martial Versatility and the rest). They are optional
+by the book: the DM decides whether the table uses them, so seeding them
+into every campaign's shared catalogue would be a rules call made in a
+migration.
 
-**Fix:** one file per book per class, in 082's shape, e.g.
-`097_class_features_xgte_barbarian.sql` (095/096 went to feature choices). Seed the ones the party uses first.
+**Fix:** decide first whether this table uses them. If it does, either seed
+them as shared base-class rows (every campaign gets them), or as one
+campaign's homebrew rows (only this campaign does). The second keeps the
+optional rule optional.
 
 ### The demo characters start with default stats (noted 2026-10-05)
 
@@ -1158,6 +1167,14 @@ Small, understood, not worth an entry of their own.
 ---
 
 ## Resolved
+
+### XGtE and TCoE subclasses had no features (noted 2026-10-20, resolved 2026-11-05 by 097-120)
+
+The 57 Xanathar's and Tasha's subclasses could be picked, but the sheet
+showed only their description. 097-120 seed their 308 feature rows, one
+file per book per class in 084's shape, each asserting its per-subclass
+counts and its option links. College of Swords' Fighting Style (099) is the
+one new picker, linked to Dueling and Two-Weapon Fighting.
 
 ### Champion's second fighting style had nowhere to go (noted 2026-10-11, resolved 2026-11-05 by 095)
 
