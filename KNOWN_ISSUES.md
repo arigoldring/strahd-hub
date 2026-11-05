@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 122. Last updated 2026-11-05.**
+**Current through migration 126. Last updated 2026-11-05.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -705,14 +705,19 @@ arrived, so the design can start.
 
 122 added the machinery: `class_feature_picks` says how many picks a
 feature allows per class level, and the sheet shows a checklist picker for
-any feature with linked options and steps. Battle Master maneuvers (all 23,
-Tasha's included) are the first list on it. Every other such pick is still
+any feature with linked options and steps. Battle Master maneuvers (122),
+Metamagic (123), Arcane Shots (124), runes (125) and Eldritch Invocations
+(126) are on it, Tasha's options included and labelled. Every other such pick is still
 text the player notes by hand, with the options listed in the row: Expertise (Bard, Rogue),
 Magical Secrets, Favored Enemy and Natural Explorer, the Hunter's four
 picks, Totem animals (three picks, which can differ), the Circle of the
-Land's terrain, the Four Elements disciplines, Metamagic, Dragon Ancestor,
-Eldritch Invocations, Pact Boon and Mystic Arcanum. 097-120 add Arcane Shot
-options (105), Rune Carver's runes (106) and the Kensei's weapons (107).
+Land's terrain, the Four Elements disciplines, Dragon Ancestor, Pact Boon,
+Mystic Arcanum and the Kensei's weapons (107).
+
+The pickers' prerequisites are display only: nothing stops a 2nd-level
+warlock picking Witch Sight, or a Rune Knight taking Storm before 7th
+level. Enforcing them would need the pact boon to be a pick first, and a
+structured prerequisite instead of text.
 
 Some single picks are also noted by hand, because each one would need a new
 `feature_options` kind: Storm Aura's environment and Divine Fury's damage
@@ -720,9 +725,10 @@ type (097), Divine Magic's affinity (115), the Genie's kind (118), and the
 bonus skill, tool, save or language several subclasses grant. Those are the
 cheapest next pickers: one row per feature, which 095 already supports.
 
-**Fix:** per list, one migration: a new `feature_options` kind, its options
-(text in our own words), the links, and the feature's steps. Metamagic,
-Arcane Shot, runes and invocations are next. Expertise and skill picks
+**Fix:** per list, one migration: a new `feature_options` kind (shipped to
+the client first), its options in our own words, the links, and the
+feature's steps. Pact Boon and Dragon Ancestor are single picks and the
+cheapest next ones. Expertise and skill picks
 want to write `character_proficiencies` instead, and Favored Enemy's
 humanoid races want the old branch's free-text `detail` column.
 
