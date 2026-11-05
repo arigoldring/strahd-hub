@@ -9,10 +9,10 @@ import { useClasses } from "../../hooks/useClasses";
 import { useRaces } from "../../hooks/useRaces";
 import { useSubclasses } from "../../hooks/useSubclasses";
 import { useClassFeatures } from "../../hooks/useClassFeatures";
+import { useFeatureOptions } from "../../hooks/useFeatureOptions";
 import {
   ABILITIES,
   ABILITY_LABELS,
-  FIGHTING_STYLES,
   SKILLS,
   abilityModifier,
   armorClass,
@@ -25,7 +25,7 @@ import {
   totalLevel,
   weaponAbility,
   type Ability,
-  type FightingStyle,
+  type FightingStyleKey,
   type ProficiencyLevel,
   type SkillKey,
 } from "../../data/rules";
@@ -35,12 +35,15 @@ import {
   type CharacterClassEntry,
   type CharacterStats,
   type CharacterStatsPatch,
+  type FeaturePick,
   type Proficiency,
 } from "../../services/characterSheet";
 import {
+  FEATURE_OPTION_KIND_LABELS,
   SUBCLASS_SOURCE_LABELS,
   type CharacterClass,
   type ClassFeature,
+  type FeatureOption,
 } from "../../services/classes";
 import type { Character as CharacterModel } from "../../services/characters";
 import type { CharacterInventoryEntry } from "../../services/characterInventory";
@@ -152,6 +155,7 @@ function FullSheet({
   const { data: classCatalog = [] } = useClasses(campaign.id);
   const { data: subclassCatalog = [] } = useSubclasses(campaign.id);
   const { data: featureCatalog = [] } = useClassFeatures(campaign.id);
+  const { data: featureOptions = [] } = useFeatureOptions(campaign.id);
   const { data: races = [] } = useRaces(campaign.id);
   // Same key as the Carried section below, so this is a cache hit.
   const { data: gear = [], setEquipped } = useCharacterInventory(character.id);
@@ -170,7 +174,7 @@ function FullSheet({
     return <p className="ch-error">{sheetQuery.error?.message ?? "No sheet."}</p>;
   }
 
-  const { stats, classes, proficiencies } = sheetQuery.data;
+  const { stats, classes, proficiencies, picks } = sheetQuery.data;
   const updateStats = (patch: CharacterStatsPatch, what: string) =>
     run(sheetQuery.updateStats(patch), what);
 
@@ -209,11 +213,15 @@ function FullSheet({
   // Eldritch Knight and Arcane Trickster cast through a class that doesn't.
   const spellAbility = cls?.spellAbility ?? subclass?.spellAbility ?? null;
 
-  // Every fighting style the character holds, gathered across all class
-  // entries, so a Fighter/Paladin multiclass counts both picks. The maths in
-  // rules.ts tests membership, so a style held twice counts once. Only this
-  // line knows where picks are stored.
-  const styles = classes.flatMap((c) => (c.fightingStyle ? [c.fightingStyle] : []));
+  // Every fighting style the character holds: all of their picks (095),
+  // across every class entry and every feature, so a Champion's second style
+  // and a Fighter/Paladin multiclass both count. rules.ts tests membership,
+  // so a key held twice would count once. A homebrew style has no key and no
+  // automatic effect.
+  const styles: FightingStyleKey[] = picks.flatMap((p) => {
+    const o = featureOptions.find((x) => x.id === p.optionId);
+    return o?.kind === "fighting_style" && o.key ? [o.key] : [];
+  });
 
   const armors = gear.filter((i): i is ArmorEntry => i.kind === "armor");
   const weapons = gear.filter((i): i is WeaponEntry => i.kind === "weapon");
@@ -535,12 +543,14 @@ function FullSheet({
             <ClassFeatures
               entry={startingEntry}
               catalog={featureCatalog}
+              options={featureOptions}
+              picks={picks}
               canEdit={canEdit}
-              setFightingStyle={(style) =>
+              setPick={(featureId, optionId) =>
                 startingEntry &&
                 run(
-                  sheetQuery.setFightingStyle({ entryId: startingEntry.id, style }),
-                  "fighting style",
+                  sheetQuery.setFeaturePick({ entry: startingEntry, featureId, optionId }),
+                  "your choice",
                 )
               }
             />
@@ -759,25 +769,30 @@ function CombatBlock({
  * archetype's once one is picked. Same level rule as the subclass picker: a
  * Fighter 2 / Wizard 3 sees Fighter features through level 2, not 5.
  *
- * A feature with a `choice` carries a picker under its text. Only
- * 'fighting_style' exists so far; the pick is stored on the class entry, and
- * the chosen style's own text comes from FIGHTING_STYLES. The row's own
- * fightingStyleOptions (083) decides which styles are offered, so a Paladin
- * isn't shown Archery. A stored pick outside that list (nothing in the
- * database prevents one) is still offered, so the select never shows "Choose"
- * over a style that is actually saved. Defense and Archery change the AC tile
- * and the attack rows; the other styles are display only (see KNOWN_ISSUES).
+ * A feature with linked options (095) carries a picker under its text: the
+ * Fighter's, Paladin's and Ranger's Fighting Style, and Champion's
+ * Additional Fighting Style. Each picker offers its own row's options in the
+ * catalogue's order. An option the character already holds on another
+ * feature is shown but disabled: the PHB says a style can't be taken twice,
+ * and 095's unique (character_id, option_id) would refuse it anyway. A
+ * pick is always one of its row's options, because 095's (feature_id,
+ * option_id) FK says so. Defense and Archery change the AC tile and the
+ * attack rows; the rest are display only (see KNOWN_ISSUES).
  */
 function ClassFeatures({
   entry,
   catalog,
+  options,
+  picks,
   canEdit,
-  setFightingStyle,
+  setPick,
 }: {
   entry: CharacterClassEntry | undefined;
   catalog: ClassFeature[];
+  options: FeatureOption[];
+  picks: FeaturePick[];
   canEdit: boolean;
-  setFightingStyle: (style: FightingStyle | null) => void;
+  setPick: (featureId: string, optionId: string | null) => void;
 }) {
   // Already ordered by level, then name, by getClassFeatures.
   const features = entry
@@ -797,44 +812,55 @@ function ClassFeatures({
     );
   }
 
-  const style = FIGHTING_STYLES.find((s) => s.key === entry?.fightingStyle) ?? null;
-
   return (
     <ul className="sm-features">
-      {features.map((f) => (
-        <li key={f.id} className="sm-feature">
-          <div className="sm-feature__head">
-            <span className="sm-feature__name">{f.name}</span>
-            <span className="sm-feature__level">Level {f.level}</span>
-          </div>
-          <p className="sm-feature__text">{f.description}</p>
-          {f.choice === "fighting_style" && (
-            <div className="sm-feature__choice">
-              <select
-                aria-label="Fighting style"
-                value={entry?.fightingStyle ?? ""}
-                disabled={!canEdit}
-                onChange={(e) =>
-                  setFightingStyle((e.target.value || null) as FightingStyle | null)
-                }
-              >
-                <option value="">Choose a style...</option>
-                {FIGHTING_STYLES.filter(
-                  (s) =>
-                    f.fightingStyleOptions?.includes(s.key) ||
-                    s.key === entry?.fightingStyle,
-                ).map((s) => (
-                  <option key={s.key} value={s.key}>
-                    {s.name}
-                    {s.source === "tcoe" ? ` (${SUBCLASS_SOURCE_LABELS.tcoe})` : ""}
-                  </option>
-                ))}
-              </select>
-              {style && <p className="sm-feature__text">{style.description}</p>}
+      {features.map((f) => {
+        const pick = picks.find(
+          (p) => p.characterClassId === entry?.id && p.featureId === f.id,
+        );
+        const offered = options.filter((o) => f.optionIds.includes(o.id));
+        const chosen = options.find((o) => o.id === pick?.optionId) ?? null;
+        // Held anywhere else on this character, on any class entry.
+        const takenElsewhere = new Set(
+          picks.filter((p) => p !== pick).map((p) => p.optionId),
+        );
+        const kindLabel = (
+          offered[0] ? FEATURE_OPTION_KIND_LABELS[offered[0].kind] : "Choice"
+        ).toLowerCase();
+        return (
+          <li key={f.id} className="sm-feature">
+            <div className="sm-feature__head">
+              <span className="sm-feature__name">{f.name}</span>
+              <span className="sm-feature__level">Level {f.level}</span>
             </div>
-          )}
-        </li>
-      ))}
+            <p className="sm-feature__text">{f.description}</p>
+            {offered.length > 0 && (
+              <div className="sm-feature__choice">
+                <select
+                  aria-label={`${f.name}: ${kindLabel}`}
+                  value={pick?.optionId ?? ""}
+                  disabled={!canEdit}
+                  onChange={(e) => setPick(f.id, e.target.value || null)}
+                >
+                  <option value="">Choose a {kindLabel}...</option>
+                  {offered.map((o) => (
+                    <option key={o.id} value={o.id} disabled={takenElsewhere.has(o.id)}>
+                      {o.name}
+                      {o.source && o.source !== "phb"
+                        ? ` (${SUBCLASS_SOURCE_LABELS[o.source]})`
+                        : o.isHomebrew
+                          ? " (Homebrew)"
+                          : ""}
+                      {takenElsewhere.has(o.id) ? " (already taken)" : ""}
+                    </option>
+                  ))}
+                </select>
+                {chosen && <p className="sm-feature__text">{chosen.description}</p>}
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -866,7 +892,7 @@ function AttacksBlock({
   pb: number;
   strMod: number;
   dexMod: number;
-  styles: readonly FightingStyle[];
+  styles: readonly FightingStyleKey[];
 }) {
   const extra = new Set(
     proficiencies.filter((p) => p.kind === "weapon").map((p) => p.key),

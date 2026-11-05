@@ -2,10 +2,8 @@ import { supabase } from "../lib/supabase";
 import { parseOneOf, requireField } from "../lib/parse";
 import {
   ABILITIES,
-  FIGHTING_STYLE_KEYS,
   SPELL_ABILITIES,
   type Ability,
-  type FightingStyle,
   type SpellAbility,
 } from "../data/rules";
 import type { Tables } from "../types/database.types";
@@ -52,8 +50,7 @@ export interface Subclass {
 
 /**
  * A class or subclass feature (079). subclassId null means the base class's
- * own (Second Wind); otherwise it belongs to that archetype. `choice` says
- * the feature carries a picker, and which kind.
+ * own (Second Wind); otherwise it belongs to that archetype.
  */
 export interface ClassFeature {
   id: string;
@@ -62,19 +59,38 @@ export interface ClassFeature {
   level: number;
   name: string;
   description: string;
-  choice: FeatureChoice | null;
   /**
-   * The styles a 'fighting_style' picker offers (083). Set exactly when
-   * choice is 'fighting_style'; 083's CHECK says so. The sheet lists them in
-   * FIGHTING_STYLES' order, not this array's.
+   * The options this feature's picker offers, from class_feature_options
+   * (095). Empty means the feature has no picker. Having options is what
+   * makes a picker, so there's no separate flag that could disagree with it.
+   * The sheet lists them in the catalogue's order, not this array's.
    */
-  fightingStyleOptions: FightingStyle[] | null;
+  optionIds: string[];
   isHomebrew: boolean;
 }
 
-// One list in two places with 079's CHECK on class_features.choice.
-export const FEATURE_CHOICES = ["fighting_style"] as const;
-export type FeatureChoice = (typeof FEATURE_CHOICES)[number];
+/**
+ * Something a feature lets a character pick (095): a fighting style today.
+ * `key` is what code gives an effect to (rules.ts); homebrew may have none.
+ */
+export interface FeatureOption {
+  id: string;
+  kind: FeatureOptionKind;
+  key: string | null;
+  name: string;
+  description: string;
+  /** Null for homebrew. */
+  source: SubclassSource | null;
+  isHomebrew: boolean;
+}
+
+// One list in two places with 095's CHECK on feature_options.kind.
+export const FEATURE_OPTION_KINDS = ["fighting_style"] as const;
+export type FeatureOptionKind = (typeof FEATURE_OPTION_KINDS)[number];
+
+export const FEATURE_OPTION_KIND_LABELS: Record<FeatureOptionKind, string> = {
+  fighting_style: "Fighting style",
+};
 
 const WEAPON_TRAINING = ["simple", "martial"] as const;
 
@@ -171,8 +187,11 @@ export async function getSubclasses(campaignId: string): Promise<Subclass[]> {
   return data.map(toSubclass);
 }
 
-export function toClassFeature(row: Tables<"class_features">): ClassFeature {
-  const subject = `Class feature ${row.id}`;
+type ClassFeatureRow = Tables<"class_features"> & {
+  class_feature_options: Pick<Tables<"class_feature_options">, "option_id">[];
+};
+
+export function toClassFeature(row: ClassFeatureRow): ClassFeature {
   return {
     id: row.id,
     classId: row.class_id,
@@ -180,26 +199,20 @@ export function toClassFeature(row: Tables<"class_features">): ClassFeature {
     level: row.level,
     name: row.name,
     description: row.description,
-    choice:
-      row.choice == null
-        ? null
-        : parseOneOf(row.choice, FEATURE_CHOICES, "choice", subject),
-    fightingStyleOptions:
-      row.fighting_style_options == null
-        ? null
-        : row.fighting_style_options.map((s) =>
-            parseOneOf(s, FIGHTING_STYLE_KEYS, "fighting_style_options", subject),
-          ),
+    optionIds: row.class_feature_options.map((l) => l.option_id),
     isHomebrew: row.campaign_id !== null,
   };
 }
 
 // getSubclasses' shape: every class's features in one read, filtered per class
 // on the client, with the same .or() keeping other campaigns' homebrew out.
+// The links are embedded. Their read policy needs both ends visible, so a
+// link to another campaign's homebrew option comes back as absent, not as an
+// id the options catalogue can't resolve.
 export async function getClassFeatures(campaignId: string): Promise<ClassFeature[]> {
   const { data, error } = await supabase
     .from("class_features")
-    .select("*")
+    .select("*, class_feature_options(option_id)")
     .or(`campaign_id.is.null,campaign_id.eq.${campaignId}`)
     .order("level")
     .order("name");
@@ -208,4 +221,36 @@ export async function getClassFeatures(campaignId: string): Promise<ClassFeature
     throw error;
   }
   return data.map(toClassFeature);
+}
+
+export function toFeatureOption(row: Tables<"feature_options">): FeatureOption {
+  const subject = `Feature option ${row.id}`;
+  return {
+    id: row.id,
+    kind: parseOneOf(row.kind, FEATURE_OPTION_KINDS, "kind", subject),
+    key: row.key,
+    name: row.name,
+    description: row.description,
+    source:
+      row.source == null
+        ? null
+        : parseOneOf(row.source, SUBCLASS_SOURCES, "source", subject),
+    isHomebrew: row.campaign_id !== null,
+  };
+}
+
+// The options catalogue, getSubclasses' shape again. PHB first, then the
+// later books, then homebrew, alphabetical within each: the picker's order.
+export async function getFeatureOptions(campaignId: string): Promise<FeatureOption[]> {
+  const { data, error } = await supabase
+    .from("feature_options")
+    .select("*")
+    .or(`campaign_id.is.null,campaign_id.eq.${campaignId}`)
+    .order("source", { nullsFirst: false })
+    .order("name");
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+  return data.map(toFeatureOption);
 }

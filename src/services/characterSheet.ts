@@ -2,10 +2,8 @@ import { supabase } from "../lib/supabase";
 import { parseOneOf } from "../lib/parse";
 import {
   ABILITIES,
-  FIGHTING_STYLE_KEYS,
   SKILLS,
   type Ability,
-  type FightingStyle,
   type ProficiencyLevel,
   type SkillKey,
 } from "../data/rules";
@@ -38,8 +36,6 @@ export interface CharacterClassEntry {
   id: string;
   classId: string;
   subclassId: string | null;
-  /** The Fighting Style pick (079); null until chosen, or for a class without one. */
-  fightingStyle: FightingStyle | null;
   level: number;
   isStarting: boolean;
 }
@@ -61,10 +57,23 @@ export interface Proficiency {
   level: 1 | 2;
 }
 
+/**
+ * One pick on one feature of one class entry (095). A feature has at most one
+ * pick per entry, and a character holds each option at most once (095's two
+ * unique constraints).
+ */
+export interface FeaturePick {
+  id: string;
+  characterClassId: string;
+  featureId: string;
+  optionId: string;
+}
+
 export interface CharacterSheetData {
   stats: CharacterStats;
   classes: CharacterClassEntry[];
   proficiencies: Proficiency[];
+  picks: FeaturePick[];
 }
 
 // The one place ability codes meet column names. 056 spells the columns out
@@ -103,9 +112,10 @@ function toProficiency(row: Tables<"character_proficiencies">): Proficiency {
 }
 
 /**
- * Three reads in parallel, the getCharacterInventory shape. A failure in any
- * sinks all three on purpose: a sheet with scores but no proficiencies would
- * show wrong totals rather than an error.
+ * Four reads in parallel, the getCharacterInventory shape. A failure in any
+ * sinks all four on purpose: a sheet with scores but no proficiencies would
+ * show wrong totals rather than an error, and one without its picks would
+ * show an AC missing Defense.
  *
  * The stats row always exists (056's trigger and backfill), so its absence is
  * an error here rather than a "no stats yet" state: it means RLS hid the
@@ -114,7 +124,7 @@ function toProficiency(row: Tables<"character_proficiencies">): Proficiency {
 export async function getCharacterSheet(
   characterId: string,
 ): Promise<CharacterSheetData> {
-  const [stats, classes, profs] = await Promise.all([
+  const [stats, classes, profs, picks] = await Promise.all([
     supabase
       .from("character_stats")
       .select("*")
@@ -129,9 +139,13 @@ export async function getCharacterSheet(
       .from("character_proficiencies")
       .select("*")
       .eq("character_id", characterId),
+    supabase
+      .from("character_feature_choices")
+      .select("*")
+      .eq("character_id", characterId),
   ]);
 
-  for (const { error } of [stats, classes, profs]) {
+  for (const { error } of [stats, classes, profs, picks]) {
     if (error) {
       console.error(error);
       throw error;
@@ -145,19 +159,16 @@ export async function getCharacterSheet(
       id: row.id,
       classId: row.class_id,
       subclassId: row.subclass_id,
-      fightingStyle:
-        row.fighting_style == null
-          ? null
-          : parseOneOf(
-              row.fighting_style,
-              FIGHTING_STYLE_KEYS,
-              "fighting_style",
-              `Class entry ${row.id}`,
-            ),
       level: row.level,
       isStarting: row.is_starting,
     })),
     proficiencies: profs.data!.map(toProficiency),
+    picks: picks.data!.map((row) => ({
+      id: row.id,
+      characterClassId: row.character_class_id,
+      featureId: row.feature_id,
+      optionId: row.option_id,
+    })),
   };
 }
 
@@ -246,7 +257,10 @@ export async function setStartingClass(
   const write = existing
     ? supabase
         .from("character_classes")
-        .update({ class_id: classId, subclass_id: null, fighting_style: null })
+        // 095's clear_stale_feature_choices deletes the entry's picks on a
+        // class change, so nothing here clears them. The old
+        // fighting_style column isn't named: 096 drops it.
+        .update({ class_id: classId, subclass_id: null })
         .eq("id", existing.id)
         .select("id")
         .maybeSingle()
@@ -300,22 +314,61 @@ export async function setSubclass(
   if (!data) throw new Error("You can't change this character's subclass.");
 }
 
-/** Null clears it. 079's CHECK refuses a key FIGHTING_STYLES doesn't know. */
-export async function setFightingStyle(
-  entryId: string,
-  style: FightingStyle | null,
+/**
+ * Set or clear the pick on one feature of one class entry (095).
+ *
+ * Setting is an upsert on (character_class_id, feature_id) WITHOUT
+ * ignoreDuplicates, because changing a pick must change the stored option.
+ * The second save is an UPDATE, which is why 095 ships an UPDATE policy
+ * (CLAUDE.md's upsert gotcha). Its pin trigger lets the update change
+ * option_id and nothing else.
+ *
+ * The FKs refuse an option the feature doesn't offer (23503), and the unique
+ * (character_id, option_id) refuses a style the character already holds on
+ * another feature (23505). The picker doesn't offer either, so seeing one
+ * means a stale page.
+ *
+ * Clearing is a DELETE. Zero rows back is not treated as a refusal, because
+ * "there was no pick to clear" is an ordinary answer too.
+ */
+export async function setFeaturePick(
+  characterId: string,
+  entry: Pick<CharacterClassEntry, "id" | "classId">,
+  featureId: string,
+  optionId: string | null,
 ): Promise<void> {
+  if (optionId === null) {
+    const { error } = await supabase
+      .from("character_feature_choices")
+      .delete()
+      .eq("character_class_id", entry.id)
+      .eq("feature_id", featureId);
+    if (error) {
+      console.error(error);
+      throw error;
+    }
+    return;
+  }
+
   const { data, error } = await supabase
-    .from("character_classes")
-    .update({ fighting_style: style })
-    .eq("id", entryId)
+    .from("character_feature_choices")
+    .upsert(
+      {
+        character_id: characterId,
+        character_class_id: entry.id,
+        class_id: entry.classId,
+        feature_id: featureId,
+        option_id: optionId,
+      },
+      { onConflict: "character_class_id,feature_id" },
+    )
     .select("id")
     .maybeSingle();
   if (error) {
     console.error(error);
     throw error;
   }
-  if (!data) throw new Error("You can't change this character's fighting style.");
+  if (!data) throw new Error("You can't change this character's choices.");
 }
 
 async function replaceSaves(characterId: string, saves: readonly Ability[]) {

@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 094. Last updated 2026-11-05.**
+**Current through migration 095. Last updated 2026-11-05.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -636,7 +636,7 @@ styles, nothing reads it.
 
 - **Fighting style:** Defense (+1 AC while body armour is worn) and Archery
   (+2 to-hit on ranged weapons) are applied by `armorClass` and
-  `styleAttackBonus` in `rules.ts`, for every class entry's pick. The rest
+  `styleAttackBonus` in `rules.ts`, for every pick the character holds. The rest
   stay manual, each for a reason. Dueling depends on what's in the other
   hand, and the sheet doesn't track hands. Thrown Weapon Fighting's +2
   applies only when the weapon is thrown, and the attack row shows one
@@ -687,33 +687,56 @@ marks them always prepared. The Eldritch Knight (082) and Arcane Trickster
 subclass. The second third-caster this entry was waiting for has now
 arrived, so the design can start.
 
-### Features with many picks have nowhere to store them (noted 2026-10-11, widened by 082 and 084-094)
+### 096 is written but not run: the old fighting-style columns are still live (noted 2026-11-05)
 
-`character_classes.fighting_style` is one column. Champion's Additional
-Fighting Style (Fighter 10, seeded by 082 as text with no picker) has nowhere
-to go, and CoS reaches level 10. That row deliberately carries no `choice`: a
-second 'fighting_style' picker would write the same column and overwrite the
-first pick.
+095 is the expand half. `character_classes.fighting_style`,
+`class_features.choice`, `class_features.fighting_style_options`, the
+`fighting_style` domain and the temporary `mirror_fighting_style` trigger all
+still exist, so the client deployed from main keeps working, and its
+fighting-style writes are copied into `character_feature_choices`.
 
-Every other pick is text the player notes by hand, with the options listed
-in the row: Battle Master maneuvers (082), Expertise (Bard, Rogue), Magical
-Secrets, Favored Enemy and Natural Explorer, the Hunter's four picks, Totem
-animals (three picks, which can differ), the Circle of the Land's terrain,
-the Four Elements disciplines, Metamagic, Dragon Ancestor, Eldritch
-Invocations, Pact Boon and Mystic Arcanum.
+**Trigger:** none. It's a deliberate window.
 
-**Fix:** a `character_feature_choices (character_class_id, feature_id,
-choice)` table, migrating the column into it. Maneuvers and invocations are
-the triggers; Arcane Shots (XGtE) and runes (TCoE) will want it too.
+**Cost:** while it lasts, the old column can disagree with the picks table
+in one direction. A pick made by the new client isn't copied back into the
+column, so an old-client tab shows the old style until it reloads onto the
+new client. Nothing is lost: the table is the source of truth, and 096
+asserts every non-null column value has its pick before dropping anything.
+
+**Fix:** after the client from this branch is live on dnd-cos.pages.dev, run
+096, reload the schema cache, regenerate types, and delete the remote
+`feat/feature-choices` branch. 096 was dry-run inside a rolled-back
+transaction on 2026-11-05, and every check passed.
+
+### Features with many picks have nowhere to store them (noted 2026-10-11, widened by 082 and 084-094, narrowed 2026-11-05 by 095)
+
+095's `character_feature_choices` allows one pick per feature per class
+entry. That covers every Fighting Style row, including Champion's Additional
+Fighting Style, which is a real picker now. It doesn't cover a feature that
+grants several picks from one list.
+
+Every such pick is still text the player notes by hand, with the options
+listed in the row: Battle Master maneuvers (082), Expertise (Bard, Rogue),
+Magical Secrets, Favored Enemy and Natural Explorer, the Hunter's four
+picks, Totem animals (three picks, which can differ), the Circle of the
+Land's terrain, the Four Elements disciplines, Metamagic, Dragon Ancestor,
+Eldritch Invocations, Pact Boon and Mystic Arcanum.
+
+**Fix:** the old branch's `class_feature_picks (feature_id, level, total)`
+table, saying how many picks a feature allows from each class level on.
+Then relax `unique (character_class_id, feature_id)`, and seed the options
+(maneuvers first) as new `feature_options` kinds. Favored Enemy's humanoid
+races also want the old branch's free-text `detail` column. Maneuvers and
+invocations are the triggers; Arcane Shots (XGtE) and runes (TCoE) will want
+it too.
 
 **The remote branch `feat/feature-choices` is superseded, not rebased.** It
 was written against 082. Its files are numbered 083/084, numbers the live
 database has since used for other migrations. It replaces a column without
 knowing about 083's `class_features.fighting_style_options`, and its header
-says "RUN 082 FIRST". Its design (an options catalogue, a feature-to-option
-link table, a picks table, and an expand-then-contract mirror trigger) is
-being rebuilt as 095/096 against the current schema, without its
-`class_feature_picks` table. Delete the remote branch once 096 lands.
+says "RUN 082 FIRST". 095/096 rebuild its design against the current schema,
+without its `class_feature_picks` table and `detail` column. Delete the
+remote branch once 096 lands.
 
 ### XGtE and TCoE subclasses have no features (noted 2026-10-20)
 
@@ -725,7 +748,7 @@ the base class's features. Tasha's optional class features (Primal
 Knowledge, Deft Explorer and the rest) are also unseeded.
 
 **Fix:** one file per book per class, in 082's shape, e.g.
-`095_class_features_xgte_fighter.sql`. Seed the ones the party uses first.
+`097_class_features_xgte_barbarian.sql` (095/096 went to feature choices). Seed the ones the party uses first.
 
 ### The demo characters start with default stats (noted 2026-10-05)
 
@@ -1156,6 +1179,15 @@ Small, understood, not worth an entry of their own.
 ---
 
 ## Resolved
+
+### Champion's second fighting style had nowhere to go (noted 2026-10-11, resolved 2026-11-05 by 095)
+
+`character_classes.fighting_style` held one style per class entry, so Additional
+Fighting Style (Champion 10) was text with no picker. 095 moved every pick
+into `character_feature_choices`, one row per feature, and linked Additional
+Fighting Style to the Fighter's eleven. The sheet gathers styles from every
+pick, so Defense or Archery taken second counts too, and a style can't be
+taken twice. The general many-picks case is still open, above.
 
 ### 029 was never applied, so `added_by` was client-supplied (noted 2026-08-31, resolved 2026-11-05 by 029)
 

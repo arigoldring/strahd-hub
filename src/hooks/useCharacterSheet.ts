@@ -2,7 +2,7 @@ import {
   adjustCharacterHp,
   getCharacterSheet,
   setClassLevel,
-  setFightingStyle,
+  setFeaturePick,
   setProficiency,
   setStartingClass,
   setSubclass,
@@ -12,7 +12,7 @@ import {
   type CharacterStatsPatch,
   type ProficiencyKind,
 } from "../services/characterSheet";
-import type { Ability, FightingStyle, ProficiencyLevel } from "../data/rules";
+import type { Ability, ProficiencyLevel } from "../data/rules";
 import { errorMessage } from "../lib/errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -139,16 +139,35 @@ export function useCharacterSheet(characterId: string) {
     onSettled: invalidate,
   });
 
-  const setFightingStyleMutation = useMutation({
-    mutationFn: (vars: { entryId: string; style: FightingStyle | null }) =>
-      setFightingStyle(vars.entryId, vars.style),
-    onMutate: ({ entryId, style }) =>
-      patchCache((sheet) => ({
-        ...sheet,
-        classes: sheet.classes.map((c) =>
-          c.id === entryId ? { ...c, fightingStyle: style } : c,
-        ),
-      })),
+  // Optimistic like the other selects. The cached pick gets a placeholder id
+  // until the refetch on settle brings the real row.
+  const setFeaturePickMutation = useMutation({
+    mutationFn: (vars: {
+      entry: Pick<CharacterClassEntry, "id" | "classId">;
+      featureId: string;
+      optionId: string | null;
+    }) => setFeaturePick(characterId, vars.entry, vars.featureId, vars.optionId),
+    onMutate: ({ entry, featureId, optionId }) =>
+      patchCache((sheet) => {
+        const rest = sheet.picks.filter(
+          (p) => !(p.characterClassId === entry.id && p.featureId === featureId),
+        );
+        return {
+          ...sheet,
+          picks:
+            optionId === null
+              ? rest
+              : [
+                  ...rest,
+                  {
+                    id: `pending-${entry.id}-${featureId}`,
+                    characterClassId: entry.id,
+                    featureId,
+                    optionId,
+                  },
+                ],
+        };
+      }),
     onError: restore,
     onSettled: invalidate,
   });
@@ -163,6 +182,6 @@ export function useCharacterSheet(characterId: string) {
     setClass: setClassMutation.mutateAsync,
     setLevel: setLevelMutation.mutateAsync,
     setSubclass: setSubclassMutation.mutateAsync,
-    setFightingStyle: setFightingStyleMutation.mutateAsync,
+    setFeaturePick: setFeaturePickMutation.mutateAsync,
   };
 }
