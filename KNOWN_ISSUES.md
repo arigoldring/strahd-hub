@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 095. Last updated 2026-11-05.**
+**Current through migration 096. Last updated 2026-11-05.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -687,27 +687,6 @@ marks them always prepared. The Eldritch Knight (082) and Arcane Trickster
 subclass. The second third-caster this entry was waiting for has now
 arrived, so the design can start.
 
-### 096 is written but not run: the old fighting-style columns are still live (noted 2026-11-05)
-
-095 is the expand half. `character_classes.fighting_style`,
-`class_features.choice`, `class_features.fighting_style_options`, the
-`fighting_style` domain and the temporary `mirror_fighting_style` trigger all
-still exist, so the client deployed from main keeps working, and its
-fighting-style writes are copied into `character_feature_choices`.
-
-**Trigger:** none. It's a deliberate window.
-
-**Cost:** while it lasts, the old column can disagree with the picks table
-in one direction. A pick made by the new client isn't copied back into the
-column, so an old-client tab shows the old style until it reloads onto the
-new client. Nothing is lost: the table is the source of truth, and 096
-asserts every non-null column value has its pick before dropping anything.
-
-**Fix:** after the client from this branch is live on dnd-cos.pages.dev, run
-096, reload the schema cache, regenerate types, and delete the remote
-`feat/feature-choices` branch. 096 was dry-run inside a rolled-back
-transaction on 2026-11-05, and every check passed.
-
 ### Features with many picks have nowhere to store them (noted 2026-10-11, widened by 082 and 084-094, narrowed 2026-11-05 by 095)
 
 095's `character_feature_choices` allows one pick per feature per class
@@ -736,7 +715,7 @@ database has since used for other migrations. It replaces a column without
 knowing about 083's `class_features.fighting_style_options`, and its header
 says "RUN 082 FIRST". 095/096 rebuild its design against the current schema,
 without its `class_feature_picks` table and `detail` column. Delete the
-remote branch once 096 lands.
+remote branch: 096 has landed (2026-11-05).
 
 ### XGtE and TCoE subclasses have no features (noted 2026-10-20)
 
@@ -1188,6 +1167,10 @@ into `character_feature_choices`, one row per feature, and linked Additional
 Fighting Style to the Fighter's eleven. The sheet gathers styles from every
 pick, so Defense or Archery taken second counts too, and a style can't be
 taken twice. The general many-picks case is still open, above.
+
+096 dropped the old columns, the `choice` flag and the `fighting_style`
+domain on 2026-11-05, once the new client was live. Verification blocks in
+079-095 that name those columns no longer run, by design (096's header).
 
 ### 029 was never applied, so `added_by` was client-supplied (noted 2026-08-31, resolved 2026-11-05 by 029)
 

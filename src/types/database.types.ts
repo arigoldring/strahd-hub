@@ -162,7 +162,6 @@ export type Database = {
           character_id: string
           class_id: string
           created_at: string
-          fighting_style: string | null
           id: string
           is_starting: boolean
           level: number
@@ -172,7 +171,6 @@ export type Database = {
           character_id: string
           class_id: string
           created_at?: string
-          fighting_style?: string | null
           id?: string
           is_starting?: boolean
           level?: number
@@ -182,7 +180,6 @@ export type Database = {
           character_id?: string
           class_id?: string
           created_at?: string
-          fighting_style?: string | null
           id?: string
           is_starting?: boolean
           level?: number
@@ -641,11 +638,9 @@ export type Database = {
       class_features: {
         Row: {
           campaign_id: string | null
-          choice: string | null
           class_id: string
           created_at: string
           description: string
-          fighting_style_options: unknown[] | null
           id: string
           level: number
           name: string
@@ -653,11 +648,9 @@ export type Database = {
         }
         Insert: {
           campaign_id?: string | null
-          choice?: string | null
           class_id: string
           created_at?: string
           description: string
-          fighting_style_options?: unknown[] | null
           id?: string
           level: number
           name: string
@@ -665,11 +658,9 @@ export type Database = {
         }
         Update: {
           campaign_id?: string | null
-          choice?: string | null
           class_id?: string
           created_at?: string
           description?: string
-          fighting_style_options?: unknown[] | null
           id?: string
           level?: number
           name?: string

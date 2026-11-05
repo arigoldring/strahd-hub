@@ -24,9 +24,10 @@ export function requireField<T>(
 // "assert" — TS assertion functions return void, which this does not.
 // The cast is on `allowed`, not `value`: widening readonly T[] to readonly
 // unknown[] is always sound, so it sits on something known-true while the
-// actual check stays honest. `value` is unknown because the generator types an
-// array of a domain as unknown[] (083's fighting_style_options); only a string
-// in the list can pass, so nothing else needs checking first.
+// actual check stays honest. `value` is unknown so a caller can pass anything
+// the generator typed loosely (it types an array of a domain as unknown[]; 083's
+// fighting_style_options was one until 096). Only a string in the list can
+// pass, so nothing else needs checking first.
 export function parseOneOf<T extends string>(
   value: unknown,
   allowed: readonly T[],

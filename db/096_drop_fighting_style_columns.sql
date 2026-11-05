@@ -31,6 +31,15 @@
 -- insert, on purpose: if anything still uses the domain, it raises and the
 -- whole file rolls back.
 --
+-- OLDER VERIFICATION BLOCKS STOP RUNNING. 079-095's blocks name `choice`,
+-- `fighting_style` or `fighting_style_options` (079, 080, 082, 083, 084-094's
+-- "no pickers" column, and 095's mirror test), and after this file they fail
+-- with "column does not exist". That is expected: each one checked the
+-- schema as it stood at its own migration. Don't re-add a column to make one
+-- pass. 095's BLOCKS 2-4 still describe the live design, but they set
+-- `fighting_style = null` in their setup. The 097+ seed files assert
+-- "no pickers" by counting class_feature_options links instead.
+--
 -- THE SQL EDITOR MAY OFFER "Run and enable RLS". Decline it: this file creates
 -- no table.
 --
