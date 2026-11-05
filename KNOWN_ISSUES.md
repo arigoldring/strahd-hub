@@ -629,13 +629,26 @@ excepted: it's a class 055 never seeded, so it has nothing to hang them on.
 **Fix:** a CreateFeat-style form; 053's homebrew-edit policy plus a pin
 trigger for editing.
 
-### Class features are display only (noted 2026-10-11, widened by 081/082 and 084-094)
+### Class features are display only (noted 2026-10-11, widened by 081/082 and 084-094, narrowed 2026-11-05)
 
-079-094 store and show the text for every class, but nothing reads it.
+079-094 store and show the text for every class. Apart from two fighting
+styles, nothing reads it.
 
-- **Fighting style:** Defense doesn't add +1 to the AC tile, Archery doesn't
-  add +2 to ranged to-hit, Dueling and Thrown Weapon Fighting don't add +2
-  damage. Same for the Paladin's and Ranger's picks.
+- **Fighting style:** Defense (+1 AC while body armour is worn) and Archery
+  (+2 to-hit on ranged weapons) are applied by `armorClass` and
+  `styleAttackBonus` in `rules.ts`, for every class entry's pick. The rest
+  stay manual, each for a reason. Dueling depends on what's in the other
+  hand, and the sheet doesn't track hands. Thrown Weapon Fighting's +2
+  applies only when the weapon is thrown, and the attack row shows one
+  damage line per weapon. Great Weapon Fighting is a reroll, not a number.
+  Protection, Interception, Blind Fighting, Superior Technique and Unarmed
+  Fighting are reactions, senses or new attacks.
+- **Archery misses the Dart.** `isRangedWeapon` says "has a range and isn't
+  thrown", and the Dart is the one ranged weapon with the thrown property.
+  Its columns are identical in shape to a dagger's (simple, finesse, thrown,
+  20/60, 1d4), so nothing but the name tells them apart. Fix: a
+  melee/ranged column on weapon items, or a `ranged` property on the Dart's
+  row.
 - **Derived numbers nothing applies:** Improved/Superior Critical's crit range,
   Remarkable Athlete and Jack of All Trades on ability checks, Extra Attack's
   attack count, Rage's damage bonus and resistances, Sneak Attack dice, the
@@ -652,13 +665,10 @@ trigger for editing.
 **Trigger:** any feature whose effect is a number the sheet derives or a use
 that recharges on a rest.
 
-**Cost:** the sheet shows "Defense" beside an AC that ignores it, and the
-player adds the bonus and counts the uses in their head.
+**Cost:** the player adds the remaining bonuses and counts the uses in their
+head.
 
-**Fix:** pass the starting entry's `fightingStyle` into `armorClass` (Defense,
-only when armour is worn) and `AttacksBlock` (Archery on ranged rows;
-Dueling needs "one weapon in hand", which the sheet doesn't model, so it may
-stay manual). Use tracking wants a `character_feature_uses` table, or
+**Fix:** use tracking wants a `character_feature_uses` table, or
 counters on the class entry, plus a short/long rest action; that is a design
 of its own.
 

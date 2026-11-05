@@ -21,6 +21,7 @@ import {
   formatModifier,
   proficiencyBonus,
   skillBonus,
+  styleAttackBonus,
   totalLevel,
   weaponAbility,
   type Ability,
@@ -208,6 +209,12 @@ function FullSheet({
   // Eldritch Knight and Arcane Trickster cast through a class that doesn't.
   const spellAbility = cls?.spellAbility ?? subclass?.spellAbility ?? null;
 
+  // Every fighting style the character holds, gathered across all class
+  // entries, so a Fighter/Paladin multiclass counts both picks. The maths in
+  // rules.ts tests membership, so a style held twice counts once. Only this
+  // line knows where picks are stored.
+  const styles = classes.flatMap((c) => (c.fightingStyle ? [c.fightingStyle] : []));
+
   const armors = gear.filter((i): i is ArmorEntry => i.kind === "armor");
   const weapons = gear.filter((i): i is WeaponEntry => i.kind === "weapon");
   const armor = armors.find((a) => a.equipped && a.category !== "shield") ?? null;
@@ -225,6 +232,7 @@ function FullSheet({
           allowsShield: cls.name !== "Monk",
         }
       : null,
+    styles,
     bonus: stats.acBonus,
   });
 
@@ -507,6 +515,7 @@ function FullSheet({
             pb={pb}
             strMod={mod("str")}
             dexMod={mod("dex")}
+            styles={styles}
           />
           <CharacterSpells characterId={character.id} isOwn={isOwn} />
           <CharacterFeats characterId={character.id} isOwn={isOwn} />
@@ -756,8 +765,8 @@ function CombatBlock({
  * fightingStyleOptions (083) decides which styles are offered, so a Paladin
  * isn't shown Archery. A stored pick outside that list (nothing in the
  * database prevents one) is still offered, so the select never shows "Choose"
- * over a style that is actually saved. Display only: no style changes a
- * derived number yet (see KNOWN_ISSUES).
+ * over a style that is actually saved. Defense and Archery change the AC tile
+ * and the attack rows; the other styles are display only (see KNOWN_ISSUES).
  */
 function ClassFeatures({
   entry,
@@ -836,6 +845,7 @@ function ClassFeatures({
  * category, or when the character has a 'weapon' proficiency row for that
  * item (056) — the way a Rogue gets rapiers. A class-granted proficiency can't
  * be switched off here, because "no row" already means "nothing extra".
+ * Archery's +2 is added to a ranged row's to-hit and named in its tooltip.
  */
 function AttacksBlock({
   weapons,
@@ -846,6 +856,7 @@ function AttacksBlock({
   pb,
   strMod,
   dexMod,
+  styles,
 }: {
   weapons: WeaponEntry[];
   proficiencies: Proficiency[];
@@ -855,6 +866,7 @@ function AttacksBlock({
   pb: number;
   strMod: number;
   dexMod: number;
+  styles: readonly FightingStyle[];
 }) {
   const extra = new Set(
     proficiencies.filter((p) => p.kind === "weapon").map((p) => p.key),
@@ -873,7 +885,8 @@ function AttacksBlock({
               const abilityMod = ability === "dex" ? dexMod : strMod;
               const classProf = fromClass(w);
               const proficient = classProf || extra.has(w.id);
-              const toHit = abilityMod + (proficient ? pb : 0);
+              const styleBonus = styleAttackBonus(w, styles);
+              const toHit = abilityMod + (proficient ? pb : 0) + styleBonus;
               return (
                 <tr key={w.entryId}>
                   <td className="sm-attacks__prof">
@@ -905,7 +918,12 @@ function AttacksBlock({
                         .join(" · ")}
                     </span>
                   </td>
-                  <td className="sm-attacks__hit">{formatModifier(toHit)}</td>
+                  <td
+                    className="sm-attacks__hit"
+                    title={styleBonus ? `Includes Archery ${formatModifier(styleBonus)}` : undefined}
+                  >
+                    {formatModifier(toHit)}
+                  </td>
                   <td className="sm-attacks__dmg">
                     {damageString(w.damageDice, abilityMod)} {w.damageType}
                     {w.versatileDice && (

@@ -207,6 +207,11 @@ export interface ArmorLike {
  * plain 10 + DEX, unless the class loses it with a shield (the Monk). The
  * caller says which: whether a shield breaks it is not a column on classes.
  *
+ * Defense adds +1 only while body armour is worn. A shield alone doesn't
+ * count, and neither does Unarmored Defense. `styles` is every fighting style
+ * the character holds, across all their classes, so a style picked twice
+ * still adds once.
+ *
  * Returns the parts as well as the total, so the sheet can say where the
  * number came from rather than just print it.
  */
@@ -215,9 +220,10 @@ export function armorClass(opts: {
   shield: ArmorLike | null;
   dexMod: number;
   unarmored: { ability: Ability; mod: number; allowsShield: boolean } | null;
+  styles: readonly FightingStyle[];
   bonus: number;
 }): { total: number; parts: string[] } {
-  const { armor, shield, dexMod, unarmored, bonus } = opts;
+  const { armor, shield, dexMod, unarmored, styles, bonus } = opts;
   const parts: string[] = [];
   let total: number;
 
@@ -242,6 +248,10 @@ export function armorClass(opts: {
     total += shield.baseArmorClass;
     parts.push(`${shield.name} +${shield.baseArmorClass}`);
   }
+  if (armor && styles.includes("defense")) {
+    total += 1;
+    parts.push("Defense +1");
+  }
   if (bonus) {
     total += bonus;
     parts.push(`other ${formatModifier(bonus)}`);
@@ -256,23 +266,45 @@ export interface WeaponLike {
 }
 
 /**
+ * A ranged weapon has a range and is not merely thrown. A dagger has a range
+ * too, but it's a melee weapon you can throw. The one this gets wrong is the
+ * Dart: it is a ranged weapon with the thrown property, and nothing in the
+ * item's columns tells it apart from a dagger (see KNOWN_ISSUES).
+ *
+ * weaponAbility and the Archery bonus both ask this, so they can't disagree
+ * about what counts as ranged.
+ */
+export function isRangedWeapon(weapon: WeaponLike): boolean {
+  return weapon.rangeNormal != null && !weapon.properties.includes("thrown");
+}
+
+/**
  * Which ability a weapon attacks with. Ranged weapons use DEX; finesse
  * weapons use whichever of STR and DEX is better; everything else is STR.
- * "Ranged" means it has a range and is not merely thrown — a dagger has a
- * range too, but it's a melee weapon you can throw.
  */
 export function weaponAbility(
   weapon: WeaponLike,
   strMod: number,
   dexMod: number,
 ): Ability {
-  const ranged =
-    weapon.rangeNormal != null && !weapon.properties.includes("thrown");
-  if (ranged) return "dex";
+  if (isRangedWeapon(weapon)) return "dex";
   if (weapon.properties.includes("finesse")) {
     return dexMod > strMod ? "dex" : "str";
   }
   return "str";
+}
+
+/**
+ * The to-hit bonus a fighting style gives this weapon: Archery's +2 on ranged
+ * weapons, otherwise 0. Dueling and Thrown Weapon Fighting add damage, not
+ * to-hit. Dueling depends on what's in the other hand, which the sheet doesn't
+ * track, so both stay manual for now.
+ */
+export function styleAttackBonus(
+  weapon: WeaponLike,
+  styles: readonly FightingStyle[],
+): number {
+  return styles.includes("archery") && isRangedWeapon(weapon) ? 2 : 0;
 }
 
 /** "1d8" + 3 → "1d8+3"; a zero modifier is left off. */
