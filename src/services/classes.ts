@@ -98,13 +98,27 @@ export interface FeatureOption {
   isHomebrew: boolean;
 }
 
-// One list in two places with the CHECK on feature_options.kind (095, 122).
-export const FEATURE_OPTION_KINDS = ["fighting_style", "maneuver"] as const;
+// One list in two places with the CHECK on feature_options.kind (095, 122-126).
+// The client must know a kind before the database holds one: toFeatureOption
+// throws on a kind it doesn't know, which would fail every sheet's load. So a
+// new kind ships here first, and its seed runs once this is live.
+export const FEATURE_OPTION_KINDS = [
+  "fighting_style",
+  "maneuver",
+  "metamagic",
+  "arcane_shot",
+  "rune",
+  "invocation",
+] as const;
 export type FeatureOptionKind = (typeof FEATURE_OPTION_KINDS)[number];
 
 export const FEATURE_OPTION_KIND_LABELS: Record<FeatureOptionKind, string> = {
   fighting_style: "Fighting style",
   maneuver: "Maneuver",
+  metamagic: "Metamagic option",
+  arcane_shot: "Arcane Shot option",
+  rune: "Rune",
+  invocation: "Invocation",
 };
 
 const WEAPON_TRAINING = ["simple", "martial"] as const;
