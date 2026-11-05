@@ -6,10 +6,10 @@ import { Fortune } from "../../services/fortunes";
 import { errorMessage } from "../../lib/errors";
 import "./fortunes.css";
 
-const NUMERALS = ["I", "II", "III"];
+const NUMERALS = ["I", "II", "III", "IV", "V"];
 
 /**
- * Madam Eva's reading: three fortunes, one per artifact.
+ * Madam Eva's reading: three artifacts, then two companions (127).
  *
  * No route guard. A player who types the URL before the reading gets the
  * empty state, because RLS (065) gave them no rows -- there is nothing on this
@@ -30,7 +30,7 @@ export function Fortunes() {
     revealPending,
     setFound,
     setFoundError,
-    saveLines,
+    saveStanzas,
   } = useFortunes(campaign.id, { asPlayer: previewing });
 
   // One open editor at a time, by id -- Recaps' shape.
@@ -45,7 +45,7 @@ export function Fortunes() {
   if (isLoading) return <p>Loading...</p>;
   if (error) return <p>{error.message}</p>;
 
-  // The DM gets all three rows whatever their state, so this is the flag, not
+  // The DM gets every row whatever their state, so this is the flag, not
   // the length. A player only ever has rows when it's true.
   const revealed = fortunes.some((f) => f.isRevealed);
 
@@ -92,7 +92,7 @@ export function Fortunes() {
               isEditing={editingId === fortune.id}
               onEdit={() => setEditingId(fortune.id)}
               onStopEditing={() => setEditingId(null)}
-              onSave={(lines) => saveLines({ id: fortune.id, lines })}
+              onSave={(stanzas) => saveStanzas({ id: fortune.id, stanzas })}
               onFound={(isFound) => setFound({ id: fortune.id, isFound })}
             />
           ))}
@@ -116,9 +116,13 @@ function FortuneCard({
   isEditing: boolean;
   onEdit: () => void;
   onStopEditing: () => void;
-  onSave: (lines: string[]) => Promise<unknown>;
+  onSave: (stanzas: string[]) => Promise<unknown>;
   onFound: (isFound: boolean) => void;
 }) {
+  // A companion's fortune has nothing to find, so neither the DM's checkbox
+  // nor the badge appears on it. 127's CHECK refuses the write anyway.
+  const findable = fortune.isArtifact;
+
   return (
     <article className={`fortune${fortune.isFound ? " is-found" : ""}`}>
       <header className="fortune__head">
@@ -127,7 +131,7 @@ function FortuneCard({
         </span>
         <h2 className="fortune__title">{fortune.title}</h2>
         {/* The DM's checkbox stands in for the badge, so it isn't shown twice. */}
-        {fortune.isFound && !showDmUi && (
+        {findable && fortune.isFound && !showDmUi && (
           <span className="fortune__found">Found</span>
         )}
       </header>
@@ -142,22 +146,28 @@ function FortuneCard({
         />
       ) : (
         <blockquote className="fortune__lines">
-          {fortune.lines.map((line, i) => (
-            <p key={i}>“{line}”</p>
+          {/* One <p> per stanza; pre-line in the CSS breaks its verse lines. */}
+          {fortune.stanzas.map((stanza, i) => (
+            <p key={i}>{stanza}</p>
           ))}
         </blockquote>
       )}
 
       {showDmUi && !isEditing && (
         <div className="fortune__dm">
-          <label className="fortune__check">
-            <input
-              type="checkbox"
-              checked={fortune.isFound}
-              onChange={(e) => onFound(e.target.checked)}
-            />
-            Found
-          </label>
+          {findable ? (
+            <label className="fortune__check">
+              <input
+                type="checkbox"
+                checked={fortune.isFound}
+                onChange={(e) => onFound(e.target.checked)}
+              />
+              Found
+            </label>
+          ) : (
+            // Holds the Edit button at the right, where space-between puts it.
+            <span />
+          )}
           <button className="fortune__edit" onClick={onEdit}>
             Edit
           </button>
@@ -169,9 +179,10 @@ function FortuneCard({
 
 /**
  * The text only -- the title is pinned in the database (065), so the form
- * doesn't offer it. One textarea, one spoken line per line of it: the array
- * becomes newlines on the way in and splits back on the way out. Blank lines
- * are dropped by the service, so a stray empty line between two isn't saved.
+ * doesn't offer it. One textarea: a verse line per line, a blank line between
+ * stanzas. The stanzas are joined with a blank line on the way in and split on
+ * blank lines (whitespace-only counts) on the way out; the service trims each
+ * line and drops empty stanzas, so extra blank lines aren't saved.
  */
 function FortuneEditor({
   fortune,
@@ -179,10 +190,10 @@ function FortuneEditor({
   onClose,
 }: {
   fortune: Fortune;
-  onSave: (lines: string[]) => Promise<unknown>;
+  onSave: (stanzas: string[]) => Promise<unknown>;
   onClose: () => void;
 }) {
-  const [draft, setDraft] = useState(fortune.lines.join("\n"));
+  const [draft, setDraft] = useState(fortune.stanzas.join("\n\n"));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -191,7 +202,7 @@ function FortuneEditor({
     setSaving(true);
     setSaveError(null);
     try {
-      await onSave(draft.split("\n"));
+      await onSave(draft.split(/\n\s*\n/));
       onClose();
     } catch (err) {
       console.error("Problem saving fortune:", err);
@@ -204,13 +215,13 @@ function FortuneEditor({
   return (
     <form className="fortune__editor" onSubmit={handleSubmit}>
       <label className="fortune__editor-label" htmlFor={`fortune-${fortune.id}`}>
-        One line per line. Quotation marks are added for you.
+        One line per line; a blank line between stanzas.
       </label>
       <textarea
         id={`fortune-${fortune.id}`}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        rows={10}
+        rows={14}
         disabled={saving}
       />
       {saveError && <p className="fortunes__error">{saveError}</p>}

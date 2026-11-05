@@ -2,7 +2,7 @@ import {
   getFortunes,
   setFortunesRevealed,
   setFortuneFound,
-  updateFortuneLines,
+  updateFortuneStanzas,
   Fortune,
 } from "../services/fortunes";
 import { asPlayerView } from "../lib/playerView";
@@ -14,7 +14,7 @@ const fortunesAsPlayer = (fortunes: Fortune[]): Fortune[] =>
   asPlayerView(fortunes);
 
 /**
- * asPlayer re-renders the DM's three cards the way a player's response would
+ * asPlayer re-renders the DM's cards the way a player's response would
  * arrive: all of them once revealed, none before. Passed in rather than read
  * from the preview context, for the reason useNpcs gives.
  *
@@ -50,9 +50,9 @@ export function useFortunes(
     onSuccess: invalidate,
   });
 
-  const saveLinesMutation = useMutation({
-    mutationFn: ({ id, lines }: { id: string; lines: string[] }) =>
-      updateFortuneLines(id, lines),
+  const saveStanzasMutation = useMutation({
+    mutationFn: ({ id, stanzas }: { id: string; stanzas: string[] }) =>
+      updateFortuneStanzas(id, stanzas),
     onSuccess: invalidate,
   });
 
@@ -69,6 +69,6 @@ export function useFortunes(
     setFoundError: foundMutation.error,
     // mutateAsync: the editor awaits it and stays open holding the draft when
     // the save is refused, useNpcs' saveNpc shape.
-    saveLines: saveLinesMutation.mutateAsync,
+    saveStanzas: saveStanzasMutation.mutateAsync,
   };
 }

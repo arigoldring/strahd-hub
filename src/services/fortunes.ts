@@ -7,10 +7,16 @@ type FortuneRow = Tables<"campaign_fortunes">;
 
 export interface Fortune {
   id: string;
-  /** 1-3 in reading order. Also the sort key. */
+  /** 1-5 in reading order. Also the sort key. */
   card: number;
   title: string;
-  lines: string[];
+  /**
+   * One element per stanza, its verse lines joined by "\n" (127). The column
+   * is still called `lines`; renaming it wasn't worth a migration.
+   */
+  stanzas: string[];
+  /** Only an artifact can be found. A companion's fortune never is (127). */
+  isArtifact: boolean;
   isRevealed: boolean;
   isFound: boolean;
 }
@@ -20,13 +26,14 @@ function toFortune(row: FortuneRow): Fortune {
     id: row.id,
     card: row.card,
     title: row.title,
-    lines: row.lines,
+    stanzas: row.lines,
+    isArtifact: row.is_artifact,
     isRevealed: row.is_revealed,
     isFound: row.is_found,
   };
 }
 
-// No isDm branch. 065's read policy hands the DM all three and a player none
+// No isDm branch. 065's read policy hands the DM every card and a player none
 // until the reading is revealed, so "no rows" IS "Madam Eva hasn't read yet" --
 // the nav and the page both render straight from the length of this.
 //
@@ -49,7 +56,7 @@ export async function getFortunes(campaignId: string): Promise<Fortune[]> {
 
 /**
  * Reveal or hide the whole reading at once. One UPDATE across the campaign's
- * three rows, so the cards can't end up half-revealed.
+ * rows, so the cards can't end up half-revealed.
  *
  * Zero rows back is a refusal, not a no-op: RLS USING drops every row for a
  * non-DM before anything is checked (CLAUDE.md, "A refused write raises
@@ -75,18 +82,27 @@ export async function setFortunesRevealed(
 }
 
 /**
- * Rewrite one card's text. The text only: pin_fortune_row (065) resets the
- * title and every key column, so nothing else is offered here.
+ * Rewrite one card's text. The text only: pin_fortune_row (065, 127) resets
+ * the title, is_artifact and every key column, so nothing else is offered here.
  *
- * Trimmed and blank lines dropped at the boundary, so 065's lines CHECK is a
- * backstop rather than the error a DM sees. All-blank is refused here with a
- * message, for the same reason. Returns what was stored.
+ * Every line is trimmed, blank lines inside a stanza are dropped, and a stanza
+ * left empty is dropped, so 065's lines CHECK is a backstop rather than the
+ * error a DM sees. All-blank is refused here with a message, for the same
+ * reason. Returns what was stored.
  */
-export async function updateFortuneLines(
+export async function updateFortuneStanzas(
   id: string,
-  lines: string[],
+  stanzas: string[],
 ): Promise<string[]> {
-  const cleaned = lines.map((line) => line.trim()).filter((line) => line !== "");
+  const cleaned = stanzas
+    .map((stanza) =>
+      stanza
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line !== "")
+        .join("\n"),
+    )
+    .filter((stanza) => stanza !== "");
   if (cleaned.length === 0) {
     throw new Error("A fortune needs at least one line");
   }

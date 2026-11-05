@@ -45,6 +45,7 @@ export type Database = {
           card: number
           created_at: string
           id: string
+          is_artifact: boolean
           is_found: boolean
           is_revealed: boolean
           lines: string[]
@@ -55,6 +56,7 @@ export type Database = {
           card: number
           created_at?: string
           id?: string
+          is_artifact: boolean
           is_found?: boolean
           is_revealed?: boolean
           lines: string[]
@@ -65,6 +67,7 @@ export type Database = {
           card?: number
           created_at?: string
           id?: string
+          is_artifact?: boolean
           is_found?: boolean
           is_revealed?: boolean
           lines?: string[]

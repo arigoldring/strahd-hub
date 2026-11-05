@@ -1,5 +1,5 @@
 /* =========================================================
-   Fortunes -- Madam Eva's reading, three cards.
+   Fortunes -- Madam Eva's reading, five cards in verse.
 
    Palette and fonts come from theme.css's --sh-* tokens on :root.
    ========================================================= */
@@ -112,8 +112,10 @@
   line-height: 1.5;
   color: var(--sh-bone);
 }
+/* One <p> per stanza; its verse lines are "\n"-joined in the data (127). */
 .fortune__lines p {
-  margin: 0 0 10px;
+  margin: 0 0 14px;
+  white-space: pre-line;
 }
 .fortune__lines p:last-child {
   margin-bottom: 0;
