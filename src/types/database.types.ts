@@ -907,6 +907,7 @@ export type Database = {
       items: {
         Row: {
           armor_category: string | null
+          attunement_note: string | null
           base_armor_class: number | null
           campaign_id: string | null
           created_at: string | null
@@ -920,6 +921,8 @@ export type Database = {
           properties: string[] | null
           range_long: number | null
           range_normal: number | null
+          rarity: string | null
+          requires_attunement: boolean
           stealth_disadvantage: boolean | null
           strength_requirement: number | null
           tags: string[]
@@ -928,6 +931,7 @@ export type Database = {
         }
         Insert: {
           armor_category?: string | null
+          attunement_note?: string | null
           base_armor_class?: number | null
           campaign_id?: string | null
           created_at?: string | null
@@ -941,6 +945,8 @@ export type Database = {
           properties?: string[] | null
           range_long?: number | null
           range_normal?: number | null
+          rarity?: string | null
+          requires_attunement?: boolean
           stealth_disadvantage?: boolean | null
           strength_requirement?: number | null
           tags?: string[]
@@ -949,6 +955,7 @@ export type Database = {
         }
         Update: {
           armor_category?: string | null
+          attunement_note?: string | null
           base_armor_class?: number | null
           campaign_id?: string | null
           created_at?: string | null
@@ -962,6 +969,8 @@ export type Database = {
           properties?: string[] | null
           range_long?: number | null
           range_normal?: number | null
+          rarity?: string | null
+          requires_attunement?: boolean
           stealth_disadvantage?: boolean | null
           strength_requirement?: number | null
           tags?: string[]

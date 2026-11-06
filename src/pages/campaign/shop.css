@@ -123,6 +123,13 @@ html { overflow-y: scroll; }
   color: #fff2d0; border-color: rgba(255,210,180,.55);
   box-shadow: inset 0 1px 0 rgba(255,210,180,.25), inset 0 -2px 0 rgba(0,0,0,.4), 0 0 22px rgba(138,13,13,.5);
 }
+/* The rarity row under the Magic filter (129). Same div, same button styling;
+   the break forces it onto its own line, and the buttons are a step smaller so
+   the second row reads as subordinate to the first. */
+.shop-filter-break { flex-basis: 100%; height: 0; }
+.shop > div:nth-of-type(1) > button.shop-rarity {
+  font-size: 11px; padding: 5px 11px;
+}
 
 /* ---------- search ---------- */
 .shop > input {

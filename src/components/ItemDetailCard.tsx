@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Item } from "../services/items";
+import { Item, priceLabel, rarityLabel } from "../services/items";
 // The card's look lives in shop.css (the item-detail-* classes). Imported here
 // so the card carries its own styling wherever it's used, rather than depending
 // on each caller to have imported that sheet first. Same file the pages import;
@@ -18,8 +18,25 @@ function capitalize(value: string): string {
 }
 
 // One row per fact worth showing in the detail panel. Kind-specific so a
-// GeneralItem just renders an empty list instead of "N/A" filler.
+// GeneralItem just renders an empty list instead of "N/A" filler, and the
+// magic rows (129) appended for any kind, since rarity is an axis beside kind.
 function itemStats(item: Item): { label: string; value: string }[] {
+  const stats = kindStats(item);
+  if (item.rarity) {
+    stats.push({ label: "Rarity", value: rarityLabel(item.rarity) });
+    if (item.requiresAttunement) {
+      stats.push({
+        label: "Attunement",
+        value: item.attunementNote
+          ? `Required (${item.attunementNote})`
+          : "Required",
+      });
+    }
+  }
+  return stats;
+}
+
+function kindStats(item: Item): { label: string; value: string }[] {
   switch (item.kind) {
     case "weapon": {
       const stats = [
@@ -115,7 +132,7 @@ export function ItemDetailCard({
           {customName ?? item.name}
           {customName && <span className="detail-alias">{item.name}</span>}
         </span>
-        <span className="item-detail-price">{item.price} gold</span>
+        <span className="item-detail-price">{priceLabel(item)}</span>
       </div>
       {stats.length > 0 && (
         <dl className="item-detail-stats">

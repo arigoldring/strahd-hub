@@ -25,7 +25,45 @@ export interface ItemBase {
   // a DM sees an Edit button. Not campaignId itself: getItems has already
   // narrowed to shared-or-this-campaign, so "not shared" is enough.
   isHomebrew: boolean;
+  // Null is mundane, and the only spelling of it (129). Magic is an axis beside
+  // kind, not a fourth kind: a +1 longsword is a weapon and magic at once.
+  rarity: Rarity | null;
+  // Always false on a mundane item; 129's attunement_needs_rarity CHECK.
+  requiresAttunement: boolean;
+  // "by a cleric or paladin". Only ever set when requiresAttunement is.
+  attunementNote?: string;
 }
+
+// The same list, in the same order, as 129's CHECK on items.rarity: one list
+// in two places, so change them together, client first. toItem narrows the
+// column against it, so a value only the database knows throws and blanks the
+// Shop. The order is the Shop's rarity-button order and its sort order.
+export const magicRarities = [
+  "common",
+  "uncommon",
+  "rare",
+  "very rare",
+  "legendary",
+  "varies",
+] as const;
+export type Rarity = (typeof magicRarities)[number];
+
+export function rarityLabel(rarity: Rarity): string {
+  return rarity
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+// What the Shop row and the card header print where a price goes. The 2014
+// books price magic items by rarity range, not by item, so 130-137 seed them at
+// 0 and the rarity takes the price's place. A magic item with a real price
+// (Potion of Healing, 50 gp in the PHB; a DM's homebrew) still shows it.
+export function priceLabel(item: Item): string {
+  if (item.rarity && item.price === 0) return rarityLabel(item.rarity);
+  return `${item.price} gold`;
+}
+
 export const weaponProperties = [
   "ammunition",
   "finesse",
@@ -114,6 +152,12 @@ export function toItem(row: Tables<"items">): Item {
     price: row.price_cp / 100,
     tags: row.tags,
     isHomebrew: row.campaign_id !== null,
+    rarity:
+      row.rarity === null
+        ? null
+        : parseOneOf(row.rarity, magicRarities, "rarity", subject),
+    requiresAttunement: row.requires_attunement,
+    attunementNote: row.attunement_note ?? undefined,
   };
   switch (row.kind) {
     case "weapon":
@@ -214,6 +258,14 @@ function toAuthoredColumns(input: NewItem) {
     price_cp: Math.round(input.price * 100),
     tags: input.tags,
     kind: input.kind,
+    // Normalised here so a form can't send the states 129's CHECKs refuse:
+    // attunement only on a magic item, a note only with attunement.
+    rarity: input.rarity,
+    requires_attunement: input.rarity !== null && input.requiresAttunement,
+    attunement_note:
+      input.rarity !== null && input.requiresAttunement
+        ? input.attunementNote?.trim() || null
+        : null,
   };
 
   switch (input.kind) {
