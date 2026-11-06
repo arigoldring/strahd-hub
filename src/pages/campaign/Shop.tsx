@@ -1,7 +1,13 @@
 import { ReactNode, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useItems } from "../../hooks/useItems";
-import { Item } from "../../services/items";
+import {
+  Item,
+  type Rarity,
+  magicRarities,
+  priceLabel,
+  rarityLabel,
+} from "../../services/items";
 import { useCampaign } from "../../components/CampaignLayout";
 import { usePlayerPreview } from "../../components/PlayerPreviewContext";
 import { addToPartyInventory } from "../../services/partyInventory";
@@ -29,24 +35,50 @@ export function Shop() {
   // replaces the row with a new object) would show a stale card beside a fresh
   // table row, and a delete would leave a card for an item that's gone.
   const [panelId, setPanelId] = useState<string | null>(null);
+  // The second filter axis, live only while the Magic filter is. Held here
+  // rather than in useSearchBar, which knows one filter string; the predicate
+  // below closes over it, and it is read on every render, so it never lags.
+  const [rarity, setRarity] = useState<Rarity | "">("");
+  // "magic" is any item with a rarity, whatever its kind (129: rarity is an
+  // axis beside kind). The kind filters exclude magic items, or General would
+  // be ~300 wondrous items with the rope buried among them.
   const { filter, setFilter, setSearch, filtered } = useSearchBar(
     items,
-    (item, filter) => item.kind === filter,
+    (item, filter) =>
+      filter === "magic"
+        ? item.rarity !== null && (rarity === "" || item.rarity === rarity)
+        : item.kind === filter && item.rarity === null,
   );
   if (loading) return <p>Loading Items...</p>;
   if (error) return <p>Couldn't load items: {error.message}</p>;
   const panel = items.find((item) => item.id === panelId) ?? null;
 
+  // The magic view reads best grouped by rarity, common first; every other
+  // view keeps the order it always had.
+  const rows =
+    filter === "magic"
+      ? [...filtered].sort(
+          (a, b) =>
+            rarityRank(a.rarity) - rarityRank(b.rarity) ||
+            a.name.localeCompare(b.name),
+        )
+      : filtered;
+
+  function chooseFilter(next: string) {
+    setFilter(next);
+    setRarity("");
+  }
+
   function createTable() {
     return (
       <table>
         <tbody>
-          {filtered.map((item: Item) => (
+          {rows.map((item: Item) => (
             <tr key={item.id}>
               <td>
                 <button onClick={() => setPanelId(item.id)}>{item.name}</button>
               </td>
-              <td>{item.price} gold</td>
+              <td>{priceLabel(item)}</td>
             </tr>
           ))}
         </tbody>
@@ -66,28 +98,53 @@ export function Shop() {
           <p>Filters</p>
           <button
             className={filter === "" ? "active" : ""}
-            onClick={() => setFilter("")}
+            onClick={() => chooseFilter("")}
           >
             All
           </button>
           <button
             className={filter === "general" ? "active" : ""}
-            onClick={() => setFilter("general")}
+            onClick={() => chooseFilter("general")}
           >
             general
           </button>
           <button
             className={filter === "armor" ? "active" : ""}
-            onClick={() => setFilter("armor")}
+            onClick={() => chooseFilter("armor")}
           >
             Armor
           </button>
           <button
             className={filter === "weapon" ? "active" : ""}
-            onClick={() => setFilter("weapon")}
+            onClick={() => chooseFilter("weapon")}
           >
             Weapons
           </button>
+          <button
+            className={filter === "magic" ? "active" : ""}
+            onClick={() => chooseFilter("magic")}
+          >
+            Magic
+          </button>
+          {/* The rarity row lives inside this same div, after a line break,
+              because shop.css styles `.shop > div:nth-of-type(n)` by position:
+              a second div here would become the detail overlay's selector. The
+              break is a span for the same reason. */}
+          {filter === "magic" && (
+            <>
+              <span className="shop-filter-break" />
+              <p>Rarity</p>
+              {(["", ...magicRarities] as const).map((r) => (
+                <button
+                  key={r || "any"}
+                  className={`shop-rarity${rarity === r ? " active" : ""}`}
+                  onClick={() => setRarity(r)}
+                >
+                  {r === "" ? "Any" : rarityLabel(r)}
+                </button>
+              ))}
+            </>
+          )}
         </div>
         <input
           type="text"
@@ -129,6 +186,13 @@ export function Shop() {
       </div>
     </>
   );
+}
+
+// Position in magicRarities, so the magic view sorts in the tuple's order.
+// Mundane items never reach it (the magic filter excludes them); they would
+// sort last.
+function rarityRank(rarity: Rarity | null): number {
+  return rarity === null ? magicRarities.length : magicRarities.indexOf(rarity);
 }
 
 // The one place a Shop item crosses into a campaign's shared loot. Calls the

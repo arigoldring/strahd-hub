@@ -5,6 +5,9 @@ import { usePartyInventory } from "../../hooks/usePartyInventory";
 import {
   type Item,
   type NewItem,
+  type Rarity,
+  magicRarities,
+  rarityLabel,
   armorCategories,
   damageTypes,
   weaponCategories,
@@ -76,6 +79,14 @@ export function HomebrewItemForm({
     initial ? String(initial.price) : "",
   );
   const [tagsInput, setTagsInput] = useState(initial?.tags.join(", ") ?? "");
+  // "" is mundane in the <select>; it becomes null on submit (129).
+  const [rarity, setRarity] = useState<Rarity | "">(initial?.rarity ?? "");
+  const [requiresAttunement, setRequiresAttunement] = useState(
+    initial?.requiresAttunement ?? false,
+  );
+  const [attunementNote, setAttunementNote] = useState(
+    initial?.attunementNote ?? "",
+  );
 
   const [weaponCategory, setWeaponCategory] = useState<"simple" | "martial">(
     weapon?.category ?? "simple",
@@ -158,6 +169,15 @@ export function HomebrewItemForm({
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
 
+    // The same three fields on every kind, since rarity is an axis beside kind.
+    // toAuthoredColumns drops attunement on a mundane item, so switching the
+    // rarity back to None can't trip 129's CHECKs with a stale checkbox.
+    const magic = {
+      rarity: rarity === "" ? null : rarity,
+      requiresAttunement,
+      attunementNote: attunementNote.trim() || undefined,
+    };
+
     let input: NewItem;
 
     if (kind === "weapon") {
@@ -172,6 +192,7 @@ export function HomebrewItemForm({
         description: description.trim(),
         price: Number(price),
         tags,
+        ...magic,
         category: weaponCategory,
         damageDice: damageDice.trim(),
         damageType,
@@ -192,6 +213,7 @@ export function HomebrewItemForm({
         description: description.trim(),
         price: Number(price),
         tags,
+        ...magic,
         category: armorCategory,
         baseArmorClass: Number(baseArmorClass),
         strengthRequirement: strengthRequirement
@@ -206,6 +228,7 @@ export function HomebrewItemForm({
         description: description.trim(),
         price: Number(price),
         tags,
+        ...magic,
       };
     }
 
@@ -300,6 +323,59 @@ export function HomebrewItemForm({
             </label>
           ))}
         </div>
+      </fieldset>
+
+      <fieldset className="create-item-section">
+        <legend>Magic</legend>
+
+        <label className="create-item-label" htmlFor="rarity">
+          Rarity
+        </label>
+        <select
+          id="rarity"
+          className="create-item-input"
+          value={rarity}
+          onChange={(e) => setRarity(e.target.value as Rarity | "")}
+          disabled={saving}
+        >
+          <option value="">None (mundane)</option>
+          {magicRarities.map((r) => (
+            <option key={r} value={r}>
+              {rarityLabel(r)}
+            </option>
+          ))}
+        </select>
+
+        {rarity !== "" && (
+          <>
+            <label className="create-item-radio-label">
+              <input
+                type="checkbox"
+                checked={requiresAttunement}
+                onChange={(e) => setRequiresAttunement(e.target.checked)}
+                disabled={saving}
+              />
+              Requires attunement
+            </label>
+            {requiresAttunement && (
+              <>
+                <label className="create-item-label" htmlFor="attunementNote">
+                  Attuned by{" "}
+                  <span className="create-item-hint">(optional)</span>
+                </label>
+                <input
+                  id="attunementNote"
+                  className="create-item-input"
+                  type="text"
+                  value={attunementNote}
+                  onChange={(e) => setAttunementNote(e.target.value)}
+                  disabled={saving}
+                  placeholder="e.g. by a cleric or paladin"
+                />
+              </>
+            )}
+          </>
+        )}
       </fieldset>
 
       {kind === "weapon" && (
