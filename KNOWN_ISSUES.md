@@ -807,6 +807,51 @@ and `!showDmUi` (a client gate, like Give and Teach; RLS on `party_inventory`
 is membership). For value, a per-rarity price table in code, used only by the
 total.
 
+### The 81 original spells read differently from the other 394 (noted 2026-11-06)
+
+023/024 wrote near-verbatim book text with the upcast rule inside
+`description`, and never filled `material_component` or `higher_levels`.
+139-146 write own-words summaries, upcasting in `higher_levels` and every
+material component. 138 repaired the old rows' levels, components and class
+lists, and wrote the material component on the 36 rows it touched, but left
+their text alone. So 26 old rows still show "M" with no component (counted
+live 2026-11-06), and none of the 81 has an "At Higher Levels" block.
+
+**Trigger:** opening, say, Fireball beside Chain Lightning in the grimoire.
+
+**Cost:** cosmetic; nothing is missing, just in a different place.
+
+**Fix:** a backfill in 138's shape: a temp table of (name, material_component,
+higher_levels, description) for the 81 rows, an update, and an assertion.
+
+### Spell class lists leave out the Artificer (noted 2026-11-06)
+
+TCoE gives the Artificer its own spell list, and most TCoE spells name it.
+The catalogue has no Artificer class (055 seeded the PHB twelve), so 138-147
+leave it out of every `classes` array rather than name a class nothing can
+pick.
+
+**Trigger:** adding the Artificer as a class.
+
+**Cost:** none until then.
+
+**Fix:** in the same change that seeds the class, a 147-shaped file of
+(spell, 'Artificer') pairs from TCoE's Artificer list.
+
+### 147's TCoE expanded spell lists were written from memory (noted 2026-11-06)
+
+The 63 (spell, class) pairs in 147 were not copied from the book. The
+likeliest slips are named in its header: Sorcerer's Flame Blade and the
+8th/9th rows.
+
+**Trigger:** a player asking why a spell is or isn't on their list.
+
+**Cost:** one wrong line on a detail card; the sheet doesn't gate spells by
+class.
+
+**Fix:** check the 63 pairs against TCoE's "Expanded Spell Lists" tables,
+then add or `array_remove` the difference in a follow-up migration.
+
 ### Editing a homebrew item rewrites every stack that holds it (noted 2026-09-30)
 
 053 edits the `items` row in place, which is the point: no copy, no reseed. But
