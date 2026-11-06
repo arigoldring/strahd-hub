@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 126. Last updated 2026-11-05.**
+**Current through migration 137. Last updated 2026-11-05.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -230,6 +230,10 @@ time this pattern is copied.
 likely to grow columns (rarity, attunement, weight), and every one of them is
 DM-editable on homebrew the moment it lands. Today that is the right answer for
 each of them, which is exactly how a blocklist stays unnoticed.
+
+129 made the prediction true: `rarity`, `requires_attunement` and
+`attunement_note` landed unpinned, which is right (a DM should be able to fix
+their homebrew's rarity), and the CHECKs still apply.
 
 ### `npcs.description` is normalised in the client only (noted 2026-08-14, partly addressed by 035)
 
@@ -767,6 +771,41 @@ HP and no class, so the demo sheet looks empty.
 
 **Fix:** extend the fixture with an UPDATE of `character_stats` and inserts
 into `character_classes`, after its characters insert.
+
+### Magic items are text: the sheet applies no +1 and counts no attunement (noted 2026-11-05)
+
+130-137 seed every magic weapon and armour as `kind = 'general'`, because most
+are "any sword" or "any armour" with no dice or AC for the kind columns. So a
+character carrying a +1 Weapon or wearing +2 Armor gets nothing from it on the
+sheet: `rules.ts` reads only weapon and armour rows. Likewise
+`requires_attunement` is shown, but nothing caps a character at three attuned
+items, and nothing records which ones are attuned.
+
+**Trigger:** equipping magic gear and expecting the attack or AC to change.
+
+**Cost:** the player adds the bonus in their head, as with features (above).
+
+**Fix:** a `magic_bonus int` on items and a way to pair it with a base
+weapon or armour row (a +1 longsword is a longsword *and* +1), which is the
+real design question; then `rules.ts` adds it when equipped. Attunement wants
+an `attuned` boolean on `character_inventory`, 057's `equipped` shape.
+
+### Magic items are free to add, and worth 0 in the hoard (noted 2026-11-05)
+
+Decided with the seed: magic items behave like the rest of the Shop, so any
+member can press "Add to party inventory" on a Vorpal Sword. And they are
+priced 0 (the books give rarity ranges, not prices), so the hoard's "in goods"
+total ignores them.
+
+**Trigger:** a player adding loot the DM didn't hand out; a DM reading the
+goods total as the party's wealth.
+
+**Cost:** trust at the table; one misleading total.
+
+**Fix if the answer changes:** hide the Add button when `item.rarity` is set
+and `!showDmUi` (a client gate, like Give and Teach; RLS on `party_inventory`
+is membership). For value, a per-rarity price table in code, used only by the
+total.
 
 ### Editing a homebrew item rewrites every stack that holds it (noted 2026-09-30)
 
