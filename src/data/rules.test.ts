@@ -15,12 +15,14 @@ import {
   keysClearedByRest,
   martialArtsDie,
   martialArtsWeapon,
+  pactSlots,
   picksAllowed,
   resourceMax,
   resourceRecharge,
   saveAura,
   sneakAttackDice,
   speedBonus,
+  spellSlots,
   styleAttackBonus,
   untrainedCheckBonus,
   weaponAbility,
@@ -366,5 +368,63 @@ describe("keysClearedByRest", () => {
   });
   it("clears everything on a long rest", () => {
     expect(keysClearedByRest(counters, "long")).toEqual(["a", "b"]);
+  });
+});
+
+describe("spellSlots", () => {
+  it("reads the PHB Spellcaster table for a full caster", () => {
+    expect(spellSlots("full", 1)).toEqual([2]);
+    expect(spellSlots("full", 5)).toEqual([4, 3, 2]);
+    expect(spellSlots("full", 17)).toEqual([4, 3, 3, 3, 2, 1, 1, 1, 1]);
+    expect(spellSlots("full", 20)).toEqual([4, 3, 3, 3, 3, 2, 2, 1, 1]);
+  });
+
+  // The printed Paladin/Ranger table, level by level.
+  it("matches the PHB half-caster table, with nothing at 1st", () => {
+    const paladin: Record<number, number[]> = {
+      1: [], 2: [2], 3: [3], 4: [3], 5: [4, 2], 6: [4, 2], 7: [4, 3], 8: [4, 3],
+      9: [4, 3, 2], 10: [4, 3, 2], 11: [4, 3, 3], 12: [4, 3, 3], 13: [4, 3, 3, 1],
+      14: [4, 3, 3, 1], 15: [4, 3, 3, 2], 16: [4, 3, 3, 2], 17: [4, 3, 3, 3, 1],
+      18: [4, 3, 3, 3, 1], 19: [4, 3, 3, 3, 2], 20: [4, 3, 3, 3, 2],
+    };
+    for (const [level, slots] of Object.entries(paladin)) {
+      expect(spellSlots("half", Number(level))).toEqual(slots);
+    }
+  });
+
+  it("starts the Artificer's table at 1st", () => {
+    expect(spellSlots("half_up", 1)).toEqual([2]);
+    expect(spellSlots("half_up", 2)).toEqual([2]);
+    expect(spellSlots("half_up", 5)).toEqual([4, 2]);
+    expect(spellSlots("half_up", 20)).toEqual([4, 3, 3, 3, 2]);
+  });
+
+  // The printed Eldritch Knight table, level by level.
+  it("matches the PHB third-caster table, from 3rd", () => {
+    const knight: Record<number, number[]> = {
+      2: [], 3: [2], 4: [3], 6: [3], 7: [4, 2], 9: [4, 2], 10: [4, 3], 12: [4, 3],
+      13: [4, 3, 2], 15: [4, 3, 2], 16: [4, 3, 3], 18: [4, 3, 3], 19: [4, 3, 3, 1],
+      20: [4, 3, 3, 1],
+    };
+    for (const [level, slots] of Object.entries(knight)) {
+      expect(spellSlots("third", Number(level))).toEqual(slots);
+    }
+  });
+
+  it("gives Pact Magic and non-casters no regular slots", () => {
+    expect(spellSlots("pact", 10)).toEqual([]);
+    expect(spellSlots(null, 10)).toEqual([]);
+  });
+});
+
+describe("pactSlots", () => {
+  it("follows the Warlock table", () => {
+    expect(pactSlots(1)).toEqual({ count: 1, slotLevel: 1 });
+    expect(pactSlots(2)).toEqual({ count: 2, slotLevel: 1 });
+    expect(pactSlots(3)).toEqual({ count: 2, slotLevel: 2 });
+    expect(pactSlots(9)).toEqual({ count: 2, slotLevel: 5 });
+    expect(pactSlots(11)).toEqual({ count: 3, slotLevel: 5 });
+    expect(pactSlots(17)).toEqual({ count: 4, slotLevel: 5 });
+    expect(pactSlots(0)).toBeNull();
   });
 });

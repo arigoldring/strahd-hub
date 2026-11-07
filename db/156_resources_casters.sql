@@ -4,8 +4,8 @@
 -- Artificer: 80 rows in 153's feature_resources, 154's shape. RUN 153 FIRST.
 -- Each row is a feature whose own text says it recharges on a rest, base
 -- class and every seeded archetype. Spell slots and Pact Magic are not here:
--- they come from a slot table in rules.ts (KNOWN_ISSUES, "Spellcasting has
--- no slot or school model"). Highlights:
+-- they come from a slot table in rules.ts keyed on 158's caster_type.
+-- Highlights:
 --
 --   Bardic Inspiration  CHA modifier (min 1) per long rest, and per short
 --                       rest from 5th (Font of Inspiration), the one row

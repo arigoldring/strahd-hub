@@ -754,6 +754,7 @@ export type Database = {
       classes: {
         Row: {
           campaign_id: string | null
+          caster_type: string | null
           created_at: string
           description: string
           hit_die: number
@@ -768,6 +769,7 @@ export type Database = {
         }
         Insert: {
           campaign_id?: string | null
+          caster_type?: string | null
           created_at?: string
           description?: string
           hit_die: number
@@ -782,6 +784,7 @@ export type Database = {
         }
         Update: {
           campaign_id?: string | null
+          caster_type?: string | null
           created_at?: string
           description?: string
           hit_die?: number
@@ -1551,6 +1554,7 @@ export type Database = {
       subclasses: {
         Row: {
           campaign_id: string | null
+          caster_type: string | null
           class_id: string
           created_at: string
           description: string
@@ -1561,6 +1565,7 @@ export type Database = {
         }
         Insert: {
           campaign_id?: string | null
+          caster_type?: string | null
           class_id: string
           created_at?: string
           description?: string
@@ -1571,6 +1576,7 @@ export type Database = {
         }
         Update: {
           campaign_id?: string | null
+          caster_type?: string | null
           class_id?: string
           created_at?: string
           description?: string

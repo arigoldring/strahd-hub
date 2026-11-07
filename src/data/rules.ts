@@ -575,3 +575,79 @@ export function keysClearedByRest(
 ): string[] {
   return counters.filter((c) => rest === "long" || c.recharge === "short").map((c) => c.key);
 }
+
+// ---------------------------------------------------------------------------
+// Spell slots (158)
+// ---------------------------------------------------------------------------
+
+/** One list in two places with the CHECK on classes/subclasses.caster_type. */
+export const CASTER_TYPES = ["full", "half", "half_up", "third", "pact"] as const;
+export type CasterType = (typeof CASTER_TYPES)[number];
+
+// The PHB's Spellcaster table: slots per spell level (index 0 = 1st) for a
+// full caster of each level (index 0 = 1st).
+const FULL_CASTER_SLOTS: readonly (readonly number[])[] = [
+  [2],
+  [3],
+  [4, 2],
+  [4, 3],
+  [4, 3, 2],
+  [4, 3, 3],
+  [4, 3, 3, 1],
+  [4, 3, 3, 2],
+  [4, 3, 3, 3, 1],
+  [4, 3, 3, 3, 2],
+  [4, 3, 3, 3, 2, 1],
+  [4, 3, 3, 3, 2, 1],
+  [4, 3, 3, 3, 2, 1, 1],
+  [4, 3, 3, 3, 2, 1, 1],
+  [4, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 2, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 2, 1, 1],
+];
+
+/**
+ * Spell slots for a single-class caster of a class level, index 0 = 1st
+ * level. Empty for no slots (a non-caster, a Paladin at 1st, Pact Magic,
+ * which is pactSlots).
+ *
+ * The half and third tables in the PHB and Tasha's are the full table read at
+ * the level divided and rounded up, from the level each class starts casting:
+ * a Paladin 5 has a full caster 3's slots, an Eldritch Knight 7 a full
+ * caster 3's. rules.test.ts checks this against the printed tables.
+ */
+export function spellSlots(type: CasterType | null, classLevel: number): readonly number[] {
+  const at = (n: number) => FULL_CASTER_SLOTS[Math.min(20, n) - 1] ?? [];
+  switch (type) {
+    case "full":
+      return classLevel >= 1 ? at(classLevel) : [];
+    case "half":
+      return classLevel >= 2 ? at(Math.ceil(classLevel / 2)) : [];
+    case "half_up":
+      return classLevel >= 1 ? at(Math.ceil(classLevel / 2)) : [];
+    case "third":
+      return classLevel >= 3 ? at(Math.ceil(classLevel / 3)) : [];
+    case "pact":
+    case null:
+      return [];
+  }
+}
+
+/**
+ * Pact Magic (Warlock): how many slots, all of one level, back on a short
+ * rest. Null below 1st level.
+ */
+export function pactSlots(warlockLevel: number): { count: number; slotLevel: number } | null {
+  if (warlockLevel < 1) return null;
+  const count = warlockLevel >= 17 ? 4 : warlockLevel >= 11 ? 3 : warlockLevel >= 2 ? 2 : 1;
+  const slotLevel = Math.min(5, Math.ceil(warlockLevel / 2));
+  return { count, slotLevel };
+}
+
+/** "1st", "2nd", "3rd", "4th"... for a spell level. */
+export function ordinal(n: number): string {
+  return n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`;
+}

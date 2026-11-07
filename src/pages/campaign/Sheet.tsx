@@ -29,6 +29,8 @@ import {
   martialArtsDie,
   martialArtsWeapon,
   picksAllowed,
+  ordinal,
+  pactSlots,
   proficiencyBonus,
   resourceMax,
   resourceRecharge,
@@ -36,6 +38,7 @@ import {
   skillBonus,
   sneakAttackDice,
   speedBonus,
+  spellSlots,
   styleAttackBonus,
   totalLevel,
   untrainedCheckBonus,
@@ -268,6 +271,28 @@ function FullSheet({
         )
         .filter((c) => c.max > 0)
     : [];
+  // Spell slots (158), ahead of the feature counters: the class's slot table,
+  // else the subclass's (Eldritch Knight, Arcane Trickster). Starting class
+  // only, like everything above.
+  const casterType = cls?.casterType ?? subclass?.casterType ?? null;
+  const slotCounters: SheetCounter[] = spellSlots(casterType, classLevel).map((max, i) => ({
+    key: `slot:${i + 1}`,
+    name: `${ordinal(i + 1)}-level slots`,
+    source: "Spell Slots",
+    max,
+    recharge: "long",
+  }));
+  const pact = casterType === "pact" ? pactSlots(classLevel) : null;
+  if (pact) {
+    slotCounters.push({
+      key: "pact",
+      name: `Pact slots (${ordinal(pact.slotLevel)} level)`,
+      source: "Pact Magic",
+      max: pact.count,
+      recharge: "short",
+    });
+  }
+  counters.unshift(...slotCounters);
   // Feats' counters (157) read the character's total level, not a class's.
   for (const feat of ownFeats) {
     for (const r of feat.resources) {

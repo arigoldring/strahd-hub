@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 157. Last updated 2026-11-07.**
+**Current through migration 158. Last updated 2026-11-07.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -699,20 +699,20 @@ head.
 counters on the class entry, plus a short/long rest action; that is a design
 of its own.
 
-### Spellcasting has no slot or school model (noted 2026-10-13, widened by 084-094)
+### Spellcasting has no school model, and slots are single-class (noted 2026-10-13, widened by 084-094, narrowed 2026-11-07 by 158)
 
-Every caster's Spellcasting row (and the Warlock's Pact Magic) is text, with
-its slot table written out. The spell DC and attack use the class's or
-subclass's `spell_ability`, but slots aren't tracked, prepared and known
-counts aren't checked, and the spell picker offers every spell. Domain,
-oath, circle and patron spells are listed in their rows' text and nothing
-marks them always prepared. The Eldritch Knight (082) and Arcane Trickster
-(091) both have a school restriction nobody enforces.
+158 gave classes and subclasses a `caster_type`, and the sheet derives slots
+from it (`spellSlots` / `pactSlots` in `rules.ts`): full, half, Artificer
+and third casters, and the Warlock's Pact Magic on short rests. Each slot
+level is a counter in the Resources band. What's still missing: prepared and
+known counts aren't checked, and the spell picker offers every spell.
+Domain, oath, circle and patron spells are listed in their rows' text and
+nothing marks them always prepared. The Eldritch Knight (082) and Arcane
+Trickster (091) both have a school restriction nobody enforces. Slots come
+from the starting class only (see "Use counters and rests").
 
-**Fix:** spell slots as a derived table in `rules.ts` keyed on caster type
-(full, half, third, pact), and a school filter in the picker driven by the
-subclass. The second third-caster this entry was waiting for has now
-arrived, so the design can start.
+**Fix:** a school filter in the picker driven by the subclass, and the
+PHB multiclass slot table in `rules.ts` once multiclassing is on the sheet.
 
 ### Use counters and rests: what the first version leaves out (noted 2026-11-07)
 
