@@ -710,6 +710,53 @@ marks them always prepared. The Eldritch Knight (082) and Arcane Trickster
 subclass. The second third-caster this entry was waiting for has now
 arrived, so the design can start.
 
+### Use counters and rests: what the first version leaves out (noted 2026-11-07)
+
+The counters work (`features-count`, 153 on) tracks uses of class features,
+feats and spell slots, and has a Short Rest and a Long Rest button that clear
+them. Its scope was cut on purpose. Each item below was decided with the
+design and is not an oversight.
+
+- **Spending a slot isn't linked to casting.** Slots are pips of their own.
+  Nothing on the spell list spends one, and nothing records upcasting.
+  *Fix:* a "Cast" control on each spell row that spends a slot at a level
+  you choose, no lower than the spell's.
+- **Partial recoveries are done by hand.** The rest buttons clear a counter
+  completely. Features that win back only part of a pool are left to the
+  player, who un-fills pips by hand. That covers Arcane Recovery, Natural
+  Recovery, Harness Divine Power, Font of Magic's slot and point
+  conversion, Psionic Power's one die per short rest, and every "regain one
+  use when you roll initiative" feature (Ever-Ready Shot, Tireless Spirit,
+  Superior Inspiration, Perfect Self...).
+  *Fix:* one action per feature that knows what it gives back, for
+  example an Arcane Recovery button that offers slots up to its level
+  budget.
+- **Magic item charges aren't tracked.** Items have no charges column (129
+  added rarity and attunement only), and charges often come back as dice
+  "at dawn".
+  *Fix:* a `charges` and `recharge` pair on `items`, a counter per
+  carried stack, and perhaps a third "Dawn" rest kind.
+- **Multiclass characters get counters from their starting class only.**
+  This is the sheet's existing single-class rule, which the Class Features
+  list already follows. Slots use that one class's own table, not the
+  PHB's multiclass table.
+  *Fix:* walk every class entry, the same way `collectEffects` already
+  does, and add the multiclass slot table to `rules.ts`.
+- **A Long Rest only clears counters, like a Short Rest.** It doesn't
+  restore hit points, clear temporary HP, give Hit Dice back or lower
+  exhaustion. A Short Rest doesn't offer to spend Hit Dice. Spent Hit Dice
+  aren't tracked at all: the tile shows `{level}d{die}`.
+  *Fix:* HP to max and temp HP to 0 are two more columns in the long rest's
+  write. Hit Dice want a `hit_dice_spent` column on `character_stats`,
+  half of it returned on a long rest and a spend control for short rests.
+- **Only the character's own sheet rests.** There's no DM-wide "the party
+  takes a long rest" button. The owner and the DM can each press a
+  character's buttons, as with every other sheet write (`can_edit_character`).
+- **Homebrew features and feats can't define counters.** Counters are rows
+  in `feature_resources` (153). Only the migrations write those, and the
+  app has no form for them, the same gap as the rest of homebrew class
+  editing (above).
+
 ### Many-pick features without a picker yet (noted 2026-10-11, widened by 082 and 084-094, narrowed 2026-11-05 by 095 and 122)
 
 122 added the machinery: `class_feature_picks` says how many picks a
