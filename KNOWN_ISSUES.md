@@ -1,311 +1,25 @@
 # Known issues
 
-Things that are wrong on purpose — understood, judged not worth fixing at this
-size, and written down so they stay decisions rather than becoming discoveries.
-Each entry says what it takes to trigger, what it costs, and what the fix would
-be if the answer ever changes.
+Open work: things that are wrong and still want fixing. Each entry says what it
+takes to trigger, what it costs, and what the fix would be.
 
 **Current through migration 158. Last updated 2026-11-07.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
-and invariants and deliberately does not duplicate anything below.
+and invariants and deliberately does not duplicate anything below. Two sibling
+files hold what is no longer open:
+
+- `ACCEPTED_ISSUES.md` — trade-offs judged not worth fixing. Move an entry
+  there when it is accepted, and back here if the answer changes.
+- `FIXED_ISSUES.md` — entries that have been fixed, newest first. Move an entry
+  there when it is fixed rather than deleting it.
+
+Older comments in `db/` and `src/` say "see KNOWN_ISSUES" for entries that now
+live in one of those two files; search all three.
 
 ---
 
 ## Open
-
-### The demo account can rewrite its own sheet, and the reset is the only undo (noted 2026-08-31)
-
-The public `/demo` login is a shared `'player'` seat, and a player's ordinary
-permissions are the whole of what it has: it can rename its character, add and
-drop its own gear, spend its own purse, edit any recap in the campaign, and
-rename itself through `set_display_name`. It can also delete its character
-outright (`owner deletes own character` is `user_id = auth.uid()`) and make a new
-one under any name — `unique (campaign_id, user_id)` only stops two existing at
-once, so "the demo account has exactly one character" is true at reset time and
-not between resets.
-
-Accepted, not a bug. A `viewer` role and a `campaigns.frozen` column were both
-considered and rejected: either adds a branch to every policy in the app to
-serve one account.
-
-**Trigger:** anyone following the link doing anything at all.
-
-**Cost:** the demo looks like whatever the last visitor left. Bounded to one
-campaign — `read campaigns you can see` (018) is pure membership and this account
-has exactly one row — and bounded away from anything structural, since
-`is_campaign_dm` is false for it: it cannot rename or delete the campaign, touch
-the roster, reveal a location or map, or read a DM note. What it cannot do is the
-part worth knowing: it also cannot remove itself, because `campaign_members` has
-only `dm manages memberships` (ALL, gated `is_campaign_dm`) and `members read own
-memberships` (SELECT). There is no player-facing DELETE, so the link cannot be
-broken from inside. That is what makes an unattended public link survivable.
-
-**Fix if the answer changes:** re-run `db/fixtures/demo_campaign_reset.sql`. It
-is delete-then-insert precisely so a rename and a junk stack go away rather than
-being topped up around.
-
-### The demo reset does not restore the party hoard or purse (noted 2026-08-31)
-
-`demo_campaign_reset.sql` scopes its delete to characters (and, by cascade, their
-inventory, spells, feats and descriptions) plus the recap rows.
-`party_inventory` and `party_currency` are outside it. Both are
-`is_campaign_member` for read **and** write — that is 045's stated design, "the
-DM can add to the party's pool" being no special case because the DM is a member
-— so a demo visitor can add to and spend from both, and nothing puts them back.
-
-**Trigger:** a visitor using the Inventory page's party half, or the party purse.
-
-**Cost:** the one drift in the demo that accumulates. Small in practice, because
-the hoard starts at a single row and there is nothing to buy, but it is the one
-place where "re-running the seed is the recovery path" is not currently true.
-
-**Fix if the answer changes:** two more deletes scoped to the same
-`campaign_id`, and a seeded hoard and purse in the fixture's cast section. About
-eight lines, and the file's header names the gap so it is findable from there.
-
-### An invite posted beside the demo link would let it out of its campaign (noted 2026-08-31)
-
-The demo account's containment is entirely its single `campaign_members` row.
-`claim_player_invite` is security-definer and its whole job is to add one — it
-works for a caller who cannot read the invite row, by design, because an invitee
-is by definition not yet a member of anything. So a demo visitor holding any
-valid player-invite code can join whatever campaign it belongs to, with a real
-seat.
-
-**Trigger:** posting a player invite in the same place as the demo link. Not
-hypothetical if that Discord is also where players get recruited.
-
-**Cost:** potentially a real campaign, with a stranger in it who can edit recaps
-and read every revealed location. Nothing else in the app makes this reachable —
-`dm_invites` is unreadable to a non-DM, `generate_player_invite` needs
-`is_campaign_dm`, and codes are bare uuids nobody can guess.
-
-**Fix if the answer changes:** hand player invites out privately rather than in
-the channel carrying the demo link. Nothing in the schema needs changing, and
-narrowing `claim_player_invite` would break the invitee case it exists for.
-
-### Currency denominations don't auto-convert (noted 2026-08-20)
-
-045 gives a purse five separate integer columns — copper, silver, electrum,
-gold, platinum — and `adjust_character_currency`/`adjust_party_currency` each
-touch exactly one. There is no "break a gold piece into 10 silver" operation
-anywhere: spending 100 cp when a purse holds only gold pieces means manually
-adding copper (or converting by hand) before the spend can succeed, because
-the copper column's own floor check refuses to go negative even though the
-purse's total value would cover it.
-
-**Trigger:** any spend that mismatches the denomination actually held. Common
-at the table — loot rarely arrives in the exact coins a price is written in.
-
-**Cost:** low and mostly friction, not data loss — the refusal is a clean
-"not enough of that denomination", not a crash, and nothing stops a player or
-the DM from doing the conversion by hand with two Add/Spend calls. What it
-costs is convenience: nothing in the app currently prices anything to spend
-_against_, so it hasn't bitten yet, but it will the day a shop or a service
-charge is priced in gold and a party is holding platinum.
-
-**Fix if the answer changes:** a `convert_currency` RPC taking a purse target,
-a source denomination, an amount, and a target denomination, doing the spend
-and the add as one transaction at fixed 5e rates (1 sp = 10 cp, 1 ep = 5 sp,
-1 gp = 2 ep, 1 pp = 10 gp). Not hard, just not written yet.
-
-### `locations` has no `campaign_id`-pinning trigger (noted 2026-08-12)
-
-`session_recaps`, `characters` and `npcs` all carry a BEFORE-UPDATE trigger that
-pins `campaign_id` to its old value. `locations` does not. Both clauses of "dms
-update locations" pass for a DM who runs two campaigns, so that DM can move a
-location from one campaign into the other with an ordinary update.
-
-**Trigger:** being the DM of two campaigns and sending an update that names
-`campaign_id`. Nothing in the UI does this — `updateLocationDescription` and
-`updateLocationVisibility` send one column each — so it needs a hand-written
-request or a client bug.
-
-**Cost:** low, and this is not a privilege hole. Only a DM of _both_ campaigns
-can do it, and reassigning a location is a DM action either way; a
-single-campaign DM still cannot move a location out. What it costs is
-consistency — this is the one content table where the "pin the immutable facts"
-rule isn't enforced, and the exception is invisible until someone goes looking.
-
-**Fix if the answer changes:** the same trigger shape recaps uses. Four lines,
-plus a `create trigger`.
-
-`locations.map_key` (042) is unpinned the same way and for the same reason —
-042 gave the table no BEFORE-UPDATE trigger of its own, so a two-campaign DM
-can also move a location's map assignment cross-campaign with an ordinary
-update. Same cost, same fix, one trigger doing both jobs if it's ever added.
-
-### Maps have no RLS boundary — the reveal flag does, the image does not (noted 2026-08-20)
-
-042 added multi-map support: `campaign_map_reveals` gates whether a campaign
-has revealed a given map, and that table is real, RLS-protected data — a
-player cannot flip or forge it. What it gates is not protected by anything.
-`src/data/maps.ts` is a plain module compiled into the JS bundle every
-authenticated user downloads, images included by reference; `MapView.tsx`'s
-`mapsAsPlayer` flag is the only thing standing between a hidden map and a
-player's screen, and it is a client-side `if`, not a database policy. Every
-other reveal-gated thing in this app (locations, NPCs, their DM notes) is
-hidden by RLS before it ever leaves Postgres; this is the first feature where
-that is not true.
-
-**Trigger:** none needed for the flag itself — `is_campaign_member`/
-`is_campaign_dm` on `campaign_map_reveals` are exactly as solid as every other
-policy in this app (042's verification blocks 2 and 3 cover the read and the
-write). The gap is reaching the image directly: devtools, a saved page, or
-simply reading `src/data/maps.ts` in the deployed bundle.
-
-**Cost:** a picture. Concretely narrower than it sounds, for two reasons
-worth keeping rather than hand-waving away: Vite emits each map as a separate
-hashed asset referenced by URL, so the bytes are not inlined into the parsed
-JS and nothing on a player's screen requests them unless `MapView` actually
-renders an `<img>` for that map — reachable, not served. And every pin on
-every map stays fully RLS-gated regardless: an unrevealed location's
-existence, description and DM notes never leave the database for a real
-player, on any map. What could leak is the map art; the DM's actual secrets
-about it do not.
-
-Accepted at this size — the threat model is a player glancing at a map on
-screen before the DM means them to, not someone deliberately dumping the
-bundle, and these are published Curse of Strahd images findable in five
-seconds regardless.
-
-**Related gap, same entry:** `Home.tsx`'s dashboard thumbnail always renders
-`REGION_MAP.image` unconditionally — it never checks that map's own reveal
-flag. Today `REGION_MAP.defaultRevealed` is `true` and realistically stays
-that way, so this is currently theoretical, but it means hiding the region
-map would not actually remove it from a player's dashboard. Left alone rather
-than gated, on the same "not worth it for a picture" reasoning above.
-
-**Fix if the answer changes:** move map images into a Supabase Storage bucket
-behind signed URLs, with a storage policy joining `campaign_map_reveals` and
-`is_campaign_member` — the real boundary, turning `MapDef.image` into an async
-fetch. A day of work and a new failure mode (expiring URLs) to protect a
-picture; worth it only if the calculus above changes. If it's ever done, fix
-the Home thumbnail gap in the same change rather than leaving it as a second
-trip through this reasoning.
-
-### The pin triggers are blocklists, so new columns are writable by default (noted 2026-08-14)
-
-`pin_npc_row`, `pin_character_row` and `stamp_session_recap` all name the columns
-an update may _not_ touch. Every column added to those tables from here on is
-client-writable until someone remembers to pin it.
-
-**Trigger:** adding a column. `npcs.faction_id`, a `characters.level`, anything.
-The failure is invisible at the moment it is introduced — the migration adding
-the column succeeds, the app works, and the column is simply open.
-
-**Cost:** depends entirely on the column. Harmless for a display field, a
-privilege hole for anything the DM is supposed to control. It fails open, which
-is the wrong direction, and the comment at each trigger saying so only helps
-someone who reads the trigger — and the reason they are editing is that they are
-thinking about the column, not about the trigger.
-
-**Fix if the answer changes:** invert to an allowlist. Start from `old` and copy
-across only the writable set, so an unlisted column is read-only rather than
-open:
-
-```sql
-declare r npcs := old;
-begin
-  r.name        := trim(new.name);
-  r.description := new.description;
-  r.location_id := new.location_id;
-  r.is_revealed := new.is_revealed;
-  return r;
-end;
-```
-
-Identical behaviour today. This is a convention change rather than one table's
-fix — do all three together or none, so the pattern stays legible.
-
-046 and 047 add two more of the same shape —
-`pin_character_spell_description_row` and `pin_character_item_description_row`,
-each naming its two key columns and `updated_at`. Both say so in their own
-headers. Five blocklists now; the inversion gets one table more expensive every
-time this pattern is copied.
-
-053 makes it six: `pin_item_row` pins `id`, `campaign_id` and `created_at` on
-`items`. This one is wider than it looks, because `items` is the table most
-likely to grow columns (rarity, attunement, weight), and every one of them is
-DM-editable on homebrew the moment it lands. Today that is the right answer for
-each of them, which is exactly how a blocklist stays unnoticed.
-
-129 made the prediction true: `rarity`, `requires_attunement` and
-`attunement_note` landed unpinned, which is right (a DM should be able to fix
-their homebrew's rarity), and the CHECKs still apply.
-
-### `npcs.description` is normalised in the client only (noted 2026-08-14, partly addressed by 035)
-
-`name` is trimmed by `pin_npc_row` and backstopped by `npcs_name_check`, so the
-database is where that rule lives. `description` is normalised by
-`blankDescriptionToNull` in `services/npcs.ts` and by nothing in Postgres — two
-adjacent fields, two different layers, for no stated reason.
-
-**Trigger:** anything writing a description without going through `updateNpc`.
-Today that means the seed and anything typed into the SQL editor, which is also
-exactly where the roster comes from. A description of `'   '` stored that way
-renders as an empty paragraph, because `npc.description ?? "No description yet"`
-treats `''` as present.
-
-**Cost:** cosmetic. One card with a blank space where its blurb should be, and no
-sign anything went wrong.
-
-**What 035 did and did not do.** `035_npc_desc_fix.sql` is the one-time cleanup
-of existing rows and nothing else — no trigger change, no constraint. The rule
-still lives only in the client.
-
-```sql
--- the whole of 035
-update npcs set description = null
-where description is not null and trim(description) = '';
-```
-
-⚠ **Whether 035 actually ran is unconfirmed.** 036's ledger records it, but data-
-only migrations are backfilled on the word of whoever ran the ledger file, and
-the after-the-fact check (`select count(*) ... where trim(description) = ''`)
-returns 0 both if it ran and if there was never anything to clean. The statement
-is idempotent, so the cheap resolution is to run it once more and stop wondering.
-
-**Fix if the answer changes:** mirror what `name` already does — normalise in the
-trigger, backstop with a constraint. Clean first, then constrain, or the
-constraint will not validate.
-
-```sql
--- in pin_npc_row, beside the name trim
-new.description := nullif(btrim(new.description), '');
-
-alter table npcs add constraint npcs_description_check
-  check (description is null or (description = trim(description) and description <> ''));
-```
-
-Block 9 of `033_npcs_verification.sql` confirms this constraint is **not**
-currently present.
-
-### NPCs cannot be created or deleted from the app (noted 2026-08-14)
-
-`npcs` has SELECT and UPDATE policies and deliberately no INSERT and no DELETE.
-The roster arrives through the SQL editor, which is also where portraits and
-seeded notes are prepared. `034_npc_seed.sql` is written to be copied for this.
-
-**Trigger:** wanting a new NPC mid-session. There is no button, and adding one is
-a migration.
-
-**Cost:** the DM leaves the app to add a row. Acceptable while the roster is
-prepared between sessions, annoying the first time a player names an innkeeper
-that needs to exist immediately.
-
-**Fix if the answer changes:** an INSERT policy gated on `is_campaign_dm`, a
-`with check` that pins `campaign_id` to a campaign the caller runs, and a
-decision about `portrait_key` — which is currently pinned against updates
-precisely because a key naming no file fails silently. This is a piece of work,
-not a policy line. **The absence is the design; do not add either policy for
-symmetry.**
-
-Narrowed by 048: a *new* campaign no longer needs the SQL editor for the
-standard roster, because a trigger on `campaigns` seeds it (see CLAUDE.md,
-"Campaign seeding"). Anything beyond that roster, and any backfill into an
-existing campaign, is still a hand-run migration. Copy 051 for that, not 034.
 
 ### Death House sits at placeholder coordinates (noted 2026-09-18)
 
@@ -341,55 +55,6 @@ locations.
 
 **Fix:** `delete from locations where ...` instead of `truncate`, or reseed the
 roster after. Flagged at the bottom of `033_npcs.sql` as well as here.
-
-### Removing a player from a campaign destroys their character, gear, spells and feats (noted 2026-08-12, widened by 037 and 041)
-
-`characters` carries a composite FK to `campaign_members (campaign_id, user_id)`
-with `on delete cascade`, and `character_inventory.character_id`, — since 037 —
-`character_spells.character_id` and — since 041 — `character_feats.character_id`
-all cascade from `characters` in turn. So deleting one `campaign_members` row
-silently deletes that player's PC, every item on it, every spell on it and every
-feat on it, in the same statement, with no intermediate state and nothing to
-restore from.
-
-Each new child table widens this by one list without touching the entry, which
-is the shape of the problem: the cascade is correct and invisible, and the count
-of what it takes only ever goes up. 046 and 047 widen it again, and by the thing
-that is least replaceable: both description tables cascade from `characters`, so
-the words a player wrote go with everything else.
-
-**Trigger:** any delete against `campaign_members`. There is no kick UI today —
-the only paths are leaving a campaign yourself and a manual delete in the
-Supabase console — so this is latent rather than live. It is written down now
-because the day a "remove player" button is built, the cascade is already wired
-and does not appear anywhere near the button that fires it. A DM demoting a
-player who missed a session would not expect to be deleting their character
-sheet, and the UI would give no sign that they had.
-
-**Cost:** unrecoverable loss of one PC and everything on it. Cheap at this size
-(a character is a name, a gear list and a spell list, and reset already exists as
-a deliberate version of the same destruction), expensive in surprise, because
-nothing in the action's wording implies it.
-
-**Fix if the answer changes:** the cascade itself is right — 028 chose it so that
-leaving a campaign takes your character with you rather than stranding a row that
-fails its own FK. What is missing is at the call site, not in the schema: any
-kick UI needs to name the consequence in its confirm, the way the reset form
-already does, and should read the character first so it can name it. If
-characters ever need to outlive membership, that is a different change —
-`on delete cascade` becomes a nullable `campaign_members` link plus a retirement
-flag, which 028 explicitly declined ("there is no retired_at, by decision").
-
-### `removeFromPartyInventory` assumes party gear is common property
-
-Any campaign member may remove any row from the party inventory. That is the
-intended model — the party stash belongs to the party — and it matches how
-recaps are editable by everyone.
-
-**Fix if the answer changes:** if the DM ever needs sole control of removals, or
-if `added_by` is ever meant to confer ownership, the DELETE policy is where that
-split goes, not the service. `added_by` is already stamped server-side from
-`auth.uid()` in a trigger, so the column is trustworthy enough to gate on.
 
 ### `ignoreDuplicates: true` is load-bearing on `character_spells` (noted 2026-08-17)
 
@@ -449,27 +114,6 @@ nothing new to go stale.
 means giving those hooks the campaign id they currently and deliberately do
 without. Decide it once, in one sitting, for both.
 
-### The Party page mounts two background queries per character, for the DM (noted 2026-08-17)
-
-`GiveForm` and `TeachForm` write through `useCharacterInventory` and
-`useCharacterSpells`, which are queries as well as mutations. A DM viewing a
-party of six mounts six gear fetches and six spell fetches that the page never
-renders — `useParty` already carried both, in one request.
-
-**Trigger:** the DM opening the Party page. Players don't see the forms and don't
-pay the cost.
-
-**Cost:** eleven redundant requests at a party of six, all small and all cached.
-Real but negligible at this size. 046/047 doubled each of those reads — both
-`getCharacterSpells` and `getCharacterInventory` now fire a second request for
-the override map — so the true figure is twenty-two.
-
-**Why it's like this:** it buys the repo's rule that a mutation lives in a hook
-rather than being wired up ad hoc in a page. That is worth eleven cheap requests.
-
-**Fix if the party grows enough to matter:** `giveItem` and `teachSpell`
-mutations on `useParty` — not bare service calls from the page.
-
 ### `CharacterSpellRow` asserts the embedded spell is non-null (noted 2026-08-17)
 
 `CHARACTER_SPELLS_SELECT` is `"*, spells(*)"` and the row type declares
@@ -484,7 +128,8 @@ can create one today.
 
 **Cost:** currently zero. Note that "unreachable because there's no INSERT
 policy" is exactly the shape that protected `items` until 025 shipped and made it
-reachable — see the Resolved entry below. This is the same bet, one table over,
+reachable — see "Cross-campaign homebrew visible in every campaign's catalogue"
+in `FIXED_ISSUES.md`. This is the same bet, one table over,
 and 039 has since lost it for feats: `character_feats` has the identical hole and
 it is live, because feats shipped with DM homebrew in the same migration as the
 table. See "`CharacterFeatRow` asserts the embedded feat is non-null" below for
@@ -609,19 +254,6 @@ the save failed.
 **Fix:** a `set_starting_class(character, class)` plpgsql function doing all
 three in one transaction, security invoker so RLS stays the boundary.
 
-### A homebrew class or race can be attached across campaigns (noted 2026-10-05)
-
-041's hole, on 054/056's tables. A DM of campaigns A and B can create a class
-or race in B and point a character in A at it, where A's players can't read
-the row: the sheet then shows no class (or race) for that character.
-
-**Trigger:** writing the row by hand; the client never offers it, because its
-pickers read `getClasses(campaignId)` / `getRaces(campaignId)`.
-
-**Cost:** one DM mislabelling their own table. Same reasoning as 041 for
-leaving it open: closing it needs a trigger re-deriving the character's
-campaign on every write.
-
 ### Classes, subclasses and races can't be created or edited from the app (noted 2026-10-05)
 
 054 ships SELECT and INSERT policies on all three, so a DM is allowed to
@@ -714,53 +346,6 @@ from the starting class only (see "Use counters and rests").
 **Fix:** a school filter in the picker driven by the subclass, and the
 PHB multiclass slot table in `rules.ts` once multiclassing is on the sheet.
 
-### Use counters and rests: what the first version leaves out (noted 2026-11-07)
-
-The counters work (`features-count`, 153 on) tracks uses of class features,
-feats and spell slots, and has a Short Rest and a Long Rest button that clear
-them. Its scope was cut on purpose. Each item below was decided with the
-design and is not an oversight.
-
-- **Spending a slot isn't linked to casting.** Slots are pips of their own.
-  Nothing on the spell list spends one, and nothing records upcasting.
-  *Fix:* a "Cast" control on each spell row that spends a slot at a level
-  you choose, no lower than the spell's.
-- **Partial recoveries are done by hand.** The rest buttons clear a counter
-  completely. Features that win back only part of a pool are left to the
-  player, who un-fills pips by hand. That covers Arcane Recovery, Natural
-  Recovery, Harness Divine Power, Font of Magic's slot and point
-  conversion, Psionic Power's one die per short rest, and every "regain one
-  use when you roll initiative" feature (Ever-Ready Shot, Tireless Spirit,
-  Superior Inspiration, Perfect Self...).
-  *Fix:* one action per feature that knows what it gives back, for
-  example an Arcane Recovery button that offers slots up to its level
-  budget.
-- **Magic item charges aren't tracked.** Items have no charges column (129
-  added rarity and attunement only), and charges often come back as dice
-  "at dawn".
-  *Fix:* a `charges` and `recharge` pair on `items`, a counter per
-  carried stack, and perhaps a third "Dawn" rest kind.
-- **Multiclass characters get counters from their starting class only.**
-  This is the sheet's existing single-class rule, which the Class Features
-  list already follows. Slots use that one class's own table, not the
-  PHB's multiclass table.
-  *Fix:* walk every class entry, the same way `collectEffects` already
-  does, and add the multiclass slot table to `rules.ts`.
-- **A Long Rest only clears counters, like a Short Rest.** It doesn't
-  restore hit points, clear temporary HP, give Hit Dice back or lower
-  exhaustion. A Short Rest doesn't offer to spend Hit Dice. Spent Hit Dice
-  aren't tracked at all: the tile shows `{level}d{die}`.
-  *Fix:* HP to max and temp HP to 0 are two more columns in the long rest's
-  write. Hit Dice want a `hit_dice_spent` column on `character_stats`,
-  half of it returned on a long rest and a spend control for short rests.
-- **Only the character's own sheet rests.** There's no DM-wide "the party
-  takes a long rest" button. The owner and the DM can each press a
-  character's buttons, as with every other sheet write (`can_edit_character`).
-- **Homebrew features and feats can't define counters.** Counters are rows
-  in `feature_resources` (153). Only the migrations write those, and the
-  app has no form for them, the same gap as the rest of homebrew class
-  editing (above).
-
 ### Many-pick features without a picker yet (noted 2026-10-11, widened by 082 and 084-094, narrowed 2026-11-05 by 095 and 122)
 
 122 added the machinery: `class_feature_picks` says how many picks a
@@ -846,23 +431,6 @@ items, and nothing records which ones are attuned.
 weapon or armour row (a +1 longsword is a longsword *and* +1), which is the
 real design question; then `rules.ts` adds it when equipped. Attunement wants
 an `attuned` boolean on `character_inventory`, 057's `equipped` shape.
-
-### Magic items are free to add, and worth 0 in the hoard (noted 2026-11-05)
-
-Decided with the seed: magic items behave like the rest of the Shop, so any
-member can press "Add to party inventory" on a Vorpal Sword. And they are
-priced 0 (the books give rarity ranges, not prices), so the hoard's "in goods"
-total ignores them.
-
-**Trigger:** a player adding loot the DM didn't hand out; a DM reading the
-goods total as the party's wealth.
-
-**Cost:** trust at the table; one misleading total.
-
-**Fix if the answer changes:** hide the Add button when `item.rarity` is set
-and `!showDmUi` (a client gate, like Give and Teach; RLS on `party_inventory`
-is membership). For value, a per-rarity price table in code, used only by the
-total.
 
 ### The 81 original spells read differently from the other 394 (noted 2026-11-06)
 
@@ -961,24 +529,6 @@ class.
 **Fix:** check the 63 pairs against TCoE's "Expanded Spell Lists" tables,
 then add or `array_remove` the difference in a follow-up migration.
 
-### Editing a homebrew item rewrites every stack that holds it (noted 2026-09-30)
-
-053 edits the `items` row in place, which is the point: no copy, no reseed. But
-the hoard and every pack store an `item_id` and nothing else, so a change shows
-up everywhere at once, including on stacks bought at the old price. Raise a
-homebrew sword from 50 to 500 gold and the hoard's "in goods" total jumps by
-450 per sword the party already holds. There is no history, so the old values
-are gone.
-
-**Trigger:** editing price or stats on a homebrew item someone already carries.
-
-**Cost:** usually what the DM meant (a typo in the damage dice should be fixed
-on the sword in the fighter's hands, too). The price case is the surprise, and
-at a table of five it is one sentence of explanation.
-
-**Fix if it ever matters:** snapshot the price onto the stack at purchase. Not
-worth it while no screen distinguishes "what we paid" from "what it's worth".
-
 ### EditItem forgets where it came from on a refresh (noted 2026-09-30)
 
 The Edit link passes the page it was pressed on as router state, and EditItem
@@ -988,19 +538,6 @@ a refresh or a pasted link loses it and both buttons fall back to the Shop.
 **Cost:** one extra click back to the hoard, rarely.
 
 **Fix:** a `?from=` search param instead of state, if it ever annoys anyone.
-
-### The faction feats lost their original categories (noted 2026-09-18)
-
-052 moved the five faction feats into `factions`, and a feat has exactly one
-category, so Harpers stopped being `social`, Zhentarim stopped being `skill`,
-and so on. Accepted: the original assignments were arbitrary (five feats across
-four categories), and what the five actually share is being faction
-memberships.
-
-**Cost:** filtering by Social no longer shows Harpers.
-
-**Fix:** if per-feat flavour matters, put it in `tags`, which exists and is
-unused. Don't add a second category column.
 
 ### `CharacterFeatRow` asserts the embedded feat is non-null (noted 2026-08-19)
 
@@ -1115,27 +652,6 @@ on a table other than the row's own.
 shape is invisible: nothing about `locationName: string | null` says the null is
 load-bearing, and `Npc`'s own comment describing it ("the home is a location this
 viewer cannot see") was already correct while the preview path quietly wasn't.
-
-### Description rows outlive the gear they describe (noted 2026-08-22)
-
-047 keys `character_item_descriptions` on `(character_id, item_id)` rather than
-on the `character_inventory` row, precisely so a description survives a
-stow-and-take and a decrement to zero. The other half of that choice is that
-nothing ever cleans one up: sell the sword for good and the row you wrote about
-it stays behind, unreachable from any screen, until the day that character owns a
-sword again — at which point your old words reappear on it.
-
-**Trigger:** permanently parting with an item you had written about.
-
-**Cost:** one narrow row per abandoned idea, at a table of five. The reappearance
-is arguably the feature working — it is the same character and the same kind of
-object — but it will surprise someone eventually.
-
-**Fix if it ever matters:** nothing automatic. A trigger on
-`character_inventory` DELETE would defeat the entire point of the key. If the
-rows ever need clearing it wants a deliberate control ("forget this"), or a
-periodic sweep of overrides whose `(character_id, item_id)` matches no stack and
-whose `updated_at` is old. Neither is worth writing yet.
 
 ### Lists sort on the catalogue name while the row shows the custom one (noted 2026-08-22)
 
@@ -1359,7 +875,7 @@ Small, understood, not worth an entry of their own.
   policies ask only `can_edit_character`, so a hand-written request can write a
   description for an item the character has never held. Unreachable from the UI
   — the card only opens from a pack row — and it is the same property that makes
-  the orphan-row behaviour in "Description rows outlive the gear they describe"
+  the orphan-row behaviour in "Description rows outlive the gear they describe" (`ACCEPTED_ISSUES.md`)
   work, so it is arguably load-bearing rather than a hole. Recorded because the
   table reads like it is scoped to a pack and is not.
 - **Concurrent demo visitors share one character.** GoTrue is happy to issue
@@ -1378,193 +894,3 @@ Small, understood, not worth an entry of their own.
   — the prop is honest about the shape it needs — but the `?.` chains inside read
   as if absence were reachable.
 
----
-
-## Resolved
-
-### Spell class lists left out the Artificer (noted 2026-11-06, resolved 2026-11-07 by 149 and 152)
-
-138-147 left 'Artificer' out of every spell's `classes` array, because the
-catalogue had no such class. 149 seeds the class, and 152 adds it to the 95
-spells on its TCoE list in 147's shape. Battle Smith's always-prepared
-spells stay in its feature text, as no domain or oath list was ever written
-into `classes`.
-
-### XGtE and TCoE subclasses had no features (noted 2026-10-20, resolved 2026-11-05 by 097-120)
-
-The 57 Xanathar's and Tasha's subclasses could be picked, but the sheet
-showed only their description. 097-120 seed their 308 feature rows, one
-file per book per class in 084's shape, each asserting its per-subclass
-counts and its option links. College of Swords' Fighting Style (099) is the
-one new picker, linked to Dueling and Two-Weapon Fighting.
-
-### Champion's second fighting style had nowhere to go (noted 2026-10-11, resolved 2026-11-05 by 095)
-
-`character_classes.fighting_style` held one style per class entry, so Additional
-Fighting Style (Champion 10) was text with no picker. 095 moved every pick
-into `character_feature_choices`, one row per feature, and linked Additional
-Fighting Style to the Fighter's eleven. The sheet gathers styles from every
-pick, so Defense or Archery taken second counts too, and a style can't be
-taken twice. The general many-picks case is still open, above.
-
-096 dropped the old columns, the `choice` flag and the `fighting_style`
-domain on 2026-11-05, once the new client was live. Verification blocks in
-079-095 that name those columns no longer run, by design (096's header).
-
-### 029 was never applied, so `added_by` was client-supplied (noted 2026-08-31, resolved 2026-11-05 by 029)
-
-The trigger that stamps `character_inventory.added_by` from the JWT on insert
-and pins it on update had never run. It was worse than the entry first said:
-030's `add_character_inventory_item` names no `added_by` and relies on this
-trigger, so every stack added through the app since then has a null byline.
-Those rows stay null, because the true adder was never recorded.
-
-The ledger had claimed 029 all along. 036's backfill guard checked for
-`character_inventory.added_by`, which is 028's column, not 029's trigger. 029
-now corrects its row's `applied_at` instead of inserting one. Its BLOCK 1
-runs the header's four cases, plus the RPC's `on conflict` increment, through
-RLS as a real player and DM.
-
-### The fighting-style list wasn't filtered by class (noted 2026-10-11, resolved 2026-10-20 by 083)
-
-The picker offered all eleven styles to any Fighting Style feature. 083 gave
-each feature row a `fighting_style_options` array (typed by a new
-`fighting_style` domain, which replaced 079's CHECK), and the sheet offers
-only that row's list. The Fighter keeps its eleven; 089 and 090 seed the
-Paladin's and Ranger's seven each, including Tasha's Blessed Warrior and
-Druidic Warrior.
-
-### No portraits existed (noted 2026-08-14, resolved by 048–050)
-
-`src/assets/portraits/` was not in the repo, so every NPC card rendered without
-an image. It now holds three: Rose and Thorn (set in 048's seed INSERT), Strahd
-(049, seeded and backfilled into every campaign) and Lancelot (050/051). The
-recipe and its traps (file before key, `pin_npc_row` on UPDATE, restarting Vite
-for the eager glob) now live in CLAUDE.md under "Campaign seeding and NPC
-portraits".
-
-### 050's backfill matched zero rows and committed (noted and resolved 2026-09-18, by 051)
-
-050 named its campaign in three statements and guarded only the first, so fixing
-a misspelling in the guard left both inserts matching nothing. They committed,
-the ledger recorded 050, and the live campaign had no Lancelot. 051 redid the
-backfill with the name in one variable and an end-state assertion. The lesson is
-in CLAUDE.md's migration conventions ("A literal that must agree across
-statements appears once").
-
-### Nothing recorded which migrations had been applied (noted 2026-08-14, resolved by 036)
-
-`db/` was declared ground truth while the database held no record of which files
-in it had run. The two were compared only by accident — by someone regenerating
-`database.types.ts` and noticing the diff, or by a feature failing in front of a
-player. The 2026-08-13 episode was the illustration: three inventory RPCs came
-back `PGRST202`, were read as "030 and 032 never ran", and re-running them fixed
-it — which is also exactly what a stale PostgREST schema cache would have looked
-like, since `create or replace function` emits a DDL event and forces a reload.
-
-`036_schema_migrations.sql` creates the ledger and backfills 000–036 behind a
-guard that raises if any migration's durable objects are missing, so the backfill
-cannot record a claim the catalog contradicts. From 037 on, every migration ends
-with a bare `insert into schema_migrations (version) values ('0NN');` inside its
-own transaction — no `on conflict`, so a re-run fails on the primary key and a
-half-run leaves no entry.
-
-**What is still assumed rather than proven:** data-only migrations (002 003 005
-017 023 024 026 034 035) have no object to check for and were recorded on the
-word of whoever ran the file. And the original 030/032 question — stale cache or
-never ran — was never settled; it is now simply answerable, which was the point.
-
-Worth keeping: `PGRST202` means _not found in the schema cache_, not _does not
-exist_. `notify pgrst, 'reload schema';` first, `pg_proc` before touching a
-migration file.
-
-### The decrement path was the last read-modify-write in the app (resolved by 032)
-
-030 and 031 made adds insert-or-increment through an RPC, and left decrement
-reading `currentQuantity` in the client and shipping back `quantity - 1` — so two
-concurrent decrements lost one. 030 also made it _more_ reachable: stacks used to
-fragment across rows, so two people spending arrows were often editing different
-rows; afterwards every copy funnels into one row that both the owner and the DM
-can decrement mid-session.
-
-032 moved the branch into plpgsql behind a `select ... for update`. The lock is
-the part that matters — the lock-free `update ... where quantity > 1` then
-delete-if-no-rows is correct against a concurrent decrement but loses both copies
-against a concurrent _add_ that bumps a stack of 1 to 2 in the window. Both
-functions are `security invoker`, so RLS remains the boundary.
-
-032 also dropped `character_inventory_character_id_idx`, which 030's unique
-constraint had made redundant and which 030 deliberately deferred.
-
-### A blank NPC description could reach the database from a second caller (resolved 2026-08-14)
-
-`updateNpcDescription` normalised blank-to-`null`; `updateNpc` — the function the
-editor actually calls — did not. The rule was written down in exactly one place
-and enforced on a path nothing used.
-
-Never a live bug: `NpcEditor` converted blank to `null` locally from its first
-commit, and `git log -S` shows `updateNpcDescription` was never called by
-anything. It was correct-today code that would have stopped being correct at the
-second caller — which was going to be NPC creation.
-
-Fixed by moving normalisation into `updateNpc` as `blankDescriptionToNull` and
-deleting the per-field function. Guarded on `=== undefined` rather than on
-falsiness, which is load-bearing: `toggleVisibility` sends `{ is_revealed }`
-alone, and a falsiness check there would have blanked the description on every
-eye click.
-
-### The write half of the NPC reveal boundary was untested (resolved 2026-08-14)
-
-`033_npcs_verification.sql` tested SELECT from four angles and no writes from an
-unauthorised role at all, leaving the two policies with the most consequence
-proven only by reading them.
-
-Two blocks added. Block 7: a player sends an unscoped `update npcs set
-is_revealed = true` — expect no error, since USING excludes every row before
-WITH CHECK is consulted, so the proof is `rows_changed = 0` against an
-owner-taken baseline in a temp table, plus `hidden_before` to show there was
-something to steal. Block 8: a player attempts an INSERT into `npc_dm_notes`
-naming a _revealed_ NPC, the case where they clear the outer half of the EXISTS
-join and only `is_campaign_dm` stops them. The target is resolved as the player
-before the attempt and travels in by uuid — a null `npc_id` fails the same EXISTS
-with the same 42501, so without that the block would pass identically whether or
-not the interesting gate was ever reached.
-
-The same shape was carried into `037_character_spells.sql`: block 2 proves the
-campaign DM may write to a player's sheet, block 3 proves another _member_ may
-not, and block 3's subject is deliberately made a plain member first — as a
-non-member they'd be stopped by the outer half of the check and the block would
-prove the weaker thing.
-
-### NPCs were filtered client-side (resolved by 033/034)
-
-`NPC.tsx` held a hardcoded `NPCS` array and rendered `NPCS.filter(n =>
-n.is_revealed)` — the exact anti-pattern the reveal-gating principle bans, not
-leaking only because the data was static and identical for everyone. 033 gave
-NPCs the locations treatment: `campaign_id` NOT NULL, an `npc_dm_notes` sibling
-reached by a fail-closed join, and a SELECT policy of
-`is_campaign_dm(campaign_id) or (is_revealed and is_campaign_member(campaign_id))`.
-034 moved the roster into it. The page has no reveal filter now; `isDm` survives
-only to render the editors and style the hidden rows a DM still receives.
-
-### Cross-campaign homebrew visible in every campaign's catalogue (resolved 2026-08-12)
-
-`getItems`/`getSpells` selected with no campaign filter and cached under bare
-`["items"]`/`["spells"]` keys, on the theory that RLS scoped the result. RLS
-answers "may this viewer see this row" — a member of two campaigns passes that
-check for both campaigns' homebrew, so both would appear in either campaign's
-Shop/Grimoire. Latent until 025 added the items INSERT policy (nothing could
-create homebrew before that; spells still can't). Verified against the live DB
-by impersonating a dual-member under RLS in a rolled-back transaction: the
-unfiltered select returned both campaigns' probe items. Fixed by scoping both
-services to `campaign_id is null or campaign_id = <viewed campaign>` and keying
-the caches by campaign — the filter is scoping, not a second permission check;
-RLS remains the boundary.
-
-### Same-campaign duplicate invite after a double navigation (noted 2026-08-02, resolved 2026-08-11)
-
-`addInvite` in `useInvites` used to prepend the minted row into local state,
-guarded by a `shownCampaignId` ref against cross-campaign paints; a
-same-campaign reload landing between the mint's two round trips could briefly
-duplicate the row. Resolved by the move to TanStack Query: the mint invalidates
-and the list comes back from the server, so there is no local prepend to race.

@@ -58,7 +58,7 @@ export function formatPurse(purse: Purse): string {
     : entries.map(({ amount, unit }) => `${amount} ${unit}`).join(" · ");
 }
 
-// The fixed 5e rates KNOWN_ISSUES.md's currency entry already names as the
+// The fixed 5e rates ACCEPTED_ISSUES.md's currency entry already names as the
 // numbers a real convert_currency RPC would use (1 sp = 10 cp, 1 ep = 5 sp,
 // 1 gp = 2 ep, 1 pp = 10 gp) — reused here for a display-only total, not a
 // stored conversion. Nothing about the purse's five columns changes.

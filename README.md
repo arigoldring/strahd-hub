@@ -99,5 +99,7 @@ npm run gen:types   # regenerate DB types (needs `supabase link`)
 
 ## Known issues
 
-Open bugs and deliberate trade-offs are tracked in
-[`KNOWN_ISSUES.md`](KNOWN_ISSUES.md).
+Open bugs are tracked in
+[`KNOWN_ISSUES.md`](KNOWN_ISSUES.md), deliberate trade-offs in
+[`ACCEPTED_ISSUES.md`](ACCEPTED_ISSUES.md), and fixed ones in
+[`FIXED_ISSUES.md`](FIXED_ISSUES.md).

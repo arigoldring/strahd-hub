@@ -45,7 +45,7 @@ import villageMapImage from "../assets/Maps/village-of-barovia.jpg";
  * work and a new failure mode (expiring URLs) to protect a picture. Worth
  * revisiting if that calculus ever changes; not worth building today. See
  * MapView.tsx's mapsAsPlayer comment for where this boundary is actually
- * enforced (client-side, and only there), and KNOWN_ISSUES.md for the same
+ * enforced (client-side, and only there), and ACCEPTED_ISSUES.md for the same
  * note plus the Home.tsx thumbnail gap it doesn't cover.
  *
  * No Supabase import here. Merging this registry with a campaign's
