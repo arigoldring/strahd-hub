@@ -4,6 +4,7 @@ import { useAuth } from "../../services/AuthContext";
 import { useCharacter } from "../../hooks/useCharacter";
 import { useParty } from "../../hooks/useParty";
 import { useCharacterInventory } from "../../hooks/useCharacterInventory";
+import { useCharacterFeats } from "../../hooks/useCharacterFeats";
 import { useCharacterSheet, type FeaturePickWrite } from "../../hooks/useCharacterSheet";
 import { useClasses } from "../../hooks/useClasses";
 import { useRaces } from "../../hooks/useRaces";
@@ -178,6 +179,9 @@ function FullSheet({
   const { data: races = [] } = useRaces(campaign.id);
   // Same key as the Carried section below, so this is a cache hit.
   const { data: gear = [], setEquipped } = useCharacterInventory(character.id);
+  // Same key as the Feats section below, so this is a cache hit too. Read
+  // here for the feats' use counters.
+  const { data: ownFeats = [] } = useCharacterFeats(character.id);
 
   // One error line under the header for any failed save. Each control could
   // own its own, but on a sheet of ~40 inputs one shared line is easier to
@@ -264,6 +268,21 @@ function FullSheet({
         )
         .filter((c) => c.max > 0)
     : [];
+  // Feats' counters (157) read the character's total level, not a class's.
+  for (const feat of ownFeats) {
+    for (const r of feat.resources) {
+      const max = resourceMax(r, { level, pb, mods });
+      if (max > 0) {
+        counters.push({
+          key: featureResourceKey(r.id),
+          name: r.name,
+          source: feat.name,
+          max,
+          recharge: resourceRecharge(r, level),
+        });
+      }
+    }
+  }
   // Eldritch Knight and Arcane Trickster cast through a class that doesn't.
   const spellAbility = cls?.spellAbility ?? subclass?.spellAbility ?? null;
 

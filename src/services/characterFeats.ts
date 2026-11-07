@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase";
 import type { Tables } from "../types/database.types";
 import { toFeat, type Feat } from "./feats";
+import { toFeatureResource, type FeatureResource } from "./classes";
 
 /**
  * The feats on one character's sheet — characterSpells.ts one table over, and
@@ -27,12 +28,13 @@ import { toFeat, type Feat } from "./feats";
  * that reaches it is the picker, and the picker is fed by getFeats(campaignId).
  */
 
-// No alias and no second embed, unlike CHARACTER_INVENTORY_SELECT: there is no
-// foreign key here whose uuid needs flattening to a name.
-const CHARACTER_FEATS_SELECT = "*, feats(*)";
+// No alias, unlike CHARACTER_INVENTORY_SELECT: there is no foreign key here
+// whose uuid needs flattening to a name. The feat's use counters (153) come
+// along, so the sheet's Resources band needs no second read.
+const CHARACTER_FEATS_SELECT = "*, feats(*, feature_resources(*))";
 
 type CharacterFeatRow = Tables<"character_feats"> & {
-  feats: Tables<"feats">;
+  feats: Tables<"feats"> & { feature_resources: Tables<"feature_resources">[] };
 };
 
 export type CharacterFeatEntry = Feat & {
@@ -40,10 +42,18 @@ export type CharacterFeatEntry = Feat & {
   // own id, and one-to-one with it for a given character, since 041's
   // unique (character_id, feat_id) means a feat appears at most once on a sheet.
   entryId: string;
+  /** The feat's use counters (153): Lucky's luck points. Usually none. */
+  resources: FeatureResource[];
 };
 
 function toCharacterFeatEntry(row: CharacterFeatRow): CharacterFeatEntry {
-  return { ...toFeat(row.feats), entryId: row.id };
+  return {
+    ...toFeat(row.feats),
+    entryId: row.id,
+    resources: [...row.feats.feature_resources]
+      .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name))
+      .map(toFeatureResource),
+  };
 }
 
 // Keyed by character, with no second filter to add: a character id already

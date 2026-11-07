@@ -311,6 +311,13 @@ describe("resourceMax", () => {
     ]);
   });
 
+  it("drops to 0, so the sheet hides it, when a step says so (Rage at 20th)", () => {
+    const rage = rule({
+      steps: [1, 3, 6, 12, 17, 20].map((level, i) => ({ level, total: [2, 3, 4, 5, 6, 0][i] })),
+    });
+    expect([1, 3, 17, 19, 20].map((l) => resourceMax(rage, ctx(l, 6)))).toEqual([2, 3, 6, 6, 0]);
+  });
+
   it("reads steps in any order", () => {
     const indomitable = rule({
       steps: [{ level: 17, total: 3 }, { level: 9, total: 1 }, { level: 13, total: 2 }],

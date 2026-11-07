@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 154. Last updated 2026-11-07.**
+**Current through migration 157. Last updated 2026-11-07.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -678,14 +678,15 @@ text.
   Spellcasting and Agonizing Blast on cantrip damage (the sheet shows no
   cantrip damage), Extra Attack from an invocation (Thirsting Blade), and
   every racial trait and feat (Alert's +5 initiative among them).
-- **Uses nothing tracks yet:** 153 added use counters and 154 seeded the
-  Fighter's (every archetype but the Rune Knight's runes, below). Not yet
-  seeded: Rage, Bardic Inspiration, Channel Divinity, Wild Shape, ki, Lay
-  on Hands' pool, sorcery points, Pact Magic slots, Flash of Genius, Arcane
-  Jolt and every other class's "once per short or long rest" feature. Also
-  untracked: which items hold an infusion, and the Rune Knight's runes,
-  which want one counter per rune picked (each is once per short rest,
-  twice from 15th), not one counter per feature row. The steel defender has no stat block on the
+- **Uses the counters don't cover:** 153-157 track every feature and feat
+  whose text says it recharges on a rest, with these exceptions. The Rune
+  Knight's runes want one counter per rune picked (each is once per short
+  rest, twice from 15th), not one counter per feature row. Infusions don't
+  record which items hold them. Rage's unlimited uses at 20th hide its
+  counter rather than showing "unlimited". Signature Spells is one counter
+  of 2, not one per spell. Spell-Storing Item's floor is 1, where the book
+  says 2. 155 and 156's headers list the rest-related text deliberately left
+  uncounted (Divine Intervention, Hex Warrior, Limited Wish...). The steel defender has no stat block on the
   sheet; its numbers are in its feature text.
 
 **Trigger:** any feature whose effect is a number the sheet derives or a use
