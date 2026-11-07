@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 152. Last updated 2026-11-07.**
+**Current through migration 154. Last updated 2026-11-07.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -678,11 +678,14 @@ text.
   Spellcasting and Agonizing Blast on cantrip damage (the sheet shows no
   cantrip damage), Extra Attack from an invocation (Thirsting Blade), and
   every racial trait and feat (Alert's +5 initiative among them).
-- **Uses nothing tracks:** Second Wind, Action Surge, Indomitable, superiority
-  dice, Rage, Bardic Inspiration, Channel Divinity, Wild Shape, ki, Lay on
-  Hands' pool, sorcery points, Pact Magic slots, Arcane Recovery, Flash of
-  Genius, Arcane Jolt, which items hold an infusion, and every "once per
-  short or long rest" feature. The steel defender has no stat block on the
+- **Uses nothing tracks yet:** 153 added use counters and 154 seeded the
+  Fighter's (every archetype but the Rune Knight's runes, below). Not yet
+  seeded: Rage, Bardic Inspiration, Channel Divinity, Wild Shape, ki, Lay
+  on Hands' pool, sorcery points, Pact Magic slots, Flash of Genius, Arcane
+  Jolt and every other class's "once per short or long rest" feature. Also
+  untracked: which items hold an infusion, and the Rune Knight's runes,
+  which want one counter per rune picked (each is once per short rest,
+  twice from 15th), not one counter per feature row. The steel defender has no stat block on the
   sheet; its numbers are in its feature text.
 
 **Trigger:** any feature whose effect is a number the sheet derives or a use

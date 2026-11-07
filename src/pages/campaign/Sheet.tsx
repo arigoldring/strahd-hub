@@ -29,6 +29,8 @@ import {
   martialArtsWeapon,
   picksAllowed,
   proficiencyBonus,
+  resourceMax,
+  resourceRecharge,
   saveAura,
   skillBonus,
   sneakAttackDice,
@@ -71,6 +73,8 @@ import {
   CharacterPurse,
   CharacterSpells,
 } from "./Character";
+import { SheetResources, type SheetCounter } from "./SheetResources";
+import { featureResourceKey } from "../../services/characterResources";
 import "./character.css";
 import "./sheet.css";
 
@@ -236,6 +240,30 @@ function FullSheet({
   const mods = Object.fromEntries(ABILITIES.map((a) => [a, mod(a)])) as Record<Ability, number>;
   const init = initiative(mods, pb, effects);
   const aura = saveAura(mod("cha"), effects);
+  // Use counters (153) from the starting class's features up to its level,
+  // the Class Features list's own rule. The maximum is derived here every
+  // render, so a level-up or a new score changes it at once. A counter at 0
+  // (before its first step) isn't shown.
+  const classLevel = startingEntry?.level ?? 0;
+  const counters: SheetCounter[] = startingEntry
+    ? featureCatalog
+        .filter(
+          (f) =>
+            f.classId === startingEntry.classId &&
+            f.level <= classLevel &&
+            (f.subclassId == null || f.subclassId === startingEntry.subclassId),
+        )
+        .flatMap((f) =>
+          f.resources.map((r) => ({
+            key: featureResourceKey(r.id),
+            name: r.name,
+            source: f.name,
+            max: resourceMax(r, { level: classLevel, pb, mods }),
+            recharge: resourceRecharge(r, classLevel),
+          })),
+        )
+        .filter((c) => c.max > 0)
+    : [];
   // Eldritch Knight and Arcane Trickster cast through a class that doesn't.
   const spellAbility = cls?.spellAbility ?? subclass?.spellAbility ?? null;
 
@@ -430,6 +458,8 @@ function FullSheet({
           value={spellAbility ? formatModifier(pb + mod(spellAbility)) : "—"}
         />
       </div>
+
+      <SheetResources characterId={character.id} counters={counters} canEdit={canEdit} />
 
       {/* Two columns on a wide screen: the numbers on the left, the lists on
           the right. Each column is a plain stack of bands, so collapsing to

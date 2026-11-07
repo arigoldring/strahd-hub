@@ -12,9 +12,12 @@ import {
   initiative,
   isMonkWeapon,
   isRangedWeapon,
+  keysClearedByRest,
   martialArtsDie,
   martialArtsWeapon,
   picksAllowed,
+  resourceMax,
+  resourceRecharge,
   saveAura,
   sneakAttackDice,
   speedBonus,
@@ -25,6 +28,7 @@ import {
   type ArmorLike,
   type EffectLevels,
   type FeatureEffect,
+  type ResourceRule,
   type WeaponLike,
 } from "./rules";
 
@@ -283,5 +287,77 @@ describe("picksAllowed", () => {
     expect([2, 3, 6, 7, 10, 14, 15, 20].map((l) => picksAllowed(combatSuperiority, l))).toEqual([
       0, 3, 3, 5, 7, 7, 9, 9,
     ]);
+  });
+});
+
+describe("resourceMax", () => {
+  const mods = { str: 3, dex: 1, con: -1, int: 0, wis: 2, cha: 4 };
+  const ctx = (level: number, pb: number) => ({ level, pb, mods });
+  const rule = (r: Partial<ResourceRule>): ResourceRule => ({
+    formula: "steps",
+    ability: null,
+    multiplier: 1,
+    bonus: 0,
+    steps: [],
+    recharge: "short",
+    shortRestFrom: null,
+    ...r,
+  });
+
+  it("follows steps, with none before the first (Action Surge)", () => {
+    const actionSurge = rule({ steps: [{ level: 2, total: 1 }, { level: 17, total: 2 }] });
+    expect([1, 2, 16, 17, 20].map((l) => resourceMax(actionSurge, ctx(l, 2)))).toEqual([
+      0, 1, 1, 2, 2,
+    ]);
+  });
+
+  it("reads steps in any order", () => {
+    const indomitable = rule({
+      steps: [{ level: 17, total: 3 }, { level: 9, total: 1 }, { level: 13, total: 2 }],
+    });
+    expect([9, 13, 17].map((l) => resourceMax(indomitable, ctx(l, 4)))).toEqual([1, 2, 3]);
+  });
+
+  it("scales proficiency with a multiplier (Psionic Energy dice)", () => {
+    expect(resourceMax(rule({ formula: "proficiency", multiplier: 2 }), ctx(5, 3))).toBe(6);
+  });
+
+  it("scales class level (ki, Lay on Hands)", () => {
+    expect(resourceMax(rule({ formula: "level" }), ctx(7, 3))).toBe(7);
+    expect(resourceMax(rule({ formula: "level", multiplier: 5 }), ctx(7, 3))).toBe(35);
+  });
+
+  it("uses an ability modifier plus a bonus (Divine Sense)", () => {
+    expect(resourceMax(rule({ formula: "ability", ability: "cha", bonus: 1 }), ctx(1, 2))).toBe(5);
+  });
+
+  it("floors every formula but steps at 1", () => {
+    expect(resourceMax(rule({ formula: "ability", ability: "con" }), ctx(3, 2))).toBe(1);
+    expect(resourceMax(rule({ formula: "ability", ability: "int" }), ctx(3, 2))).toBe(1);
+  });
+});
+
+describe("resourceRecharge", () => {
+  it("moves a long-rest counter to short rests from its level (Font of Inspiration)", () => {
+    const bardic = { recharge: "long" as const, shortRestFrom: 5 };
+    expect(resourceRecharge(bardic, 4)).toBe("long");
+    expect(resourceRecharge(bardic, 5)).toBe("short");
+  });
+  it("leaves a counter with no such level alone", () => {
+    expect(resourceRecharge({ recharge: "long", shortRestFrom: null }, 20)).toBe("long");
+    expect(resourceRecharge({ recharge: "short", shortRestFrom: null }, 1)).toBe("short");
+  });
+});
+
+describe("keysClearedByRest", () => {
+  const counters = [
+    { key: "a", recharge: "short" as const },
+    { key: "b", recharge: "long" as const },
+  ];
+  it("clears short-rest counters on a short rest", () => {
+    expect(keysClearedByRest(counters, "short")).toEqual(["a"]);
+  });
+  it("clears everything on a long rest", () => {
+    expect(keysClearedByRest(counters, "long")).toEqual(["a", "b"]);
   });
 });

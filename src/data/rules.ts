@@ -499,3 +499,79 @@ export function picksAllowed(
   if (reached.length === 0) return 0;
   return reached.reduce((a, b) => (b.level > a.level ? b : a)).total;
 }
+
+// ---------------------------------------------------------------------------
+// Use counters (153)
+// ---------------------------------------------------------------------------
+
+/**
+ * How a counter's maximum is worked out. One list in two places with the
+ * CHECK on feature_resources.formula (153). resourceMax is the maths.
+ */
+export const RESOURCE_FORMULAS = ["steps", "proficiency", "level", "ability"] as const;
+export type ResourceFormula = (typeof RESOURCE_FORMULAS)[number];
+
+export const RESOURCE_RECHARGES = ["short", "long"] as const;
+/** 'short' recharges on a short or a long rest; 'long' on a long rest only. */
+export type ResourceRecharge = (typeof RESOURCE_RECHARGES)[number];
+
+/** The rule for one counter, as feature_resources stores it. */
+export interface ResourceRule {
+  formula: ResourceFormula;
+  /** Set exactly when formula is 'ability' (153's CHECK). */
+  ability: Ability | null;
+  multiplier: number;
+  bonus: number;
+  /** For 'steps': from each level on, this many uses. */
+  steps: readonly { level: number; total: number }[];
+  recharge: ResourceRecharge;
+  /** From this class level on, a 'long' counter recharges on a short rest. */
+  shortRestFrom: number | null;
+}
+
+/**
+ * A counter's maximum for one character. `level` is the granting class's
+ * level for a class feature, the character's total level for a feat.
+ *
+ * 'steps' uses picksAllowed's step rule: the highest step at or below the
+ * level, or 0 before the first. A 0 means the counter isn't shown yet.
+ * Every other formula has a floor of 1, the book's "(minimum of once)".
+ */
+export function resourceMax(
+  rule: Pick<ResourceRule, "formula" | "ability" | "multiplier" | "bonus" | "steps">,
+  ctx: { level: number; pb: number; mods: Readonly<Record<Ability, number>> },
+): number {
+  switch (rule.formula) {
+    case "steps": {
+      const reached = rule.steps.filter((s) => s.level <= ctx.level);
+      if (reached.length === 0) return 0;
+      return reached.reduce((a, b) => (b.level > a.level ? b : a)).total;
+    }
+    case "proficiency":
+      return Math.max(1, ctx.pb * rule.multiplier + rule.bonus);
+    case "level":
+      return Math.max(1, ctx.level * rule.multiplier + rule.bonus);
+    case "ability":
+      // 153's CHECK means a null here can't come from the database.
+      return Math.max(1, (rule.ability ? ctx.mods[rule.ability] : 0) * rule.multiplier + rule.bonus);
+  }
+}
+
+/** Which rest refills a counter at this level (Font of Inspiration, 5th). */
+export function resourceRecharge(
+  rule: Pick<ResourceRule, "recharge" | "shortRestFrom">,
+  level: number,
+): ResourceRecharge {
+  return rule.shortRestFrom != null && level >= rule.shortRestFrom ? "short" : rule.recharge;
+}
+
+/**
+ * The counters a rest clears. A long rest clears every counter, since each
+ * recharges on one. A short rest clears only the short-rest ones.
+ */
+export function keysClearedByRest(
+  counters: readonly { key: string; recharge: ResourceRecharge }[],
+  rest: ResourceRecharge,
+): string[] {
+  return counters.filter((c) => rest === "long" || c.recharge === "short").map((c) => c.key);
+}
