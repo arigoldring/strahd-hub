@@ -12,6 +12,7 @@ import {
   type FeatureEffect,
   type ResourceRule,
   type SpellAbility,
+  type WeaponTrainingLevel,
 } from "../data/rules";
 import type { Tables } from "../types/database.types";
 
@@ -29,8 +30,12 @@ export interface CharacterClass {
   saves: Ability[];
   /** Null for classes that don't cast (or cast only via a subclass). */
   spellAbility: SpellAbility | null;
-  /** "martial" means simple + martial. */
-  weaponTraining: "simple" | "martial";
+  /** The whole category known: "martial" means simple + martial (161). */
+  weaponTraining: WeaponTrainingLevel;
+  /** Named weapons beyond the category, by shared weapon name (161). */
+  weaponProficiencies: string[];
+  /** Whether a second class of this kind grants its weapons (161). */
+  multiclassGrantsWeapons: boolean;
   /** Unarmored Defense: the ability added to 10 + DEX with no armour on. */
   unarmoredAbility: Ability | null;
   /** The level the subclass is chosen at. */
@@ -144,7 +149,9 @@ export const FEATURE_OPTION_KIND_LABELS: Record<FeatureOptionKind, string> = {
   infusion: "Infusion",
 };
 
-const WEAPON_TRAINING = ["simple", "martial"] as const;
+// One list in two places with 161's CHECK on classes.weapon_training; change
+// them together, client first ('none' shipped here before 162 wrote it).
+const WEAPON_TRAINING = ["none", "simple", "martial"] as const satisfies readonly WeaponTrainingLevel[];
 
 // One list in two places with 066's CHECK on subclasses.source; change them
 // together, as with featCategories.
@@ -177,6 +184,8 @@ export function toCharacterClass(row: Tables<"classes">): CharacterClass {
       "weapon_training",
       subject,
     ),
+    weaponProficiencies: row.weapon_proficiencies,
+    multiclassGrantsWeapons: row.multiclass_grants_weapons,
     unarmoredAbility:
       row.unarmored_ability == null
         ? null

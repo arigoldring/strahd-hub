@@ -372,16 +372,95 @@ export function brutalCriticalDice(effects: EffectLevels): number {
   return barbarian >= 17 ? 3 : barbarian >= 13 ? 2 : 1;
 }
 
+// ---------- weapon proficiency (161) ----------
+//
+// A class knows a whole category ('simple', 'martial', or 'none') plus a list
+// of named weapons (a Rogue's rapier, a Wizard's five). Names are the shared
+// weapon rows' names; a magic weapon is matched by its base weapon's name, so
+// the caller passes that (proficiencyName in services/items.ts).
+
+export type WeaponTrainingLevel = "none" | "simple" | "martial";
+
+const TRAINING_RANK: Record<WeaponTrainingLevel, number> = {
+  none: 0,
+  simple: 1,
+  martial: 2,
+};
+
+export interface ClassWeaponsLike {
+  name: string;
+  weaponTraining: WeaponTrainingLevel;
+  weaponProficiencies: readonly string[];
+  /** The PHB multiclass table grants this class's weapons to a second class. */
+  multiclassGrantsWeapons: boolean;
+}
+
+export interface WeaponProficiencies {
+  /** The widest whole category known, and what gave it. */
+  category: WeaponTrainingLevel;
+  categorySource: string | null;
+  /** Named weapons, each with its source: a class name, or "added". */
+  named: ReadonlyMap<string, string>;
+}
+
 /**
- * The weapon training a character attacks with: the class's own, raised to
- * martial by Battle Ready (Battle Smith), which grants martial weapons on
- * top of the Artificer's simple ones.
+ * Every weapon a character is proficient with. The starting class gives its
+ * whole list. A later class gives its list only when the PHB's multiclass
+ * table says so (Barbarian, Fighter, Paladin, Ranger, Monk, Warlock); a Rogue
+ * dip gives no rapiers. Battle Ready raises the category to martial.
+ * `extras` are the character's own 'weapon' proficiency rows (a feat, a race,
+ * the DM's say-so), keyed by weapon name.
+ *
+ * When two sources grant the same thing, the first one named wins: classes
+ * before extras, so an extra that a class already covers reads as the class.
  */
-export function weaponTraining(
-  classTraining: "simple" | "martial" | null,
+export function weaponProficiencies(
+  classes: readonly { cls: ClassWeaponsLike; isStarting: boolean }[],
+  extras: readonly string[],
   effects: EffectLevels,
-): "simple" | "martial" | null {
-  return effects.has("battle_ready") ? "martial" : classTraining;
+): WeaponProficiencies {
+  let category: WeaponTrainingLevel = "none";
+  let categorySource: string | null = null;
+  const named = new Map<string, string>();
+  const raise = (to: WeaponTrainingLevel, source: string) => {
+    if (TRAINING_RANK[to] > TRAINING_RANK[category]) {
+      category = to;
+      categorySource = source;
+    }
+  };
+
+  for (const { cls, isStarting } of classes) {
+    if (!isStarting && !cls.multiclassGrantsWeapons) continue;
+    raise(cls.weaponTraining, cls.name);
+    for (const w of cls.weaponProficiencies) if (!named.has(w)) named.set(w, cls.name);
+  }
+  if (effects.has("battle_ready")) raise("martial", "Battle Ready");
+  for (const w of extras) if (!named.has(w)) named.set(w, "added");
+  return { category, categorySource, named };
+}
+
+/** Whether a whole category covers this weapon: martial covers simple too. */
+export function categoryCovers(
+  training: WeaponTrainingLevel,
+  weaponCategory: "simple" | "martial",
+): boolean {
+  return TRAINING_RANK[training] >= TRAINING_RANK[weaponCategory];
+}
+
+/**
+ * Proficiency with one weapon, and where it comes from. `name` is the name
+ * proficiency is with: the base weapon's for a magic one. The category is
+ * asked first, so a Fighter's longsword reads "Fighter", not "added".
+ */
+export function weaponProficiency(
+  weapon: { name: string; category: "simple" | "martial" },
+  profs: WeaponProficiencies,
+): { proficient: boolean; source: string | null } {
+  if (categoryCovers(profs.category, weapon.category)) {
+    return { proficient: true, source: profs.categorySource };
+  }
+  const source = profs.named.get(weapon.name) ?? null;
+  return { proficient: source != null, source };
 }
 
 /**
@@ -444,6 +523,58 @@ export function martialArtsWeapon(
   const own = /^1d(\d+)$/.exec(weapon.damageDice);
   const bigger = own == null || die > Number(own[1]);
   return { finesse: true, dice: bigger ? `1d${die}` : weapon.damageDice };
+}
+
+/**
+ * One weapon's attack: the ability it uses, to-hit, the damage modifier and
+ * the dice. Martial Arts may swap in DEX and its die; Battle Ready may swap
+ * in INT on a magic weapon; Archery adds to a ranged weapon's to-hit; a
+ * magic weapon's bonus (161) adds to both to-hit and damage.
+ *
+ * `weapon.name` is the base weapon's name, as for proficiency, so a +1
+ * Shortsword is still a monk weapon. `hitParts` says where the to-hit came
+ * from, as armorClass's parts do for AC.
+ */
+export function weaponAttack(opts: {
+  weapon: MonkWeaponLike & { isMagic: boolean; magicBonus?: number };
+  mods: { readonly str: number; readonly dex: number; readonly int: number };
+  pb: number;
+  proficient: boolean;
+  styles: readonly FightingStyleKey[];
+  effects: EffectLevels;
+  /** No body armour and no shield: the condition Martial Arts needs. */
+  unarmored: boolean;
+}): {
+  ability: Ability;
+  toHit: number;
+  damageMod: number;
+  dice: string;
+  hitParts: string[];
+} {
+  const { weapon, mods, pb, proficient, styles, effects, unarmored } = opts;
+  const ma = martialArtsWeapon(weapon, martialArtsDie(effects), unarmored);
+  const base: Ability = ma.finesse
+    ? mods.dex > mods.str
+      ? "dex"
+      : "str"
+    : weaponAbility(weapon, mods.str, mods.dex);
+  const ability = battleReadyAbility(base, mods, weapon.isMagic, effects);
+  const abilityMod = ability === "int" ? mods.int : ability === "dex" ? mods.dex : mods.str;
+  const style = styleAttackBonus(weapon, styles);
+  const magic = weapon.magicBonus ?? 0;
+
+  const hitParts = [`${ability.toUpperCase()} ${formatModifier(abilityMod)}`];
+  if (proficient) hitParts.push(`proficiency ${formatModifier(pb)}`);
+  if (style) hitParts.push(`Archery ${formatModifier(style)}`);
+  if (magic) hitParts.push(`magic ${formatModifier(magic)}`);
+
+  return {
+    ability,
+    toHit: abilityMod + (proficient ? pb : 0) + style + magic,
+    damageMod: abilityMod + magic,
+    dice: ma.dice,
+    hitParts,
+  };
 }
 
 /**

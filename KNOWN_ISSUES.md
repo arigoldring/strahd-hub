@@ -294,8 +294,8 @@ key too (below).
   passives and initiative, Dread Ambusher, Tactical Wit and Rakish Audacity
   on initiative, Aura of Protection on saves, Fast Movement and Unarmored
   Movement on speed, Draconic Resilience's AC 13 + DEX, and Battle Ready's
-  martial weapons and INT on a magic weapon (150; the INT half has a gap,
-  below).
+  martial weapons and INT on a magic weapon (150; the INT half reaches
+  seeded magic weapons since 163).
 - **Computed since 160:** Brutal Critical's extra dice (in the attack
   legend), Warforged's Integrated Protection (+1 AC), Alert (+5
   initiative), Observant (+5 passive Perception and Investigation), Mobile
@@ -426,23 +426,33 @@ HP and no class, so the demo sheet looks empty.
 **Fix:** extend the fixture with an UPDATE of `character_stats` and inserts
 into `character_classes`, after its characters insert.
 
-### Magic items are text: the sheet applies no +1 and counts no attunement (noted 2026-11-05)
+### Magic templates and armour are text; nothing counts attunement (noted 2026-11-05, narrowed 2026-11-07 by 161-163)
 
-130-137 seed every magic weapon and armour as `kind = 'general'`, because most
-are "any sword" or "any armour" with no dice or AC for the kind columns. So a
-character carrying a +1 Weapon or wearing +2 Armor gets nothing from it on the
-sheet: `rules.ts` reads only weapon and armour rows. Likewise
-`requires_attunement` is shown, but nothing caps a character at three attuned
-items, and nothing records which ones are attuned.
+161 gave items `magic_bonus` and `base_weapon_id`, and 163 turned the 15
+seeded magic weapons with one named base (Dagger of Venom, Sun Blade...) into
+weapon rows, so those reach the attack table with their bonus. What's left:
 
-**Trigger:** equipping magic gear and expecting the attack or AC to change.
+- **"Any weapon" templates stay text.** Weapon +1/+2/+3, Flame Tongue, Vorpal
+  Sword and the other "any sword" items are `kind = 'general'`, because the
+  book leaves the weapon to the DM. A character holding the shop's
+  "Weapon, +1" gets nothing on the sheet. The DM makes the concrete one as
+  homebrew (Base weapon + Bonus in the item form) and gives that instead.
+- **Magic armour adds no AC.** 161's `magic_bonus` allows armour, but the
+  form doesn't offer it and `armorClass` doesn't read it; Armor +1 and the
+  rest are still general text.
+- **Ammunition bonuses** (+1 Ammunition) aren't applied: the attack table has
+  no ammunition row.
+- **Attunement:** `requires_attunement` is shown, but nothing caps a
+  character at three attuned items, and nothing records which are attuned.
+
+**Trigger:** a player buying "Weapon, +1" from the shop; wearing magic armour.
 
 **Cost:** the player adds the bonus in their head, as with features (above).
 
-**Fix:** a `magic_bonus int` on items and a way to pair it with a base
-weapon or armour row (a +1 longsword is a longsword *and* +1), which is the
-real design question; then `rules.ts` adds it when equipped. Attunement wants
-an `attuned` boolean on `character_inventory`, 057's `equipped` shape.
+**Fix:** for templates, a "make it a..." action on the item that creates the
+homebrew copy with a base picked. For armour, the form field plus one line in
+`armorClass`. Attunement wants an `attuned` boolean on `character_inventory`,
+057's `equipped` shape.
 
 ### The 81 original spells read differently from the other 394 (noted 2026-11-06)
 
@@ -481,23 +491,23 @@ defender. Alchemist and Artillerist would need no new effect key; the
 Armorer's model choice (Guardian or Infiltrator) is a single pick, a new
 `feature_options` kind.
 
-### Battle Ready's INT never reaches a seeded magic weapon (noted 2026-11-07)
+### Racial weapon training isn't automatic (noted 2026-11-07)
 
-`battleReadyAbility` swaps in INT when the weapon is magic, and "magic"
-means `items.rarity is not null`. But every seeded magic item is
-`kind = 'general'` (see "Magic items are text", above), so none of them is
-on the attack table at all. The swap fires only for a homebrew item with
-`kind = 'weapon'` and a rarity. The martial-weapons half of Battle Ready
-works for every weapon.
+Dwarven Combat Training (battleaxe, handaxe, light hammer, warhammer) and
+Elf Weapon Training (longsword, shortsword, shortbow, longbow for High and
+Wood Elves; Drow get rapier, shortsword and hand crossbow instead) are not
+data on `races`. Subraces aren't rows (055), so the Elf row can't say which
+list applies.
 
-**Trigger:** a Battle Smith carrying a +1 Weapon from the shop.
+**Trigger:** a Dwarf or Elf wizard attacking with a racial weapon.
 
-**Cost:** the player uses INT in their head for that one weapon, as with
-the +1 itself.
+**Cost:** the player adds each weapon by hand as an extra weapon
+proficiency, the same path a feat like Weapon Master uses.
 
-**Fix:** comes free with the magic-items fix above: once a magic weapon
-is a weapon row with a bonus, `w.rarity !== null` on the attack row is
-already true for it.
+**Fix:** a `races.weapon_proficiencies text[]` in the shape the class lists
+use, read by the same proficiency rule. Dwarf can be seeded at once; Elf
+needs subraces, or a pick between the two lists. Planned next, after the
+weapon proficiency work.
 
 ### Replicate Magic Item can be learned only once (noted 2026-11-07)
 

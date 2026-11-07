@@ -28,8 +28,11 @@ import {
   styleAttackBonus,
   untrainedCheckBonus,
   weaponAbility,
-  weaponTraining,
+  weaponAttack,
+  weaponProficiencies,
+  weaponProficiency,
   type ArmorLike,
+  type ClassWeaponsLike,
   type EffectLevels,
   type FeatureEffect,
   type ResourceRule,
@@ -192,14 +195,154 @@ describe("Martial Arts on weapons", () => {
   });
 });
 
+const wizard: ClassWeaponsLike = {
+  name: "Wizard",
+  weaponTraining: "none",
+  weaponProficiencies: ["Dagger", "Dart", "Sling", "Quarterstaff", "Crossbow, Light"],
+  multiclassGrantsWeapons: false,
+};
+const fighter: ClassWeaponsLike = {
+  name: "Fighter",
+  weaponTraining: "martial",
+  weaponProficiencies: [],
+  multiclassGrantsWeapons: true,
+};
+const rogue: ClassWeaponsLike = {
+  name: "Rogue",
+  weaponTraining: "simple",
+  weaponProficiencies: ["Crossbow, Hand", "Longsword", "Rapier", "Shortsword"],
+  multiclassGrantsWeapons: false,
+};
+
+describe("weaponProficiencies", () => {
+  it("gives a wizard five named weapons and no category", () => {
+    const p = weaponProficiencies([{ cls: wizard, isStarting: true }], [], none);
+    expect(p.category).toBe("none");
+    expect(weaponProficiency({ name: "Dagger", category: "simple" }, p)).toEqual({
+      proficient: true,
+      source: "Wizard",
+    });
+    expect(weaponProficiency({ name: "Club", category: "simple" }, p).proficient).toBe(false);
+  });
+
+  it("follows the multiclass table: a fighter dip grants martial, a rogue dip nothing", () => {
+    const wizFighter = weaponProficiencies(
+      [{ cls: wizard, isStarting: true }, { cls: fighter, isStarting: false }],
+      [],
+      none,
+    );
+    expect(wizFighter).toMatchObject({ category: "martial", categorySource: "Fighter" });
+
+    const wizRogue = weaponProficiencies(
+      [{ cls: wizard, isStarting: true }, { cls: rogue, isStarting: false }],
+      [],
+      none,
+    );
+    expect(wizRogue.category).toBe("none");
+    expect(wizRogue.named.has("Rapier")).toBe(false);
+  });
+
+  it("gives a starting rogue its own list in full", () => {
+    const p = weaponProficiencies([{ cls: rogue, isStarting: true }], [], none);
+    expect(weaponProficiency({ name: "Rapier", category: "martial" }, p).source).toBe("Rogue");
+    expect(weaponProficiency({ name: "Greatsword", category: "martial" }, p).proficient).toBe(false);
+  });
+
+  it("adds extras, but a class's grant names the source first", () => {
+    const p = weaponProficiencies(
+      [{ cls: rogue, isStarting: true }],
+      ["Longsword", "Battleaxe"],
+      none,
+    );
+    expect(p.named.get("Longsword")).toBe("Rogue");
+    expect(p.named.get("Battleaxe")).toBe("added");
+  });
+
+  it("reads a covered weapon as the category's, not as an extra", () => {
+    const p = weaponProficiencies([{ cls: fighter, isStarting: true }], ["Longsword"], none);
+    expect(weaponProficiency({ name: "Longsword", category: "martial" }, p).source).toBe("Fighter");
+  });
+
+  it("knows nothing with no class", () => {
+    const p = weaponProficiencies([], [], none);
+    expect(weaponProficiency({ name: "Club", category: "simple" }, p).proficient).toBe(false);
+  });
+});
+
+describe("weaponAttack", () => {
+  const sword = { ...longsword, name: "Longsword", category: "martial", isMagic: false };
+  const mods = { str: 3, dex: 1, int: 0 };
+  const attack = (opts: Partial<Parameters<typeof weaponAttack>[0]>) =>
+    weaponAttack({
+      weapon: sword,
+      mods,
+      pb: 2,
+      proficient: true,
+      styles: [],
+      effects: none,
+      unarmored: false,
+      ...opts,
+    });
+
+  it("is ability + proficiency to hit, ability to damage", () => {
+    expect(attack({})).toMatchObject({ ability: "str", toHit: 5, damageMod: 3, dice: "1d8" });
+    expect(attack({ proficient: false }).toHit).toBe(3);
+  });
+
+  it("adds a magic bonus to both to-hit and damage, and names it", () => {
+    const r = attack({ weapon: { ...sword, isMagic: true, magicBonus: 2 } });
+    expect(r).toMatchObject({ toHit: 7, damageMod: 5 });
+    expect(r.hitParts).toEqual(["STR +3", "proficiency +2", "magic +2"]);
+  });
+
+  it("adds Archery only to a ranged weapon", () => {
+    const bow = { ...longbow, name: "Longbow", category: "martial", isMagic: false };
+    expect(attack({ weapon: bow, styles: ["archery"] })).toMatchObject({
+      ability: "dex",
+      toHit: 5,
+      damageMod: 1,
+    });
+    expect(attack({ styles: ["archery"] }).toHit).toBe(5);
+  });
+
+  it("treats a +1 shortsword as a monk weapon by its base name", () => {
+    const shortsword = {
+      damageDice: "1d6",
+      properties: ["finesse", "light"],
+      name: "Shortsword",
+      category: "martial",
+      isMagic: true,
+      magicBonus: 1,
+    };
+    const r = attack({
+      weapon: shortsword,
+      mods: { str: 0, dex: 4, int: 0 },
+      effects: fx([["martial_arts", 11]]),
+      unarmored: true,
+    });
+    expect(r).toMatchObject({ ability: "dex", dice: "1d8", toHit: 7, damageMod: 5 });
+  });
+
+  it("lets Battle Ready use INT on a magic weapon only", () => {
+    const smith = { str: 1, dex: 0, int: 4 };
+    const ready = fx([["battle_ready", 3]]);
+    expect(attack({ mods: smith, effects: ready, weapon: { ...sword, isMagic: true } }).ability).toBe("int");
+    expect(attack({ mods: smith, effects: ready }).ability).toBe("str");
+  });
+});
+
 describe("Battle Ready", () => {
   const ready = fx([["battle_ready", 3]]);
   const smith = { str: 1, dex: 2, int: 4 };
 
   it("raises the class's training to martial", () => {
-    expect(weaponTraining("simple", none)).toBe("simple");
-    expect(weaponTraining("simple", ready)).toBe("martial");
-    expect(weaponTraining(null, ready)).toBe("martial");
+    const artificer = [{ cls: { ...wizard, name: "Artificer", weaponTraining: "simple" as const, weaponProficiencies: [] }, isStarting: true }];
+    expect(weaponProficiencies(artificer, [], none).category).toBe("simple");
+    expect(weaponProficiencies(artificer, [], ready)).toMatchObject({
+      category: "martial",
+      categorySource: "Battle Ready",
+    });
+    expect(weaponProficiencies([], [], ready).category).toBe("martial");
   });
 
   it("uses INT on a magic weapon only when INT is higher", () => {

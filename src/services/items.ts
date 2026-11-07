@@ -115,6 +115,13 @@ export interface Weapon extends ItemBase {
   versatileDice?: string;
   rangeNormal?: number;
   rangeLong?: number;
+  /** +1 to +3 on attack and damage rolls; only on a magic item (161). */
+  magicBonus?: number;
+  /**
+   * The shared, mundane weapon this one is (161): a +1 Longsword's is the
+   * Longsword. Decides proficiency, nothing else; the dice are on this row.
+   */
+  baseWeaponId?: string;
 }
 
 export interface Armor extends ItemBase {
@@ -123,6 +130,24 @@ export interface Armor extends ItemBase {
   category: ArmorCategory;
   strengthRequirement?: number;
   stealthDisadvantage: boolean;
+  /**
+   * 161 allows a bonus on armour, but nothing reads it yet: the form doesn't
+   * offer it and armorClass doesn't add it. Carried so an edit keeps it.
+   */
+  magicBonus?: number;
+}
+
+/**
+ * The name proficiency is with: the base weapon's for a magic weapon (161),
+ * else the weapon's own. `catalogue` is getItems' list, which holds every
+ * shared weapon, so a base is always found there.
+ */
+export function proficiencyName(
+  weapon: Pick<Weapon, "name" | "baseWeaponId">,
+  catalogue: ReadonlyMap<string, Item>,
+): string {
+  if (!weapon.baseWeaponId) return weapon.name;
+  return catalogue.get(weapon.baseWeaponId)?.name ?? weapon.name;
 }
 
 export type Item = GeneralItem | Weapon | Armor;
@@ -187,6 +212,8 @@ export function toItem(row: Tables<"items">): Item {
         versatileDice: row.versatile_dice ?? undefined,
         rangeNormal: row.range_normal ?? undefined,
         rangeLong: row.range_long ?? undefined,
+        magicBonus: row.magic_bonus ?? undefined,
+        baseWeaponId: row.base_weapon_id ?? undefined,
       };
     case "armor":
       return {
@@ -215,6 +242,7 @@ export function toItem(row: Tables<"items">): Item {
           "stealth_disadvantage",
           subject,
         ),
+        magicBonus: row.magic_bonus ?? undefined,
       };
     case "general":
       return { ...base, kind: "general" };
@@ -245,6 +273,9 @@ const KIND_FIELDS_CLEARED = {
   base_armor_class: null,
   strength_requirement: null,
   stealth_disadvantage: null,
+  // 161's columns: a base only on a weapon, a bonus only on a weapon or armour.
+  base_weapon_id: null,
+  magic_bonus: null,
 } satisfies TablesUpdate<"items">;
 
 // Every author-controlled column for this input, campaign_id excluded. Shared
@@ -268,10 +299,19 @@ function toAuthoredColumns(input: NewItem) {
         : null,
   };
 
+  // A bonus is magic (161's magic_bonus_needs_rarity), so a rarity set back to
+  // None drops it here rather than tripping the CHECK.
+  const magicBonus =
+    input.kind !== "general" && input.rarity !== null
+      ? (input.magicBonus ?? null)
+      : null;
+
   switch (input.kind) {
     case "weapon":
       return {
         ...base,
+        magic_bonus: magicBonus,
+        base_weapon_id: input.baseWeaponId ?? null,
         weapon_category: input.category,
         damage_dice: input.damageDice,
         damage_type: input.damageType,
@@ -283,6 +323,7 @@ function toAuthoredColumns(input: NewItem) {
     case "armor":
       return {
         ...base,
+        magic_bonus: magicBonus,
         armor_category: input.category,
         base_armor_class: input.baseArmorClass,
         strength_requirement: input.strengthRequirement ?? null,

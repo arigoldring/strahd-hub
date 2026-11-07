@@ -759,12 +759,14 @@ export type Database = {
           description: string
           hit_die: number
           id: string
+          multiclass_grants_weapons: boolean
           name: string
           save_proficiencies: string[]
           spell_ability: string | null
           subclass_level: number
           subclass_title: string
           unarmored_ability: string | null
+          weapon_proficiencies: string[]
           weapon_training: string
         }
         Insert: {
@@ -774,12 +776,14 @@ export type Database = {
           description?: string
           hit_die: number
           id?: string
+          multiclass_grants_weapons?: boolean
           name: string
           save_proficiencies: string[]
           spell_ability?: string | null
           subclass_level?: number
           subclass_title?: string
           unarmored_ability?: string | null
+          weapon_proficiencies?: string[]
           weapon_training: string
         }
         Update: {
@@ -789,12 +793,14 @@ export type Database = {
           description?: string
           hit_die?: number
           id?: string
+          multiclass_grants_weapons?: boolean
           name?: string
           save_proficiencies?: string[]
           spell_ability?: string | null
           subclass_level?: number
           subclass_title?: string
           unarmored_ability?: string | null
+          weapon_proficiencies?: string[]
           weapon_training?: string
         }
         Relationships: [
@@ -1007,6 +1013,7 @@ export type Database = {
           armor_category: string | null
           attunement_note: string | null
           base_armor_class: number | null
+          base_weapon_id: string | null
           campaign_id: string | null
           created_at: string | null
           damage_dice: string | null
@@ -1014,6 +1021,7 @@ export type Database = {
           description: string | null
           id: string
           kind: string
+          magic_bonus: number | null
           name: string
           price_cp: number
           properties: string[] | null
@@ -1031,6 +1039,7 @@ export type Database = {
           armor_category?: string | null
           attunement_note?: string | null
           base_armor_class?: number | null
+          base_weapon_id?: string | null
           campaign_id?: string | null
           created_at?: string | null
           damage_dice?: string | null
@@ -1038,6 +1047,7 @@ export type Database = {
           description?: string | null
           id?: string
           kind?: string
+          magic_bonus?: number | null
           name: string
           price_cp: number
           properties?: string[] | null
@@ -1055,6 +1065,7 @@ export type Database = {
           armor_category?: string | null
           attunement_note?: string | null
           base_armor_class?: number | null
+          base_weapon_id?: string | null
           campaign_id?: string | null
           created_at?: string | null
           damage_dice?: string | null
@@ -1062,6 +1073,7 @@ export type Database = {
           description?: string | null
           id?: string
           kind?: string
+          magic_bonus?: number | null
           name?: string
           price_cp?: number
           properties?: string[] | null
@@ -1076,6 +1088,13 @@ export type Database = {
           weapon_category?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "items_base_weapon_id_fkey"
+            columns: ["base_weapon_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "items_campaign_id_fkey"
             columns: ["campaign_id"]

@@ -11,6 +11,7 @@ import { useRaces } from "../../hooks/useRaces";
 import { useSubclasses } from "../../hooks/useSubclasses";
 import { useClassFeatures } from "../../hooks/useClassFeatures";
 import { useFeatureOptions } from "../../hooks/useFeatureOptions";
+import { useItems } from "../../hooks/useItems";
 import {
   ABILITIES,
   ABILITY_LABELS,
@@ -19,7 +20,6 @@ import {
   armorClass,
   attacksPerAction,
   averageHp,
-  battleReadyAbility,
   brutalCriticalDice,
   collectEffects,
   critThreshold,
@@ -28,7 +28,6 @@ import {
   hpBonus,
   initiative,
   martialArtsDie,
-  martialArtsWeapon,
   picksAllowed,
   ordinal,
   pactSlots,
@@ -41,16 +40,18 @@ import {
   sneakAttackDice,
   speedBonus,
   spellSlots,
-  styleAttackBonus,
   totalLevel,
   untrainedCheckBonus,
-  weaponAbility,
-  weaponTraining,
+  categoryCovers,
+  weaponAttack,
+  weaponProficiencies,
+  weaponProficiency,
   type Ability,
   type EffectLevels,
   type FightingStyleKey,
   type ProficiencyLevel,
   type SkillKey,
+  type WeaponProficiencies,
 } from "../../data/rules";
 import {
   saveSet,
@@ -59,7 +60,6 @@ import {
   type CharacterStats,
   type CharacterStatsPatch,
   type FeaturePick,
-  type Proficiency,
 } from "../../services/characterSheet";
 import {
   FEATURE_OPTION_KIND_LABELS,
@@ -70,7 +70,7 @@ import {
 } from "../../services/classes";
 import type { Character as CharacterModel } from "../../services/characters";
 import type { CharacterInventoryEntry } from "../../services/characterInventory";
-import type { Armor, Weapon } from "../../services/items";
+import { proficiencyName, type Armor, type Item, type Weapon } from "../../services/items";
 import { errorMessage } from "../../lib/errors";
 import {
   Band,
@@ -187,6 +187,10 @@ function FullSheet({
   // Same key as the Feats section below, so this is a cache hit too. Read
   // here for the feats' use counters.
   const { data: ownFeats = [] } = useCharacterFeats(character.id);
+  // The item catalogue, for a magic weapon's base (161) and the weapon
+  // proficiency picker. Same key as the Shop, so often a cache hit.
+  const { data: itemCatalog = [] } = useItems(campaign.id);
+  const itemsById = new Map(itemCatalog.map((i) => [i.id, i]));
 
   // One error line under the header for any failed save. Each control could
   // own its own, but on a sheet of ~40 inputs one shared line is easier to
@@ -329,8 +333,22 @@ function FullSheet({
     return o?.kind === "fighting_style" && o.key ? [o.key] : [];
   });
 
+  // Weapon proficiency (161): every class entry's list, subject to the
+  // multiclass rule, plus the character's own 'weapon' rows, keyed by name.
+  const weaponProfs = weaponProficiencies(
+    classes.flatMap((entry) => {
+      const c = classCatalog.find((x) => x.id === entry.classId);
+      return c ? [{ cls: c, isStarting: entry.id === startingEntry?.id }] : [];
+    }),
+    proficiencies.filter((p) => p.kind === "weapon").map((p) => p.key),
+    effects,
+  );
+
   const armors = gear.filter((i): i is ArmorEntry => i.kind === "armor");
-  const weapons = gear.filter((i): i is WeaponEntry => i.kind === "weapon");
+  // Equipped first, the rest after in their own order (sort is stable).
+  const weapons = gear
+    .filter((i): i is WeaponEntry => i.kind === "weapon")
+    .sort((a, b) => Number(b.equipped) - Number(a.equipped));
   const armor = armors.find((a) => a.equipped && a.category !== "shield") ?? null;
   const shield = armors.find((a) => a.equipped && a.category === "shield") ?? null;
   const ac = armorClass({
@@ -623,28 +641,31 @@ function FullSheet({
               </p>
             </div>
           </section>
+
+          <WeaponProficienciesBlock
+            profs={weaponProfs}
+            catalogue={itemCatalog}
+            canEdit={canEdit}
+            setExtra={(name, on) =>
+              run(
+                sheetQuery.setProficiency({ kind: "weapon", key: name, level: on ? 1 : 0 }),
+                "weapon proficiency",
+              )
+            }
+          />
         </div>
 
         <div className="sm-layout__col">
           <AttacksBlock
             weapons={weapons}
-            proficiencies={proficiencies}
+            catalogue={itemsById}
+            profs={weaponProfs}
             canEdit={canEdit}
-            toggleProf={(itemId, proficient) =>
-              run(
-                sheetQuery.setProficiency({
-                  kind: "weapon",
-                  key: itemId,
-                  level: proficient ? 1 : 0,
-                }),
-                "weapon proficiency",
-              )
+            setEquipped={(entryId, equipped) =>
+              run(setEquipped({ entryId, equipped }), "weapon")
             }
-            cls={cls}
             pb={pb}
-            strMod={mod("str")}
-            dexMod={mod("dex")}
-            intMod={mod("int")}
+            mods={mods}
             styles={styles}
             effects={effects}
             unarmored={armor == null && shield == null}
@@ -1112,51 +1133,43 @@ function FeaturePickList({
 }
 
 /**
- * One row per weapon carried, plus an unarmed strike. To-hit and damage are
- * derived. A weapon counts as proficient when the class's training covers its
- * category, or when the character has a 'weapon' proficiency row for that
- * item (056) — the way a Rogue gets rapiers. A class-granted proficiency can't
- * be switched off here, because "no row" already means "nothing extra".
- * Archery's +2 is added to a ranged row's to-hit and named in its tooltip.
+ * One row per weapon carried, plus an unarmed strike. Equipped weapons come
+ * first at full weight; the rest are dimmed, not hidden, so a weapon nobody
+ * remembered to equip still shows its numbers. There is no one-weapon limit:
+ * the sheet doesn't track hands.
+ *
+ * To-hit and damage come from weaponAttack in rules.ts. Proficiency is read,
+ * not toggled, here: it comes from the class lists and the character's own
+ * extras (161), which are edited in the Weapon Proficiencies block. A magic
+ * weapon is matched by its base weapon's name, so a +1 Longsword counts as a
+ * longsword, and its bonus is added to both to-hit and damage.
  */
 function AttacksBlock({
   weapons,
-  proficiencies,
+  catalogue,
+  profs,
   canEdit,
-  toggleProf,
-  cls,
+  setEquipped,
   pb,
-  strMod,
-  dexMod,
-  intMod,
+  mods,
   styles,
   effects,
   unarmored,
 }: {
   weapons: WeaponEntry[];
-  proficiencies: Proficiency[];
+  catalogue: ReadonlyMap<string, Item>;
+  profs: WeaponProficiencies;
   canEdit: boolean;
-  toggleProf: (itemId: string, proficient: boolean) => void;
-  cls: CharacterClass | null;
+  setEquipped: (entryId: string, equipped: boolean) => void;
   pb: number;
-  strMod: number;
-  dexMod: number;
-  /** Battle Ready's ability on a magic weapon. */
-  intMod: number;
+  mods: Record<Ability, number>;
   styles: readonly FightingStyleKey[];
   effects: EffectLevels;
   /** No body armour and no shield: the condition Martial Arts needs. */
   unarmored: boolean;
 }) {
-  const extra = new Set(
-    proficiencies.filter((p) => p.kind === "weapon").map((p) => p.key),
-  );
-  // Battle Ready raises a Battle Smith's training to martial.
-  const training = weaponTraining(cls?.weaponTraining ?? null, effects);
-  const fromClass = (w: WeaponEntry) =>
-    w.category === "simple" || training === "martial";
-  const mods = { str: strMod, dex: dexMod, int: intMod };
-  const better = Math.max(strMod, dexMod);
+  const better = Math.max(mods.str, mods.dex);
+  const equippedCount = weapons.filter((w) => w.equipped).length;
 
   // The facts that apply to every attack, shown once above the rows.
   const attacks = attacksPerAction(effects);
@@ -1179,49 +1192,60 @@ function AttacksBlock({
 
   return (
     <>
-      <Band label="Attacks" count={`${weapons.length} carried`} />
+      <Band
+        label="Attacks"
+        count={`${equippedCount} equipped · ${weapons.length} carried`}
+      />
       <div className="ch-body">
         {summary.length > 0 && <p className="sm-legend">{summary.join(" · ")}</p>}
         <table className="ch-table sm-attacks">
           <tbody>
             {weapons.map((w) => {
-              // Martial Arts lets a monk weapon use DEX and its die.
-              const ma = martialArtsWeapon(w, maDie, unarmored);
-              const base = ma.finesse
-                ? dexMod > strMod
-                  ? "dex"
-                  : "str"
-                : weaponAbility(w, strMod, dexMod);
-              // Battle Ready: INT on a magic weapon, when it's higher.
-              const ability = battleReadyAbility(base, mods, w.rarity !== null, effects);
-              const abilityMod =
-                ability === "int" ? intMod : ability === "dex" ? dexMod : strMod;
-              const classProf = fromClass(w);
-              const proficient = classProf || extra.has(w.id);
-              const styleBonus = styleAttackBonus(w, styles);
-              const toHit = abilityMod + (proficient ? pb : 0) + styleBonus;
+              const baseName = proficiencyName(w, catalogue);
+              const prof = weaponProficiency({ name: baseName, category: w.category }, profs);
+              const attack = weaponAttack({
+                weapon: { ...w, name: baseName, isMagic: w.rarity !== null },
+                mods,
+                pb,
+                proficient: prof.proficient,
+                styles,
+                effects,
+                unarmored,
+              });
+              const label = w.customName ?? w.name;
               return (
-                <tr key={w.entryId}>
+                <tr
+                  key={w.entryId}
+                  className={w.equipped ? undefined : "sm-attacks__row--stowed"}
+                >
+                  <td className="sm-attacks__equip">
+                    <input
+                      type="checkbox"
+                      checked={w.equipped}
+                      disabled={!canEdit}
+                      title={w.equipped ? "Equipped" : "Not equipped"}
+                      aria-label={`Equip ${label}`}
+                      onChange={(e) => setEquipped(w.entryId, e.target.checked)}
+                    />
+                  </td>
                   <td className="sm-attacks__prof">
-                    <button
-                      type="button"
-                      className={`sm-pip sm-pip--${proficient ? 1 : 0}`}
+                    <span
+                      className={`sm-pip sm-pip--${prof.proficient ? 1 : 0}`}
                       title={
-                        classProf
-                          ? "Proficient from class"
-                          : proficient
-                            ? "Proficient (added)"
-                            : "Not proficient"
+                        prof.proficient
+                          ? `Proficient (${prof.source})`
+                          : "Not proficient: add it under Weapon Proficiencies"
                       }
-                      aria-label={`${w.name}: ${proficient ? "proficient" : "not proficient"}`}
-                      disabled={!canEdit || classProf}
-                      onClick={() => toggleProf(w.id, !proficient)}
+                      aria-label={`${label}: ${prof.proficient ? "proficient" : "not proficient"}`}
                     />
                   </td>
                   <td>
-                    {w.customName ?? w.name}
+                    {label}
                     <span className="sm-attacks__meta">
                       {[
+                        // A magic weapon names what it is, since the row's
+                        // own name ("Sunfang") may not say.
+                        baseName !== w.name && baseName,
                         w.category,
                         ...w.properties,
                         w.rangeNormal != null &&
@@ -1231,17 +1255,14 @@ function AttacksBlock({
                         .join(" · ")}
                     </span>
                   </td>
-                  <td
-                    className="sm-attacks__hit"
-                    title={styleBonus ? `Includes Archery ${formatModifier(styleBonus)}` : undefined}
-                  >
-                    {formatModifier(toHit)}
+                  <td className="sm-attacks__hit" title={attack.hitParts.join(" · ")}>
+                    {formatModifier(attack.toHit)}
                   </td>
                   <td className="sm-attacks__dmg">
-                    {damageString(ma.dice, abilityMod)} {w.damageType}
+                    {damageString(attack.dice, attack.damageMod)} {w.damageType}
                     {w.versatileDice && (
                       <span className="sm-attacks__meta">
-                        two-handed {damageString(w.versatileDice, abilityMod)}
+                        two-handed {damageString(w.versatileDice, attack.damageMod)}
                       </span>
                     )}
                   </td>
@@ -1251,6 +1272,7 @@ function AttacksBlock({
             {/* Everyone is proficient with unarmed strikes: 1 + STR, or with
                 Martial Arts the die + the better of STR and DEX. */}
             <tr>
+              <td className="sm-attacks__equip" />
               <td className="sm-attacks__prof">
                 <span className="sm-pip sm-pip--1" />
               </td>
@@ -1261,12 +1283,12 @@ function AttacksBlock({
                 </span>
               </td>
               <td className="sm-attacks__hit">
-                {formatModifier((martial ? better : strMod) + pb)}
+                {formatModifier((martial ? better : mods.str) + pb)}
               </td>
               <td className="sm-attacks__dmg">
                 {martial
                   ? damageString(`1d${maDie}`, better)
-                  : Math.max(1, 1 + strMod)}{" "}
+                  : Math.max(1, 1 + mods.str)}{" "}
                 bludgeoning
               </td>
             </tr>
@@ -1279,6 +1301,111 @@ function AttacksBlock({
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * What weapons the character knows (161), under Skills. The class's whole
+ * category is one line ("Simple and martial weapons"); named weapons follow,
+ * each with where it came from. A named weapon the category already covers
+ * isn't repeated.
+ *
+ * Extras are 'weapon' rows in character_proficiencies keyed by weapon name:
+ * a race's training, a feat like Weapon Master, a DM's ruling. Only those
+ * can be removed here; a class's list is the class's. The picker offers
+ * every weapon name in the catalogue (a magic weapon offers its base's), so
+ * a homebrew weapon with no base can be added under its own name.
+ */
+function WeaponProficienciesBlock({
+  profs,
+  catalogue,
+  canEdit,
+  setExtra,
+}: {
+  profs: WeaponProficiencies;
+  catalogue: readonly Item[];
+  canEdit: boolean;
+  setExtra: (name: string, on: boolean) => void;
+}) {
+  const byId = new Map(catalogue.map((i) => [i.id, i]));
+  // Each proficiency name with its category. Shared rows first, so a shared
+  // weapon's category wins over a homebrew row of the same name.
+  const categories = new Map<string, Weapon["category"]>();
+  for (const i of [...catalogue].sort((a, b) => Number(a.isHomebrew) - Number(b.isHomebrew))) {
+    if (i.kind !== "weapon") continue;
+    const name = proficiencyName(i, byId);
+    if (!categories.has(name)) categories.set(name, i.category);
+  }
+  const covered = (name: string) => {
+    const c = categories.get(name);
+    return c != null && categoryCovers(profs.category, c);
+  };
+
+  const named = [...profs.named]
+    .filter(([name]) => !covered(name))
+    .sort(([a], [b]) => a.localeCompare(b));
+  const addable = [...categories.keys()]
+    .filter((name) => !covered(name) && !profs.named.has(name))
+    .sort((a, b) => a.localeCompare(b));
+  const categoryLabel =
+    profs.category === "martial"
+      ? "Simple and martial weapons"
+      : profs.category === "simple"
+        ? "Simple weapons"
+        : null;
+
+  return (
+    <section>
+      <Band label="Weapon Proficiencies" />
+      <div className="ch-body">
+        <ul className="sm-list sm-weapon-profs">
+          {categoryLabel && (
+            <li className="sm-row">
+              <span className="sm-row__name">
+                {categoryLabel}
+                <span className="sm-row__ability">{profs.categorySource}</span>
+              </span>
+            </li>
+          )}
+          {named.map(([name, source]) => (
+            <li key={name} className="sm-row">
+              <span className="sm-row__name">
+                {name}
+                <span className="sm-row__ability">{source}</span>
+              </span>
+              {source === "added" && canEdit && (
+                <button
+                  type="button"
+                  className="sm-pick__remove"
+                  aria-label={`Remove ${name} proficiency`}
+                  onClick={() => setExtra(name, false)}
+                >
+                  ×
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        {!categoryLabel && named.length === 0 && (
+          <p className="sm-legend">None yet. Pick a class, or add a weapon below.</p>
+        )}
+        {canEdit && addable.length > 0 && (
+          <select
+            className="sm-weapon-profs__add"
+            value=""
+            aria-label="Add a weapon proficiency"
+            onChange={(e) => e.target.value && setExtra(e.target.value, true)}
+          >
+            <option value="">+ Add a weapon (race, feat, DM)</option>
+            {addable.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+    </section>
   );
 }
 

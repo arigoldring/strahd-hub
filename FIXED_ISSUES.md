@@ -6,6 +6,16 @@ fixed it, and which migration did it.
 
 ---
 
+### Battle Ready's INT never reached a seeded magic weapon (noted 2026-11-07, resolved 2026-11-07 by 161 and 163)
+
+`battleReadyAbility` swaps in INT on a magic weapon, but every seeded magic
+weapon was `kind = 'general'`, so none was on the attack table. 161 gave
+items a base weapon and a bonus, and 163 turned the 15 seeded magic weapons
+with one named base into weapon rows, so a Battle Smith with a Mace of
+Smiting gets INT and the +1. "Any weapon" templates (Weapon, +1) are still
+text; the DM makes the concrete homebrew copy (KNOWN_ISSUES, "Magic
+templates and armour are text").
+
 ### Spell class lists left out the Artificer (noted 2026-11-06, resolved 2026-11-07 by 149 and 152)
 
 138-147 left 'Artificer' out of every spell's `classes` array, because the

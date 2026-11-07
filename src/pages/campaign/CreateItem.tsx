@@ -2,10 +2,12 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { SubmitEvent, useState } from "react";
 import { useCampaign } from "../../components/CampaignLayout";
 import { usePartyInventory } from "../../hooks/usePartyInventory";
+import { useItems } from "../../hooks/useItems";
 import {
   type Item,
   type NewItem,
   type Rarity,
+  type Weapon,
   magicRarities,
   rarityLabel,
   armorCategories,
@@ -69,6 +71,20 @@ export function HomebrewItemForm({
 }) {
   const weapon = initial?.kind === "weapon" ? initial : undefined;
   const armor = initial?.kind === "armor" ? initial : undefined;
+
+  // The bases a magic weapon may name: shared, mundane weapons (161's
+  // check_item_base_weapon refuses anything else).
+  const campaign = useCampaign();
+  const { data: catalogue = [] } = useItems(campaign.id);
+  const baseWeapons = catalogue
+    .filter((i): i is Weapon => i.kind === "weapon" && !i.isHomebrew && i.rarity === null)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const [baseWeaponId, setBaseWeaponId] = useState(weapon?.baseWeaponId ?? "");
+  // "" is no bonus. Only offered on a magic weapon; 161 refuses it on a
+  // mundane item, and toAuthoredColumns drops it if the rarity goes back.
+  const [magicBonus, setMagicBonus] = useState(
+    weapon?.magicBonus != null ? String(weapon.magicBonus) : "",
+  );
 
   const [kind, setKind] = useState<"general" | "weapon" | "armor">(
     initial?.kind ?? "general",
@@ -136,6 +152,22 @@ export function HomebrewItemForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Picking a base copies its stats onto the form, which the DM can still
+  // change. Copied rather than read through the link because 001's checks
+  // need a weapon row to carry its own dice.
+  function pickBase(id: string) {
+    setBaseWeaponId(id);
+    const base = baseWeapons.find((w) => w.id === id);
+    if (!base) return;
+    setWeaponCategory(base.category);
+    setDamageDice(base.damageDice);
+    setDamageType(base.damageType);
+    setProperties(new Set(base.properties));
+    setVersatileDice(base.versatileDice ?? "");
+    setRangeNormal(base.rangeNormal != null ? String(base.rangeNormal) : "");
+    setRangeLong(base.rangeLong != null ? String(base.rangeLong) : "");
+  }
+
   function toggleProperty(prop: string) {
     const newSet = new Set(properties);
     if (newSet.has(prop)) {
@@ -200,6 +232,8 @@ export function HomebrewItemForm({
         versatileDice: versatileDice.trim() || undefined,
         rangeNormal: rangeNormal ? Number(rangeNormal) : undefined,
         rangeLong: rangeLong ? Number(rangeLong) : undefined,
+        magicBonus: magicBonus ? Number(magicBonus) : undefined,
+        baseWeaponId: baseWeaponId || undefined,
       };
     } else if (kind === "armor") {
       if (!baseArmorClass || isNaN(Number(baseArmorClass))) {
@@ -220,6 +254,9 @@ export function HomebrewItemForm({
           ? Number(strengthRequirement)
           : undefined,
         stealthDisadvantage,
+        // Not offered on armour yet (nothing reads it); kept so an edit
+        // doesn't wipe one set some other way.
+        magicBonus: armor?.magicBonus,
       };
     } else {
       input = {
@@ -374,6 +411,25 @@ export function HomebrewItemForm({
                 />
               </>
             )}
+            {kind === "weapon" && (
+              <>
+                <label className="create-item-label" htmlFor="magicBonus">
+                  Bonus to attack and damage
+                </label>
+                <select
+                  id="magicBonus"
+                  className="create-item-input"
+                  value={magicBonus}
+                  onChange={(e) => setMagicBonus(e.target.value)}
+                  disabled={saving}
+                >
+                  <option value="">None</option>
+                  <option value="1">+1</option>
+                  <option value="2">+2</option>
+                  <option value="3">+3</option>
+                </select>
+              </>
+            )}
           </>
         )}
       </fieldset>
@@ -381,6 +437,27 @@ export function HomebrewItemForm({
       {kind === "weapon" && (
         <fieldset className="create-item-section">
           <legend>Weapon Stats</legend>
+
+          <label className="create-item-label" htmlFor="base-weapon">
+            Base weapon{" "}
+            <span className="create-item-hint">
+              (decides proficiency; fills in the stats below)
+            </span>
+          </label>
+          <select
+            id="base-weapon"
+            className="create-item-select"
+            value={baseWeaponId}
+            onChange={(e) => pickBase(e.target.value)}
+            disabled={saving}
+          >
+            <option value="">None (its own weapon)</option>
+            {baseWeapons.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
 
           <label className="create-item-label" htmlFor="weapon-category">
             Category *

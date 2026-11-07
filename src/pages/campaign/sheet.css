@@ -68,6 +68,7 @@
 .sm-combat input,
 .sm-resource__pool input,
 .sm-feature__choice select,
+.sm-weapon-profs__add,
 .sm-ability__score {
   padding: 6px 10px;
   font: 400 16px/1.3 var(--sh-body);
@@ -87,6 +88,7 @@
 .sm-combat input:focus,
 .sm-resource__pool input:focus,
 .sm-feature__choice select:focus,
+.sm-weapon-profs__add:focus,
 .sm-ability__score:focus {
   outline: none;
   border-color: var(--sh-gold);
@@ -452,6 +454,34 @@
 
 .sm-attacks td {
   padding: 8px 6px;
+}
+
+.sm-attacks__equip {
+  width: 1%;
+}
+
+.sm-attacks__equip input {
+  accent-color: var(--sh-gold);
+}
+
+/* Carried but not equipped: still shown, so a forgotten equip doesn't hide
+   the numbers, but pushed back behind what's in hand. */
+.sm-attacks__row--stowed {
+  opacity: 0.55;
+}
+
+/* The proficiency rows are read-only lines, not toggles. */
+.sm-weapon-profs .sm-row {
+  cursor: default;
+}
+
+.sm-weapon-profs .sm-row__name {
+  flex: 1;
+}
+
+.sm-weapon-profs__add {
+  width: 100%;
+  margin-top: 10px;
 }
 
 .sm-attacks__prof {
