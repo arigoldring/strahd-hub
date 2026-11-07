@@ -288,11 +288,37 @@ rollback;
 -- BLOCK 2: a key that isn't a counter is refused
 -- ---------------------------------------------------------------------------
 --
--- CORRECT OUTPUT: ERROR 23514, new row ... violates check constraint
--- "character_resource_uses_resource_key_check".
+-- Catches the refusal and reports it as a row (039's shape), so a pass isn't
+-- painted red. The constraint name is checked too: some other CHECK firing
+-- would be a check_violation for the wrong reason.
+--
+-- CORRECT OUTPUT: one row, outcome =
+--   'rejected by character_resource_uses_resource_key_check (23514)'.
+--   'CALL SUCCEEDED -- CONSTRAINT MISSING' means the check never landed.
 
 begin;
 
-select public.use_resource((select id from public.characters limit 1), 'slot:10', 1, 1);
+do $$
+declare
+  v_character uuid;
+  v_constraint text;
+begin
+  select id into v_character from public.characters limit 1;
+  if v_character is null then
+    raise exception 'no character to test with: this block would prove nothing';
+  end if;
+
+  perform public.use_resource(v_character, 'slot:10', 1, 1);
+  perform set_config('verification.outcome', 'CALL SUCCEEDED -- CONSTRAINT MISSING', true);
+exception
+  when check_violation then
+    get stacked diagnostics v_constraint = constraint_name;
+    perform set_config('verification.outcome',
+      'rejected by ' || v_constraint || ' (23514)', true);
+end
+$$;
+
+select 'slot:10 is not a counter key' as check,
+       current_setting('verification.outcome') as outcome;
 
 rollback;
