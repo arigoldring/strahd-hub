@@ -3,7 +3,7 @@
 Open work: things that are wrong and still want fixing. Each entry says what it
 takes to trigger, what it costs, and what the fix would be.
 
-**Current through migration 167 (168 written, waiting on a deploy). Last updated 2026-11-07.**
+**Current through migration 168. Last updated 2026-11-07.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below. Two sibling
@@ -20,22 +20,6 @@ live in one of those two files; search all three.
 ---
 
 ## Open
-
-### 168 waits for the deploy (noted 2026-11-07)
-
-167 (the `character_companions` table, `adjust_companion_hp`, Repair's
-counter and the widened `effect_key` domain) has run. 168 puts the
-`steel_defender` key on the Steel Defender feature, which is what makes the
-sheet show the defender's block, and it must not run before the client that
-knows the key is live: the deployed client parses `class_features.effect`
-strictly and would blank every sheet.
-
-**Trigger:** now, until the deploy.
-
-**Cost:** a Battle Smith sees Repair's counter under Resources but no
-defender section.
-
-**Fix:** deploy, then run 168, then move this entry to FIXED_ISSUES.
 
 ### Death House sits at placeholder coordinates (noted 2026-09-18)
 

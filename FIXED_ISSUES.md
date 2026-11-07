@@ -6,6 +6,15 @@ fixed it, and which migration did it.
 
 ---
 
+### The steel defender had no stat block (noted 2026-11-07, resolved 2026-11-07 by 167 and 168)
+
+The Battle Smith's defender was one text row (150); its HP, AC and attacks
+were the player's to work out and track. 167 added `character_companions`
+(name, damage, temp HP), `adjust_companion_hp` and Repair's counter; 168
+put the `steel_defender` effect key on the feature after the client was
+deployed. The block itself is derived in `rules.ts` (`steelDefender`); see
+CLAUDE.md, Companions.
+
 ### Racial weapon training wasn't automatic (noted 2026-11-07, resolved 2026-11-07 by 164 and 165)
 
 Dwarven Combat Training and Elf/Drow Weapon Training weren't data on
