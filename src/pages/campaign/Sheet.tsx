@@ -18,6 +18,7 @@ import {
   armorClass,
   attacksPerAction,
   averageHp,
+  battleReadyAbility,
   collectEffects,
   critThreshold,
   damageString,
@@ -36,6 +37,7 @@ import {
   totalLevel,
   untrainedCheckBonus,
   weaponAbility,
+  weaponTraining,
   type Ability,
   type EffectLevels,
   type FightingStyleKey,
@@ -562,6 +564,7 @@ function FullSheet({
             pb={pb}
             strMod={mod("str")}
             dexMod={mod("dex")}
+            intMod={mod("int")}
             styles={styles}
             effects={effects}
             unarmored={armor == null && shield == null}
@@ -1045,6 +1048,7 @@ function AttacksBlock({
   pb,
   strMod,
   dexMod,
+  intMod,
   styles,
   effects,
   unarmored,
@@ -1057,6 +1061,8 @@ function AttacksBlock({
   pb: number;
   strMod: number;
   dexMod: number;
+  /** Battle Ready's ability on a magic weapon. */
+  intMod: number;
   styles: readonly FightingStyleKey[];
   effects: EffectLevels;
   /** No body armour and no shield: the condition Martial Arts needs. */
@@ -1065,8 +1071,11 @@ function AttacksBlock({
   const extra = new Set(
     proficiencies.filter((p) => p.kind === "weapon").map((p) => p.key),
   );
+  // Battle Ready raises a Battle Smith's training to martial.
+  const training = weaponTraining(cls?.weaponTraining ?? null, effects);
   const fromClass = (w: WeaponEntry) =>
-    w.category === "simple" || cls?.weaponTraining === "martial";
+    w.category === "simple" || training === "martial";
+  const mods = { str: strMod, dex: dexMod, int: intMod };
   const better = Math.max(strMod, dexMod);
 
   // The facts that apply to every attack, shown once above the rows.
@@ -1095,12 +1104,15 @@ function AttacksBlock({
             {weapons.map((w) => {
               // Martial Arts lets a monk weapon use DEX and its die.
               const ma = martialArtsWeapon(w, maDie, unarmored);
-              const ability = ma.finesse
+              const base = ma.finesse
                 ? dexMod > strMod
                   ? "dex"
                   : "str"
                 : weaponAbility(w, strMod, dexMod);
-              const abilityMod = ability === "dex" ? dexMod : strMod;
+              // Battle Ready: INT on a magic weapon, when it's higher.
+              const ability = battleReadyAbility(base, mods, w.rarity !== null, effects);
+              const abilityMod =
+                ability === "int" ? intMod : ability === "dex" ? dexMod : strMod;
               const classProf = fromClass(w);
               const proficient = classProf || extra.has(w.id);
               const styleBonus = styleAttackBonus(w, styles);

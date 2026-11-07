@@ -258,6 +258,7 @@ export const FEATURE_EFFECTS = [
   "fast_movement",
   "unarmored_movement",
   "draconic_resilience",
+  "battle_ready",
 ] as const;
 export type FeatureEffect = (typeof FEATURE_EFFECTS)[number];
 
@@ -318,6 +319,35 @@ export function critThreshold(effects: EffectLevels): number {
 export function sneakAttackDice(effects: EffectLevels): number {
   const rogue = effects.get("sneak_attack");
   return rogue == null ? 0 : Math.ceil(rogue / 2);
+}
+
+/**
+ * The weapon training a character attacks with: the class's own, raised to
+ * martial by Battle Ready (Battle Smith), which grants martial weapons on
+ * top of the Artificer's simple ones.
+ */
+export function weaponTraining(
+  classTraining: "simple" | "martial" | null,
+  effects: EffectLevels,
+): "simple" | "martial" | null {
+  return effects.has("battle_ready") ? "martial" : classTraining;
+}
+
+/**
+ * Battle Ready's other half: a magic weapon may attack with INT instead of
+ * STR or DEX. `base` is the ability the weapon would use otherwise
+ * (weaponAbility, or Martial Arts' choice); INT replaces it only when INT's
+ * modifier is higher. A mundane weapon never changes. "Magic" means the item
+ * has a rarity (129), which no seeded weapon-kind row has (KNOWN_ISSUES).
+ */
+export function battleReadyAbility(
+  base: Ability,
+  mods: { readonly [A in Ability]?: number },
+  isMagic: boolean,
+  effects: EffectLevels,
+): Ability {
+  if (!isMagic || !effects.has("battle_ready")) return base;
+  return (mods.int ?? 0) > (mods[base] ?? 0) ? "int" : base;
 }
 
 /** The Martial Arts die's size: d4, d6 at 5th, d8 at 11th, d10 at 17th. */

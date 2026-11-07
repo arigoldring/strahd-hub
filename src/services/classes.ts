@@ -109,6 +109,7 @@ export const FEATURE_OPTION_KINDS = [
   "arcane_shot",
   "rune",
   "invocation",
+  "infusion",
 ] as const;
 export type FeatureOptionKind = (typeof FEATURE_OPTION_KINDS)[number];
 
@@ -119,6 +120,7 @@ export const FEATURE_OPTION_KIND_LABELS: Record<FeatureOptionKind, string> = {
   arcane_shot: "Arcane Shot option",
   rune: "Rune",
   invocation: "Invocation",
+  infusion: "Infusion",
 };
 
 const WEAPON_TRAINING = ["simple", "martial"] as const;
