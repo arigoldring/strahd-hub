@@ -14,9 +14,11 @@
    first — main.tsx imports it before index.css.
    ========================================================================== */
 
+/* Full width of .app-main, whose padding is the gutter: no centred column
+   with black space either side. */
 .ch {
-  width: 90%;
-  max-width: 720px;
+  width: 100%;
+  max-width: none;
   /* The 32px of air used to be .ch-eyebrow's margin-top, back when the eyebrow
      was the first thing on the page. It is inside the frame now, so the page
      holds its own top margin. */

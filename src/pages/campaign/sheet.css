@@ -7,11 +7,11 @@
 
 /* ---------- page width & two-column layout ---------- */
 
-/* character.css caps .ch at 720px, the right measure for one column of lists.
-   This page has two columns, so it gets roughly twice that. */
+/* Fills .app-main edge to edge; .app-main's own padding is the gutter. The
+   two columns are fr-based, so they share whatever width the window gives. */
 .ch.sm-wide {
-  width: calc(100% - 32px);
-  max-width: 1280px;
+  width: 100%;
+  max-width: none;
 }
 
 /* One column by default (phones, narrow windows). min-width: 0 lets a grid

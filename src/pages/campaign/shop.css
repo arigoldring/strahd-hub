@@ -30,8 +30,8 @@ html { overflow-y: scroll; }
 
   position: relative;
   z-index: 1;
-  width: 90%;
-  max-width: 720px;
+  width: 100%;
+  max-width: none;
   margin: 64px auto 80px;
   padding: 32px 36px 38px;
   font-family: "Cormorant Garamond", "Iowan Old Style", Georgia, serif;
@@ -61,8 +61,8 @@ html { overflow-y: scroll; }
 .shop-eyebrow, .shop-title {
   position: relative;
   z-index: 1;
-  width: 90%;
-  max-width: 720px;
+  width: 100%;
+  max-width: none;
   margin: 0 auto;
   text-align: center;
 }
