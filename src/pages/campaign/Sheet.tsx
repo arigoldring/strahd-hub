@@ -20,6 +20,7 @@ import {
   attacksPerAction,
   averageHp,
   battleReadyAbility,
+  brutalCriticalDice,
   collectEffects,
   critThreshold,
   damageString,
@@ -31,6 +32,7 @@ import {
   picksAllowed,
   ordinal,
   pactSlots,
+  passiveBonus,
   proficiencyBonus,
   resourceMax,
   resourceRecharge,
@@ -232,10 +234,14 @@ function FullSheet({
   const mod = (a: Ability) => abilityModifier(stats.scores[a]);
   const saves = saveSet(proficiencies);
   const skills = skillLevels(proficiencies);
-  // Every class feature effect the character has (121), from every class
-  // entry, each with the level of the class that grants it. The numbers
-  // below read from this; a feature with no effect key is display only.
-  const effects = collectEffects(classes, featureCatalog);
+  // Every effect the character has: class features' (121), each with the
+  // level of the class that grants it, plus the race's and the feats' (159)
+  // at total level. The numbers below read from this; a row with no effect
+  // key is display only.
+  const effects = collectEffects(classes, featureCatalog, [
+    race?.effect ?? null,
+    ...ownFeats.map((f) => f.effect),
+  ]);
   // Untrained skills take Jack of All Trades or Remarkable Athlete, and so
   // do the passives, which are built from this.
   const skillTotal = (key: SkillKey) => {
@@ -244,6 +250,8 @@ function FullSheet({
     const untrained = prof === 0 ? untrainedCheckBonus(skill.ability, pb, effects).bonus : 0;
     return skillBonus(mod(skill.ability), pb, prof) + untrained;
   };
+  // A passive is 10 + the skill, plus Observant's +5 where it applies.
+  const passive = (key: SkillKey) => 10 + skillTotal(key) + passiveBonus(key, effects);
   const mods = Object.fromEntries(ABILITIES.map((a) => [a, mod(a)])) as Record<Ability, number>;
   const init = initiative(mods, pb, effects);
   const aura = saveAura(mod("cha"), effects);
@@ -343,6 +351,7 @@ function FullSheet({
     natural: effects.has("draconic_resilience")
       ? { name: "Draconic Resilience", base: 13 }
       : null,
+    effects,
   });
 
   // Equip one of a kind (body armour, or shield) and un-equip the rest of
@@ -487,12 +496,9 @@ function FullSheet({
           value={formatModifier(init.total)}
           title={init.parts.join(" · ")}
         />
-        <Stat label="Passive Perception" value={String(10 + skillTotal("perception"))} />
-        <Stat
-          label="Passive Investigation"
-          value={String(10 + skillTotal("investigation"))}
-        />
-        <Stat label="Passive Insight" value={String(10 + skillTotal("insight"))} />
+        <Stat label="Passive Perception" value={String(passive("perception"))} />
+        <Stat label="Passive Investigation" value={String(passive("investigation"))} />
+        <Stat label="Passive Insight" value={String(passive("insight"))} />
         <Stat
           label={spellAbility ? `Spell Save DC (${spellAbility.toUpperCase()})` : "Spell Save DC"}
           value={spellAbility ? String(8 + pb + mod(spellAbility)) : "—"}
@@ -709,10 +715,10 @@ function CombatBlock({
   shield: ArmorEntry | null;
   armors: ArmorEntry[];
   equip: (pool: ArmorEntry[], entryId: string) => void;
-  /** Speed from class features (121), already checked against what's worn. */
+  /** Speed from features and feats (121, 159), already checked against what's worn. */
   featureSpeed: { bonus: number; parts: string[] };
-  /** Max HP class features add (Draconic Resilience), for the average hint. */
-  featureHp: number;
+  /** Max HP features and feats add (Draconic Resilience, Tough), for the average hint. */
+  featureHp: { bonus: number; parts: string[] };
 }) {
   const bodyArmors = armors.filter((a) => a.category !== "shield");
   const shields = armors.filter((a) => a.category === "shield");
@@ -836,8 +842,8 @@ function CombatBlock({
         )}
         {cls && (
           <span className="sm-combat__note">
-            Average for level {level}: {averageHp(cls.hitDie, level, conMod) + featureHp}
-            {featureHp > 0 && ` (incl. Draconic Resilience +${featureHp})`}
+            Average for level {level}: {averageHp(cls.hitDie, level, conMod) + featureHp.bonus}
+            {featureHp.parts.length > 0 && ` (incl. ${featureHp.parts.join(", ")})`}
           </span>
         )}
       </div>
@@ -1156,11 +1162,14 @@ function AttacksBlock({
   const attacks = attacksPerAction(effects);
   const crit = critThreshold(effects);
   const sneak = sneakAttackDice(effects);
+  const brutal = brutalCriticalDice(effects);
   const maDie = martialArtsDie(effects);
   const martial = maDie != null && unarmored;
   const summary = [
     attacks > 1 && `${attacks} attacks per Attack action`,
     crit < 20 && `crit on ${crit}–20`,
+    brutal > 0 &&
+      `Brutal Critical +${brutal} weapon ${brutal === 1 ? "die" : "dice"} on a melee crit`,
     sneak > 0 && `Sneak Attack ${sneak}d6 once per turn (finesse or ranged)`,
     maDie != null &&
       (martial

@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase";
 import { parseOneOf, requireField } from "../lib/parse";
+import { FEATURE_EFFECTS, type FeatureEffect } from "../data/rules";
 import type { Tables } from "../types/database.types";
 
 /**
@@ -57,13 +58,18 @@ export interface Feat {
   // without the app being able to record it.
   repeatable: boolean;
   tags: string[];
+  // The number the sheet computes from this feat (159): Alert's +5
+  // initiative, Tough's hit points. Null for most feats, which are text.
+  effect: FeatureEffect | null;
 }
 
 // What CreateFeat builds. Omit<Feat, "id"> rather than a hand-written twin, so
 // a column added to Feat is a compile error in the form rather than a field it
 // silently stops sending. items.ts' NewItem has to spell out three variants
-// because Item is a union; Feat is not, so this stays one line.
-export type NewFeat = Omit<Feat, "id">;
+// because Item is a union; Feat is not, so this stays one line. `effect` is
+// left out on purpose: CreateFeat has no effect picker, so a homebrew feat is
+// text until one exists.
+export type NewFeat = Omit<Feat, "id" | "effect">;
 
 // Exported the way toSpell and toItem are, and for the same reason:
 // characterFeats.ts embeds a whole feats row and needs exactly this mapping,
@@ -84,6 +90,10 @@ export function toFeat(row: Tables<"feats">): Feat {
     benefits: row.benefits ?? [],
     repeatable: requireField(row.repeatable, "repeatable", subject),
     tags: row.tags ?? [],
+    effect:
+      row.effect == null
+        ? null
+        : parseOneOf(row.effect, FEATURE_EFFECTS, "effect", subject),
   };
 }
 

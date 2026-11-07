@@ -6,6 +6,7 @@ import {
   armorClass,
   attacksPerAction,
   battleReadyAbility,
+  brutalCriticalDice,
   collectEffects,
   critThreshold,
   hpBonus,
@@ -16,6 +17,7 @@ import {
   martialArtsDie,
   martialArtsWeapon,
   pactSlots,
+  passiveBonus,
   picksAllowed,
   resourceMax,
   resourceRecharge,
@@ -262,8 +264,11 @@ describe("saves, speed and hit points", () => {
   });
 
   it("adds a hit point per sorcerer level for Draconic Resilience", () => {
-    expect(hpBonus(fx([["draconic_resilience", 4]]))).toBe(4);
-    expect(hpBonus(none)).toBe(0);
+    expect(hpBonus(fx([["draconic_resilience", 4]]))).toEqual({
+      bonus: 4,
+      parts: ["Draconic Resilience +4"],
+    });
+    expect(hpBonus(none)).toEqual({ bonus: 0, parts: [] });
   });
 
   it("takes the better of Draconic Resilience and Unarmored Defense", () => {
@@ -272,6 +277,81 @@ describe("saves, speed and hit points", () => {
     const unarmored = { ability: "con" as const, mod: 3, allowsShield: true };
     expect(ac({ natural: { name: "Draconic Resilience", base: 13 }, unarmored }).total).toBe(15);
     expect(ac({ natural: { name: "Draconic Resilience", base: 13 }, armor: chainMail }).total).toBe(16);
+  });
+});
+
+// ---------- race and feat effects (159) ----------
+
+describe("race and feat effects", () => {
+  const halfPlate: ArmorLike = { name: "Half Plate", category: "medium", baseArmorClass: 15 };
+
+  it("collects race and feat keys at total level, from 1st", () => {
+    const e = collectEffects(
+      [
+        { classId: "fighter", subclassId: null, level: 3 },
+        { classId: "rogue", subclassId: null, level: 2 },
+      ],
+      [],
+      ["integrated_protection", "tough", null],
+    );
+    expect(e.get("integrated_protection")).toBe(5);
+    expect(e.get("tough")).toBe(5);
+    expect(e.size).toBe(2);
+  });
+
+  it("adds Integrated Protection's +1 in armour or out of it", () => {
+    const e = fx([["integrated_protection", 1]]);
+    expect(ac({ effects: e })).toEqual({
+      total: 13,
+      parts: ["10", "DEX +2", "Integrated Protection +1"],
+    });
+    expect(ac({ armor: chainMail, shield, effects: e }).total).toBe(19);
+  });
+
+  it("raises the medium armour DEX cap to +3 with Medium Armor Master", () => {
+    const e = fx([["medium_armor_master", 1]]);
+    expect(ac({ armor: halfPlate, dexMod: 4 }).total).toBe(17);
+    expect(ac({ armor: halfPlate, dexMod: 4, effects: e }).total).toBe(18);
+    // Below DEX 16 the feat changes nothing, and it never touches heavy armour.
+    expect(ac({ armor: halfPlate, dexMod: 2, effects: e }).total).toBe(17);
+    expect(ac({ armor: chainMail, dexMod: 4, effects: e }).total).toBe(16);
+  });
+
+  it("adds Alert's +5 to initiative", () => {
+    expect(initiative(mods, 2, fx([["alert", 1]]))).toEqual({
+      total: 7,
+      parts: ["DEX +2", "Alert +5"],
+    });
+  });
+
+  it("adds Observant's +5 to passive Perception and Investigation only", () => {
+    const e = fx([["observant", 1]]);
+    expect(passiveBonus("perception", e)).toBe(5);
+    expect(passiveBonus("investigation", e)).toBe(5);
+    expect(passiveBonus("insight", e)).toBe(0);
+    expect(passiveBonus("perception", none)).toBe(0);
+  });
+
+  it("adds Mobile's +10 whatever is worn", () => {
+    const e = fx([["mobile", 1]]);
+    expect(speedBonus(e, { armorCategory: "heavy", shield: true })).toEqual({
+      bonus: 10,
+      parts: ["Mobile +10"],
+    });
+  });
+
+  it("adds Tough's 2 per level, stacking with Draconic Resilience", () => {
+    expect(hpBonus(fx([["tough", 5]])).bonus).toBe(10);
+    expect(hpBonus(fx([["tough", 5], ["draconic_resilience", 3]]))).toEqual({
+      bonus: 13,
+      parts: ["Draconic Resilience +3", "Tough +10"],
+    });
+  });
+
+  it("scales Brutal Critical by barbarian level", () => {
+    const at = (l: number) => brutalCriticalDice(fx([["brutal_critical", l]]));
+    expect([9, 12, 13, 16, 17, 20].map(at)).toEqual([1, 1, 2, 2, 3, 3]);
+    expect(brutalCriticalDice(none)).toBe(0);
   });
 });
 

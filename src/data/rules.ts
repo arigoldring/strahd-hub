@@ -114,6 +114,9 @@ export interface ArmorLike {
  * the character holds, across all their classes, so a style picked twice
  * still adds once.
  *
+ * Effects (159): Medium Armor Master raises the medium cap to +3, and
+ * Integrated Protection (Warforged) adds +1 whatever is worn.
+ *
  * Returns the parts as well as the total, so the sheet can say where the
  * number came from rather than just print it.
  */
@@ -130,17 +133,28 @@ export function armorClass(opts: {
    * higher of the two applies; they never stack.
    */
   natural?: { name: string; base: number } | null;
+  effects?: EffectLevels;
 }): { total: number; parts: string[] } {
-  const { armor, shield, dexMod, unarmored, styles, bonus, natural = null } = opts;
+  const {
+    armor,
+    shield,
+    dexMod,
+    unarmored,
+    styles,
+    bonus,
+    natural = null,
+    effects = new Map(),
+  } = opts;
   const parts: string[] = [];
   let total: number;
 
   if (armor) {
+    const mediumCap = effects.has("medium_armor_master") ? 3 : 2;
     const dex =
       armor.category === "heavy"
         ? 0
         : armor.category === "medium"
-          ? Math.min(dexMod, 2)
+          ? Math.min(dexMod, mediumCap)
           : dexMod;
     total = armor.baseArmorClass + dex;
     parts.push(`${armor.name} ${armor.baseArmorClass}`);
@@ -165,6 +179,10 @@ export function armorClass(opts: {
   if (armor && styles.includes("defense")) {
     total += 1;
     parts.push("Defense +1");
+  }
+  if (effects.has("integrated_protection")) {
+    total += 1;
+    parts.push("Integrated Protection +1");
   }
   if (bonus) {
     total += bonus;
@@ -240,8 +258,14 @@ export function totalLevel(classes: readonly { level: number }[]): number {
 // functions below turn that into numbers. A feature with no key is display
 // only. Conditions the sheet can't see (advantage, an ally beside the target,
 // being conscious) are left to the player.
+//
+// Since 159 a race and a feat carry a key the same way (races.effect,
+// feats.effect), and theirs read the character's total level.
 
-/** One list in two places with 121's CHECK on class_features.effect. */
+/**
+ * One list in two places with 159's effect_key domain, which all three
+ * effect columns use.
+ */
 export const FEATURE_EFFECTS = [
   "extra_attack",
   "extra_attack_fighter",
@@ -259,6 +283,14 @@ export const FEATURE_EFFECTS = [
   "unarmored_movement",
   "draconic_resilience",
   "battle_ready",
+  // 159: one more class key, then the race's and the feats'.
+  "brutal_critical",
+  "integrated_protection",
+  "alert",
+  "observant",
+  "mobile",
+  "tough",
+  "medium_armor_master",
 ] as const;
 export type FeatureEffect = (typeof FEATURE_EFFECTS)[number];
 
@@ -271,6 +303,10 @@ export type EffectLevels = ReadonlyMap<FeatureEffect, number>;
  * is the granting class's level, which the scaling effects read (Sneak
  * Attack by rogue level, not total level). If two entries grant the same
  * key, the higher level wins.
+ *
+ * `others` are the race's and the feats' keys (159). Those apply from 1st
+ * level, and their value is the character's total level (Tough's +2 per
+ * level), the rule 153 uses for feat counters.
  */
 export function collectEffects(
   entries: readonly { classId: string; subclassId: string | null; level: number }[],
@@ -280,8 +316,13 @@ export function collectEffects(
     level: number;
     effect: FeatureEffect | null;
   }[],
+  others: readonly (FeatureEffect | null)[] = [],
 ): Map<FeatureEffect, number> {
   const out = new Map<FeatureEffect, number>();
+  const total = entries.reduce((sum, e) => sum + e.level, 0);
+  for (const effect of others) {
+    if (effect) out.set(effect, Math.max(out.get(effect) ?? 0, total));
+  }
   for (const e of entries) {
     for (const f of features) {
       if (
@@ -319,6 +360,16 @@ export function critThreshold(effects: EffectLevels): number {
 export function sneakAttackDice(effects: EffectLevels): number {
   const rogue = effects.get("sneak_attack");
   return rogue == null ? 0 : Math.ceil(rogue / 2);
+}
+
+/**
+ * Brutal Critical: extra weapon damage dice on a melee crit. 1 at barbarian
+ * 9th, 2 at 13th, 3 at 17th. 0 without it.
+ */
+export function brutalCriticalDice(effects: EffectLevels): number {
+  const barbarian = effects.get("brutal_critical");
+  if (barbarian == null) return 0;
+  return barbarian >= 17 ? 3 : barbarian >= 13 ? 2 : 1;
 }
 
 /**
@@ -445,7 +496,21 @@ export function initiative(
       parts.push(`${name} ${formatModifier(mods[ability])}`);
     }
   }
+  if (effects.has("alert")) {
+    total += 5;
+    parts.push("Alert +5");
+  }
   return { total, parts };
+}
+
+/**
+ * What a feature adds to a passive score on top of its skill: Observant's +5
+ * to passive Perception and Investigation.
+ */
+export function passiveBonus(skill: SkillKey, effects: EffectLevels): number {
+  return effects.has("observant") && (skill === "perception" || skill === "investigation")
+    ? 5
+    : 0;
 }
 
 /** Aura of Protection: CHA modifier, minimum +1, on every saving throw. */
@@ -474,12 +539,32 @@ export function speedBonus(
     bonus += ft;
     parts.push(`Unarmored Movement +${ft}`);
   }
+  if (effects.has("mobile")) {
+    bonus += 10;
+    parts.push("Mobile +10");
+  }
   return { bonus, parts };
 }
 
-/** Hit points features add to the maximum: Draconic Resilience, +1 per sorcerer level. */
-export function hpBonus(effects: EffectLevels): number {
-  return effects.get("draconic_resilience") ?? 0;
+/**
+ * Hit points features add to the maximum: Draconic Resilience, +1 per
+ * sorcerer level, and Tough, +2 per character level. They stack: different
+ * sources, and the books never say otherwise.
+ */
+export function hpBonus(effects: EffectLevels): { bonus: number; parts: string[] } {
+  let bonus = 0;
+  const parts: string[] = [];
+  const sorcerer = effects.get("draconic_resilience");
+  if (sorcerer != null) {
+    bonus += sorcerer;
+    parts.push(`Draconic Resilience +${sorcerer}`);
+  }
+  const level = effects.get("tough");
+  if (level != null) {
+    bonus += 2 * level;
+    parts.push(`Tough +${2 * level}`);
+  }
+  return { bonus, parts };
 }
 
 // ---------- feature pick allowances (122) ----------

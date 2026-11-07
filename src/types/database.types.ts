@@ -852,6 +852,7 @@ export type Database = {
           category: string
           created_at: string
           description: string
+          effect: string | null
           id: string
           name: string
           prerequisite: string | null
@@ -864,6 +865,7 @@ export type Database = {
           category: string
           created_at?: string
           description: string
+          effect?: string | null
           id?: string
           name: string
           prerequisite?: string | null
@@ -876,6 +878,7 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string
+          effect?: string | null
           id?: string
           name?: string
           prerequisite?: string | null
@@ -1381,6 +1384,7 @@ export type Database = {
           campaign_id: string | null
           created_at: string
           description: string
+          effect: string | null
           id: string
           name: string
           size: string
@@ -1390,6 +1394,7 @@ export type Database = {
           campaign_id?: string | null
           created_at?: string
           description?: string
+          effect?: string | null
           id?: string
           name: string
           size?: string
@@ -1399,6 +1404,7 @@ export type Database = {
           campaign_id?: string | null
           created_at?: string
           description?: string
+          effect?: string | null
           id?: string
           name?: string
           size?: string

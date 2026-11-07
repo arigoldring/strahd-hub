@@ -265,12 +265,13 @@ Smith in 149), except three of the Artificer's (below).
 **Fix:** a CreateFeat-style form; 053's homebrew-edit policy plus a pin
 trigger for editing.
 
-### Class features are mostly display only (noted 2026-10-11, widened by 081/082, 084-094 and 097-120, narrowed 2026-11-05 by 095 and 121)
+### Class features are mostly display only (noted 2026-10-11, widened by 081/082, 084-094 and 097-120, narrowed 2026-11-05 by 095 and 121, and 2026-11-07 by 159/160)
 
 079-094 and 097-120 store and show the text for every class and subclass.
-The sheet computes from two fighting styles and from the 23 rows that carry
-a 121 `effect` key (two of them the Battle Smith's, 150); every other row is
-text.
+The sheet computes from two fighting styles and from the 24 rows that carry
+a 121 `effect` key (two of them the Battle Smith's, 150; Brutal Critical's,
+160); every other row is text. Since 159/160 one race and five feats carry a
+key too (below).
 
 - **Fighting style:** Defense (+1 AC while body armour is worn) and Archery
   (+2 to-hit on ranged weapons) are applied by `armorClass` and
@@ -295,6 +296,14 @@ text.
   Movement on speed, Draconic Resilience's AC 13 + DEX, and Battle Ready's
   martial weapons and INT on a magic weapon (150; the INT half has a gap,
   below).
+- **Computed since 160:** Brutal Critical's extra dice (in the attack
+  legend), Warforged's Integrated Protection (+1 AC), Alert (+5
+  initiative), Observant (+5 passive Perception and Investigation), Mobile
+  (+10 ft), Tough (+2 HP per level, in the average-HP hint only) and Medium
+  Armor Master (+3 DEX cap in medium armour). **Players who typed any of
+  these in by hand are now double-counted** (Warforged's +1 in the AC bonus
+  box most likely); 160's BLOCK 1 lists the Warforged ones. Decided
+  2026-11-07 to tell them rather than zero the box in a migration.
 - **Shown, but the condition is the player's:** Sneak Attack still needs
   advantage or an ally beside the target; Aura of Protection needs the
   paladin conscious and within range; Dread Ambusher's first-turn extra
@@ -304,12 +313,15 @@ text.
   "thrown, so not ranged" test as Archery, so it accepts the Dart, which the
   PHB lists as a ranged weapon. The same fix as above corrects both.
 - **Derived numbers nothing applies:** Rage's damage bonus and resistances
-  (rage is a state the sheet doesn't track), Brutal Critical's dice, Primal
-  Champion's +4 (the player edits the scores), Slippery Mind and Diamond
-  Soul's save proficiencies (the player can add those by hand), Potent
-  Spellcasting and Agonizing Blast on cantrip damage (the sheet shows no
-  cantrip damage), Extra Attack from an invocation (Thirsting Blade), and
-  every racial trait and feat (Alert's +5 initiative among them).
+  (rage is a state the sheet doesn't track), Primal Champion's +4 (the
+  player edits the scores), Slippery Mind and Diamond Soul's save
+  proficiencies (the player can add those by hand), Potent Spellcasting and
+  Agonizing Blast on cantrip damage (the sheet shows no cantrip damage),
+  Extra Attack from an invocation (Thirsting Blade), Dual Wielder's +1 AC
+  (the sheet doesn't track hands), proficiencies a race or feat grants, and
+  subrace traits (subraces aren't rows, 055, so Hill Dwarf's hit points have
+  nowhere to live). A homebrew race or feat can carry a key on insert, but
+  CreateFeat offers no effect picker and races have no form.
 - **Uses the counters don't cover:** 153-157 track every feature and feat
   whose text says it recharges on a rest, with these exceptions. The Rune
   Knight's runes want one counter per rune picked (each is once per short
