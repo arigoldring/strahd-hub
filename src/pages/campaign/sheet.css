@@ -66,6 +66,7 @@
 .sm-stat select,
 .sm-combat select,
 .sm-combat input,
+.sm-companion input,
 .sm-resource__pool input,
 .sm-feature__choice select,
 .sm-weapon-profs__add,
@@ -86,6 +87,7 @@
 .sm-stat select:focus,
 .sm-combat select:focus,
 .sm-combat input:focus,
+.sm-companion input:focus,
 .sm-resource__pool input:focus,
 .sm-feature__choice select:focus,
 .sm-weapon-profs__add:focus,
@@ -772,4 +774,71 @@
    each other on a phone. */
 .sm-resource__pool .sm-resource__count {
   flex-basis: 100%;
+}
+
+/* ---------- steel defender (167) ---------- */
+
+.sm-companion__name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.sm-companion__name span {
+  font: 500 9px/1 var(--sh-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sh-mute);
+}
+
+.sm-companion__name input {
+  flex: 1;
+  min-width: 0;
+  max-width: 280px;
+}
+
+/* AC and HP side by side; it lives in the narrow column, so two tiles, not
+   the character's four. */
+.sm-companion__combat {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  margin-top: 10px;
+  border-top: 1px solid var(--sh-rule-faint);
+  border-bottom: 1px solid var(--sh-rule-faint);
+}
+
+.sm-companion__combat input {
+  font-size: 14px;
+}
+
+/* The maximum is derived, so it's text where the character's is a field. */
+.sm-companion__max {
+  min-width: 48px;
+  font: 400 18px/1 var(--sh-mono);
+  color: var(--sh-bone);
+}
+
+.sm-companion__scores {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+  font: 400 13px/1.4 var(--sh-mono);
+  color: var(--sh-bone);
+}
+
+.sm-companion__scores .sm-race-facts__label {
+  display: block;
+  margin: 0 0 2px;
+}
+
+@media (max-width: 600px) {
+  .sm-companion__scores {
+    grid-template-columns: repeat(3, 1fr);
+    row-gap: 8px;
+  }
 }

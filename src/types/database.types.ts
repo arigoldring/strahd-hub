@@ -212,6 +212,41 @@ export type Database = {
           },
         ]
       }
+      character_companions: {
+        Row: {
+          character_id: string
+          damage: number
+          hp_temp: number
+          kind: string
+          name: string | null
+          updated_at: string
+        }
+        Insert: {
+          character_id: string
+          damage?: number
+          hp_temp?: number
+          kind: string
+          name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          character_id?: string
+          damage?: number
+          hp_temp?: number
+          kind?: string
+          name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_companions_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       character_feats: {
         Row: {
           character_id: string
@@ -1833,6 +1868,28 @@ export type Database = {
           to: "character_stats"
           isOneToOne: false
           isSetofReturn: true
+        }
+      }
+      adjust_companion_hp: {
+        Args: {
+          cap: number
+          delta: number
+          target_character: string
+          target_kind: string
+        }
+        Returns: {
+          character_id: string
+          damage: number
+          hp_temp: number
+          kind: string
+          name: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "character_companions"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
       adjust_party_currency: {

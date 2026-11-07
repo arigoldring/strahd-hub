@@ -457,7 +457,8 @@ design and is not an oversight.
   *Fix:* walk every class entry, the same way `collectEffects` already
   does, and add the multiclass slot table to `rules.ts`.
 - **A Long Rest only clears counters, like a Short Rest.** It doesn't
-  restore hit points, clear temporary HP, give Hit Dice back or lower
+  restore the character's hit points (it does restore a steel defender's,
+  167, whose stored damage makes that one write), clear temporary HP, give Hit Dice back or lower
   exhaustion. A Short Rest doesn't offer to spend Hit Dice. Spent Hit Dice
   aren't tracked at all: the tile shows `{level}d{die}`.
   *Fix:* HP to max and temp HP to 0 are two more columns in the long rest's

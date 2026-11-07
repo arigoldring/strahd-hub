@@ -33,10 +33,13 @@ export function SheetResources({
   characterId,
   counters,
   canEdit,
+  onLongRest,
 }: {
   characterId: string;
   counters: SheetCounter[];
   canEdit: boolean;
+  /** Anything else a long rest restores: the steel defender's HP (167). */
+  onLongRest?: () => Promise<unknown>;
 }) {
   const { uses = {}, isLoading, error, spend, rest } = useCharacterResources(characterId);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -51,11 +54,24 @@ export function SheetResources({
   const takeRest = (kind: ResourceRecharge) => {
     const label = kind === "short" ? "short rest" : "long rest";
     const what =
-      kind === "short" ? "every short-rest counter" : "every counter";
+      kind === "short"
+        ? "every short-rest counter"
+        : onLongRest
+          ? "every counter and your steel defender's hit points"
+          : "every counter";
     if (!window.confirm(`Take a ${label}? This refills ${what}.`)) return;
     // A long rest clears every stored row, including any whose counter the
     // sheet no longer shows (a feature lost to a level drop).
-    run(rest(kind === "long" ? "all" : keysClearedByRest(counters, "short")), `the ${label}`);
+    // The companion reset is a second request, not one transaction: a
+    // failure between them leaves the counters refilled and the defender
+    // hurt, and pressing Long Rest again repairs it (both writes are
+    // idempotent).
+    run(
+      kind === "long"
+        ? Promise.all([rest("all"), onLongRest?.()])
+        : rest(keysClearedByRest(counters, "short")),
+      `the ${label}`,
+    );
   };
 
   return (

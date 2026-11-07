@@ -29,6 +29,7 @@ import {
   sneakAttackDice,
   speedBonus,
   spellSlots,
+  steelDefender,
   styleAttackBonus,
   untrainedCheckBonus,
   weaponAbility,
@@ -735,5 +736,47 @@ describe("racial grants (164)", () => {
     expect(heavyArmorSlows(15, 13, fx([["heavy_armor_speed", 1]]))).toBe(false);
     expect(heavyArmorSlows(15, 15, none)).toBe(false);
     expect(heavyArmorSlows(null, 8, none)).toBe(false);
+  });
+});
+
+describe("steelDefender (167)", () => {
+  it("is built from the artificer's level, INT and proficiency at 3rd", () => {
+    const d = steelDefender(3, { intMod: 3, pb: 2 });
+    expect(d.maxHp).toBe(20); // 2 + 3 + 5 x 3
+    expect(d.ac).toBe(15);
+    expect(d.hitDice).toBe("3d8");
+    expect(d.saves).toEqual([
+      { ability: "dex", bonus: 3 },
+      { ability: "con", bonus: 4 },
+    ]);
+    expect(d.skills).toEqual([
+      { name: "Athletics", bonus: 4 },
+      { name: "Perception", bonus: 4 }, // proficiency doubled
+    ]);
+    expect(d.passivePerception).toBe(14);
+    const rend = d.actions.find((a) => a.name === "Force-Empowered Rend")!;
+    expect(rend.detail).toContain("+5 to hit");
+    expect(rend.detail).toContain("1d8+2 force");
+    expect(rend.detail).not.toContain("Arcane Jolt");
+    expect(d.actions.find((a) => a.name === "Deflect Attack")!.detail).not.toContain("attacker takes");
+  });
+
+  it("adds Arcane Jolt to Rend at 9th", () => {
+    const rend = steelDefender(9, { intMod: 4, pb: 4 }).actions.find(
+      (a) => a.name === "Force-Empowered Rend",
+    )!;
+    expect(rend.detail).toContain("+2d6 force");
+  });
+
+  it("gets Improved Defender at 15th: +2 AC, 4d6 jolts, Deflect Attack hits back", () => {
+    const d = steelDefender(15, { intMod: 5, pb: 5 });
+    expect(d.maxHp).toBe(82);
+    expect(d.ac).toBe(17);
+    expect(d.actions.find((a) => a.name === "Force-Empowered Rend")!.detail).toContain("+4d6 force");
+    expect(d.actions.find((a) => a.name === "Deflect Attack")!.detail).toContain("1d4+5 force");
+  });
+
+  it("never has fewer than 1 hit point", () => {
+    expect(steelDefender(0, { intMod: -5, pb: 2 }).maxHp).toBe(1);
   });
 });

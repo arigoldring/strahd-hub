@@ -295,6 +295,8 @@ export const FEATURE_EFFECTS = [
   "dwarven_toughness",
   "savage_attacks",
   "heavy_armor_speed",
+  // 167: the Battle Smith's companion (steelDefender below).
+  "steel_defender",
 ] as const;
 export type FeatureEffect = (typeof FEATURE_EFFECTS)[number];
 
@@ -904,6 +906,133 @@ export function keysClearedByRest(
   rest: ResourceRecharge,
 ): string[] {
   return counters.filter((c) => rest === "long" || c.recharge === "short").map((c) => c.key);
+}
+
+// ---------------------------------------------------------------------------
+// Companions (167)
+// ---------------------------------------------------------------------------
+
+/** One entry in a companion's stat block: what it can do, and when. */
+export interface CompanionAction {
+  timing: "Action" | "Reaction" | "Trait";
+  name: string;
+  detail: string;
+}
+
+/**
+ * Every number a steel defender's stat block derives. Only its name, damage
+ * and temp HP are stored (character_companions); the rest is this.
+ */
+export interface SteelDefenderBlock {
+  maxHp: number;
+  ac: number;
+  acNote: string;
+  speed: number;
+  hitDice: string;
+  scores: Readonly<Record<Ability, number>>;
+  saves: readonly { ability: Ability; bonus: number }[];
+  skills: readonly { name: string; bonus: number }[];
+  passivePerception: number;
+  senses: string;
+  damageImmunities: string;
+  conditionImmunities: string;
+  languages: string;
+  actions: readonly CompanionAction[];
+}
+
+// Tasha's stat block. The scores are fixed; everything that grows reads the
+// artificer's level, Intelligence and proficiency bonus.
+const STEEL_DEFENDER_SCORES: Readonly<Record<Ability, number>> = {
+  str: 14,
+  dex: 12,
+  con: 14,
+  int: 4,
+  wis: 10,
+  cha: 6,
+};
+
+/**
+ * The steel defender of an artificer at `artificerLevel` (the steel_defender
+ * effect's level: the Artificer class's own level, not total level, so a
+ * multiclass character's defender is the right size). `pb` is the
+ * character's proficiency bonus, which "it uses", and its attack uses the
+ * artificer's spell attack, which is always INT.
+ *
+ * Improved Defender (15th) and Arcane Jolt (9th) are Battle Smith features at
+ * fixed levels of the same class, so they're read off the same level rather
+ * than off their own keys, the way Extra Attack's later steps are.
+ */
+export function steelDefender(
+  artificerLevel: number,
+  ctx: { intMod: number; pb: number },
+): SteelDefenderBlock {
+  const { intMod, pb } = ctx;
+  const improved = artificerLevel >= 15;
+  const mods = Object.fromEntries(
+    ABILITIES.map((a) => [a, abilityModifier(STEEL_DEFENDER_SCORES[a])]),
+  ) as Record<Ability, number>;
+  const perception = mods.wis + pb * 2;
+  const jolt = improved ? "4d6" : "2d6";
+
+  const actions: CompanionAction[] = [
+    { timing: "Trait", name: "Vigilant", detail: "It can't be surprised." },
+    {
+      timing: "Trait",
+      name: "Mending",
+      detail: "It regains 2d6 hit points when the mending spell is cast on it.",
+    },
+    {
+      timing: "Action",
+      name: "Force-Empowered Rend",
+      detail:
+        `${formatModifier(pb + intMod)} to hit, reach 5 ft, one target it can see. ` +
+        `Hit: ${damageString("1d8", pb)} force damage.` +
+        (artificerLevel >= 9
+          ? ` Arcane Jolt, once per turn on a hit: +${jolt} force damage, or a ` +
+            `creature or object within 30 ft of the target regains ${jolt} HP.`
+          : ""),
+    },
+    {
+      timing: "Action",
+      name: "Repair (3/day)",
+      detail:
+        `Restores ${damageString("2d8", pb)} hit points to itself or to one ` +
+        "construct or object within 5 ft. Uses are counted under Resources.",
+    },
+    {
+      timing: "Reaction",
+      name: "Deflect Attack",
+      detail:
+        "Imposes disadvantage on one attack roll it can see against a creature " +
+        "within 5 ft of it, other than itself." +
+        (improved
+          ? ` The attacker takes ${damageString("1d4", intMod)} force damage.`
+          : ""),
+    },
+  ];
+
+  return {
+    maxHp: Math.max(1, 2 + intMod + 5 * artificerLevel),
+    ac: improved ? 17 : 15,
+    acNote: improved ? "Natural armor 15 · Improved Defender +2" : "Natural armor",
+    speed: 40,
+    hitDice: `${artificerLevel}d8`,
+    scores: STEEL_DEFENDER_SCORES,
+    saves: [
+      { ability: "dex", bonus: mods.dex + pb },
+      { ability: "con", bonus: mods.con + pb },
+    ],
+    skills: [
+      { name: "Athletics", bonus: mods.str + pb },
+      { name: "Perception", bonus: perception },
+    ],
+    passivePerception: 10 + perception,
+    senses: "Darkvision 60 ft",
+    damageImmunities: "Poison",
+    conditionImmunities: "Charmed, exhaustion, poisoned",
+    languages: "Understands the languages you speak",
+    actions,
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 Open work: things that are wrong and still want fixing. Each entry says what it
 takes to trigger, what it costs, and what the fix would be.
 
-**Current through migration 158. Last updated 2026-11-07.**
+**Current through migration 167 (168 written, waiting on a deploy). Last updated 2026-11-07.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below. Two sibling
@@ -20,6 +20,22 @@ live in one of those two files; search all three.
 ---
 
 ## Open
+
+### 168 waits for the deploy (noted 2026-11-07)
+
+167 (the `character_companions` table, `adjust_companion_hp`, Repair's
+counter and the widened `effect_key` domain) has run. 168 puts the
+`steel_defender` key on the Steel Defender feature, which is what makes the
+sheet show the defender's block, and it must not run before the client that
+knows the key is live: the deployed client parses `class_features.effect`
+strictly and would blank every sheet.
+
+**Trigger:** now, until the deploy.
+
+**Cost:** a Battle Smith sees Repair's counter under Resources but no
+defender section.
+
+**Fix:** deploy, then run 168, then move this entry to FIXED_ISSUES.
 
 ### Death House sits at placeholder coordinates (noted 2026-09-18)
 
@@ -337,8 +353,7 @@ key too (below).
   counter rather than showing "unlimited". Signature Spells is one counter
   of 2, not one per spell. Spell-Storing Item's floor is 1, where the book
   says 2. 155 and 156's headers list the rest-related text deliberately left
-  uncounted (Divine Intervention, Hex Warrior, Limited Wish...). The steel defender has no stat block on the
-  sheet; its numbers are in its feature text.
+  uncounted (Divine Intervention, Hex Warrior, Limited Wish...).
 
 **Trigger:** any feature whose effect is a number the sheet derives or a use
 that recharges on a rest.
@@ -493,8 +508,9 @@ form for it (above).
 insert in 149's shape (bump its end-state count), plus feature rows in 098's
 shape (subclass rows only; 150 already holds the base rows). Each has a
 spell list row at 3rd and features at 3, 5, 9 and 15. The Armorer's Arcane
-Armor and the Artillerist's Eldritch Cannon are text, like the steel
-defender. Alchemist and Artillerist would need no new effect key; the
+Armor and the Artillerist's Eldritch Cannon would be text; the cannon
+could instead be a second `character_companions` kind (167), the steel
+defender's shape. Alchemist and Artillerist would need no new effect key; the
 Armorer's model choice (Guardian or Infiltrator) is a single pick, a new
 `feature_options` kind.
 

@@ -1,4 +1,4 @@
-import { KeyboardEvent, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useCampaign } from "../../components/CampaignLayout";
 import { useAuth } from "../../services/AuthContext";
 import { useCharacter } from "../../hooks/useCharacter";
@@ -12,6 +12,7 @@ import { useSubclasses } from "../../hooks/useSubclasses";
 import { useClassFeatures } from "../../hooks/useClassFeatures";
 import { useFeatureOptions } from "../../hooks/useFeatureOptions";
 import { useItems } from "../../hooks/useItems";
+import { useCharacterCompanions } from "../../hooks/useCharacterCompanions";
 import {
   ABILITIES,
   ABILITY_LABELS,
@@ -43,6 +44,7 @@ import {
   sneakAttackDice,
   speedBonus,
   spellSlots,
+  steelDefender,
   totalLevel,
   untrainedCheckBonus,
   categoryCovers,
@@ -85,6 +87,8 @@ import {
   CharacterSpells,
 } from "./Character";
 import { SheetResources, type SheetCounter } from "./SheetResources";
+import { NumberField } from "./NumberField";
+import { SheetSteelDefender } from "./SheetSteelDefender";
 import { featureResourceKey } from "../../services/characterResources";
 import "./character.css";
 import "./sheet.css";
@@ -198,6 +202,9 @@ function FullSheet({
   // proficiency picker. Same key as the Shop, so often a cache hit.
   const { data: itemCatalog = [] } = useItems(campaign.id);
   const itemsById = new Map(itemCatalog.map((i) => [i.id, i]));
+  // Companions (167). Read here rather than in the defender's section
+  // because the Long Rest button in Resources restores them too.
+  const companionsQuery = useCharacterCompanions(character.id);
 
   // One error line under the header for any failed save. Each control could
   // own its own, but on a sheet of ~40 inputs one shared line is easier to
@@ -282,6 +289,11 @@ function FullSheet({
   const passive = (key: SkillKey) => 10 + skillTotal(key) + passiveBonus(key, effects);
   const mods = Object.fromEntries(ABILITIES.map((a) => [a, mod(a)])) as Record<Ability, number>;
   const init = initiative(mods, pb, effects);
+  // The steel defender (167): its level is the Artificer's own class level,
+  // which collectEffects already attaches to the key.
+  const defenderLevel = effects.get("steel_defender");
+  const defender =
+    defenderLevel != null ? steelDefender(defenderLevel, { intMod: mod("int"), pb }) : null;
   const aura = saveAura(mod("cha"), effects);
   // Use counters (153) from the starting class's features up to its level,
   // the Class Features list's own rule. The maximum is derived here every
@@ -596,7 +608,13 @@ function FullSheet({
         />
       </div>
 
-      <SheetResources characterId={character.id} counters={counters} canEdit={canEdit} />
+      <SheetResources
+        characterId={character.id}
+        counters={counters}
+        canEdit={canEdit}
+        // A long rest also brings the steel defender back to full HP (167).
+        onLongRest={defender ? () => companionsQuery.rest() : undefined}
+      />
 
       {/* Two columns on a wide screen: the numbers on the left, the lists on
           the right. Each column is a plain stack of bands, so collapsing to
@@ -735,6 +753,20 @@ function FullSheet({
               )
             }
           />
+
+          {defender && (
+            <SheetSteelDefender
+              block={defender}
+              companion={companionsQuery.companions?.find((c) => c.kind === "steel_defender")}
+              isLoading={companionsQuery.isLoading}
+              loadError={companionsQuery.error}
+              canEdit={canEdit}
+              adjustHp={(delta, cap) =>
+                companionsQuery.adjustHp({ kind: "steel_defender", delta, cap })
+              }
+              save={(current, patch) => companionsQuery.save({ current, patch })}
+            />
+          )}
         </div>
 
         <div className="sm-layout__col">
@@ -1576,85 +1608,6 @@ function WeaponProficienciesBlock({
         )}
       </div>
     </section>
-  );
-}
-
-/**
- * A number input that saves on blur or Enter rather than on every keystroke:
- * typing "15" would otherwise write 1 and then 15, and a cleared field would
- * try to save nothing. Escape reverts. The draft re-syncs from `value` when
- * the server's number changes (another device, the DM) while the field isn't
- * being edited.
- */
-function NumberField({
-  value,
-  min,
-  max,
-  onCommit,
-  disabled,
-  className,
-  title,
-  "aria-label": ariaLabel,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  onCommit: (n: number) => void;
-  disabled?: boolean;
-  className?: string;
-  title?: string;
-  "aria-label"?: string;
-}) {
-  const [draft, setDraft] = useState(String(value));
-  const [editing, setEditing] = useState(false);
-  // Set by Escape so the blur that follows doesn't commit the abandoned
-  // draft: the blur handler would otherwise still see it in its closure.
-  const cancelled = useRef(false);
-
-  useEffect(() => {
-    if (!editing) setDraft(String(value));
-  }, [value, editing]);
-
-  const commit = () => {
-    setEditing(false);
-    if (cancelled.current) {
-      cancelled.current = false;
-      setDraft(String(value));
-      return;
-    }
-    const n = Number.parseInt(draft, 10);
-    if (Number.isNaN(n)) {
-      setDraft(String(value));
-      return;
-    }
-    const clamped = Math.min(max, Math.max(min, n));
-    setDraft(String(clamped));
-    if (clamped !== value) onCommit(clamped);
-  };
-
-  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") e.currentTarget.blur();
-    if (e.key === "Escape") {
-      cancelled.current = true;
-      e.currentTarget.blur();
-    }
-  };
-
-  return (
-    <input
-      type="number"
-      className={className}
-      min={min}
-      max={max}
-      value={draft}
-      disabled={disabled}
-      title={title}
-      aria-label={ariaLabel}
-      onFocus={() => setEditing(true)}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={onKeyDown}
-    />
   );
 }
 
