@@ -1,4 +1,4 @@
--- db/138_warforged_race.sql
+-- db/148_warforged_race.sql
 --
 -- Adds Warforged (Eberron: Rising from the Last War) to the shared race
 -- catalogue, so it appears in every campaign's race picker. 055 seeded only
@@ -54,6 +54,6 @@ begin
 end
 $do$;
 
-insert into public.schema_migrations (version) values ('138');
+insert into public.schema_migrations (version) values ('148');
 
 commit;
