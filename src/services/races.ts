@@ -3,8 +3,8 @@ import { parseOneOf } from "../lib/parse";
 import type { Tables } from "../types/database.types";
 
 /**
- * The race catalogue (054/055): the nine PHB races plus this campaign's
- * homebrew. Speed is the one number the sheet uses; a character's
+ * The race catalogue (054): the nine PHB races (055) and Warforged (138),
+ * plus this campaign's homebrew. Speed is the one number the sheet uses; a character's
  * speed_override (056) beats it when set.
  */
 export interface Race {
