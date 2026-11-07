@@ -12,12 +12,17 @@ import {
   initiative,
   isMonkWeapon,
   isRangedWeapon,
+  keysClearedByRest,
   martialArtsDie,
   martialArtsWeapon,
+  pactSlots,
   picksAllowed,
+  resourceMax,
+  resourceRecharge,
   saveAura,
   sneakAttackDice,
   speedBonus,
+  spellSlots,
   styleAttackBonus,
   untrainedCheckBonus,
   weaponAbility,
@@ -25,6 +30,7 @@ import {
   type ArmorLike,
   type EffectLevels,
   type FeatureEffect,
+  type ResourceRule,
   type WeaponLike,
 } from "./rules";
 
@@ -283,5 +289,142 @@ describe("picksAllowed", () => {
     expect([2, 3, 6, 7, 10, 14, 15, 20].map((l) => picksAllowed(combatSuperiority, l))).toEqual([
       0, 3, 3, 5, 7, 7, 9, 9,
     ]);
+  });
+});
+
+describe("resourceMax", () => {
+  const mods = { str: 3, dex: 1, con: -1, int: 0, wis: 2, cha: 4 };
+  const ctx = (level: number, pb: number) => ({ level, pb, mods });
+  const rule = (r: Partial<ResourceRule>): ResourceRule => ({
+    formula: "steps",
+    ability: null,
+    multiplier: 1,
+    bonus: 0,
+    steps: [],
+    recharge: "short",
+    shortRestFrom: null,
+    ...r,
+  });
+
+  it("follows steps, with none before the first (Action Surge)", () => {
+    const actionSurge = rule({ steps: [{ level: 2, total: 1 }, { level: 17, total: 2 }] });
+    expect([1, 2, 16, 17, 20].map((l) => resourceMax(actionSurge, ctx(l, 2)))).toEqual([
+      0, 1, 1, 2, 2,
+    ]);
+  });
+
+  it("drops to 0, so the sheet hides it, when a step says so (Rage at 20th)", () => {
+    const rage = rule({
+      steps: [1, 3, 6, 12, 17, 20].map((level, i) => ({ level, total: [2, 3, 4, 5, 6, 0][i] })),
+    });
+    expect([1, 3, 17, 19, 20].map((l) => resourceMax(rage, ctx(l, 6)))).toEqual([2, 3, 6, 6, 0]);
+  });
+
+  it("reads steps in any order", () => {
+    const indomitable = rule({
+      steps: [{ level: 17, total: 3 }, { level: 9, total: 1 }, { level: 13, total: 2 }],
+    });
+    expect([9, 13, 17].map((l) => resourceMax(indomitable, ctx(l, 4)))).toEqual([1, 2, 3]);
+  });
+
+  it("scales proficiency with a multiplier (Psionic Energy dice)", () => {
+    expect(resourceMax(rule({ formula: "proficiency", multiplier: 2 }), ctx(5, 3))).toBe(6);
+  });
+
+  it("scales class level (ki, Lay on Hands)", () => {
+    expect(resourceMax(rule({ formula: "level" }), ctx(7, 3))).toBe(7);
+    expect(resourceMax(rule({ formula: "level", multiplier: 5 }), ctx(7, 3))).toBe(35);
+  });
+
+  it("uses an ability modifier plus a bonus (Divine Sense)", () => {
+    expect(resourceMax(rule({ formula: "ability", ability: "cha", bonus: 1 }), ctx(1, 2))).toBe(5);
+  });
+
+  it("floors every formula but steps at 1", () => {
+    expect(resourceMax(rule({ formula: "ability", ability: "con" }), ctx(3, 2))).toBe(1);
+    expect(resourceMax(rule({ formula: "ability", ability: "int" }), ctx(3, 2))).toBe(1);
+  });
+});
+
+describe("resourceRecharge", () => {
+  it("moves a long-rest counter to short rests from its level (Font of Inspiration)", () => {
+    const bardic = { recharge: "long" as const, shortRestFrom: 5 };
+    expect(resourceRecharge(bardic, 4)).toBe("long");
+    expect(resourceRecharge(bardic, 5)).toBe("short");
+  });
+  it("leaves a counter with no such level alone", () => {
+    expect(resourceRecharge({ recharge: "long", shortRestFrom: null }, 20)).toBe("long");
+    expect(resourceRecharge({ recharge: "short", shortRestFrom: null }, 1)).toBe("short");
+  });
+});
+
+describe("keysClearedByRest", () => {
+  const counters = [
+    { key: "a", recharge: "short" as const },
+    { key: "b", recharge: "long" as const },
+  ];
+  it("clears short-rest counters on a short rest", () => {
+    expect(keysClearedByRest(counters, "short")).toEqual(["a"]);
+  });
+  it("clears everything on a long rest", () => {
+    expect(keysClearedByRest(counters, "long")).toEqual(["a", "b"]);
+  });
+});
+
+describe("spellSlots", () => {
+  it("reads the PHB Spellcaster table for a full caster", () => {
+    expect(spellSlots("full", 1)).toEqual([2]);
+    expect(spellSlots("full", 5)).toEqual([4, 3, 2]);
+    expect(spellSlots("full", 17)).toEqual([4, 3, 3, 3, 2, 1, 1, 1, 1]);
+    expect(spellSlots("full", 20)).toEqual([4, 3, 3, 3, 3, 2, 2, 1, 1]);
+  });
+
+  // The printed Paladin/Ranger table, level by level.
+  it("matches the PHB half-caster table, with nothing at 1st", () => {
+    const paladin: Record<number, number[]> = {
+      1: [], 2: [2], 3: [3], 4: [3], 5: [4, 2], 6: [4, 2], 7: [4, 3], 8: [4, 3],
+      9: [4, 3, 2], 10: [4, 3, 2], 11: [4, 3, 3], 12: [4, 3, 3], 13: [4, 3, 3, 1],
+      14: [4, 3, 3, 1], 15: [4, 3, 3, 2], 16: [4, 3, 3, 2], 17: [4, 3, 3, 3, 1],
+      18: [4, 3, 3, 3, 1], 19: [4, 3, 3, 3, 2], 20: [4, 3, 3, 3, 2],
+    };
+    for (const [level, slots] of Object.entries(paladin)) {
+      expect(spellSlots("half", Number(level))).toEqual(slots);
+    }
+  });
+
+  it("starts the Artificer's table at 1st", () => {
+    expect(spellSlots("half_up", 1)).toEqual([2]);
+    expect(spellSlots("half_up", 2)).toEqual([2]);
+    expect(spellSlots("half_up", 5)).toEqual([4, 2]);
+    expect(spellSlots("half_up", 20)).toEqual([4, 3, 3, 3, 2]);
+  });
+
+  // The printed Eldritch Knight table, level by level.
+  it("matches the PHB third-caster table, from 3rd", () => {
+    const knight: Record<number, number[]> = {
+      2: [], 3: [2], 4: [3], 6: [3], 7: [4, 2], 9: [4, 2], 10: [4, 3], 12: [4, 3],
+      13: [4, 3, 2], 15: [4, 3, 2], 16: [4, 3, 3], 18: [4, 3, 3], 19: [4, 3, 3, 1],
+      20: [4, 3, 3, 1],
+    };
+    for (const [level, slots] of Object.entries(knight)) {
+      expect(spellSlots("third", Number(level))).toEqual(slots);
+    }
+  });
+
+  it("gives Pact Magic and non-casters no regular slots", () => {
+    expect(spellSlots("pact", 10)).toEqual([]);
+    expect(spellSlots(null, 10)).toEqual([]);
+  });
+});
+
+describe("pactSlots", () => {
+  it("follows the Warlock table", () => {
+    expect(pactSlots(1)).toEqual({ count: 1, slotLevel: 1 });
+    expect(pactSlots(2)).toEqual({ count: 2, slotLevel: 1 });
+    expect(pactSlots(3)).toEqual({ count: 2, slotLevel: 2 });
+    expect(pactSlots(9)).toEqual({ count: 2, slotLevel: 5 });
+    expect(pactSlots(11)).toEqual({ count: 3, slotLevel: 5 });
+    expect(pactSlots(17)).toEqual({ count: 4, slotLevel: 5 });
+    expect(pactSlots(0)).toBeNull();
   });
 });

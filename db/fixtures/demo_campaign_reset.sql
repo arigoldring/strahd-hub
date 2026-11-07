@@ -652,7 +652,8 @@ $$;
 -- ===========================================================================
 
 -- Everything hanging off a character goes with it by cascade: inventory,
--- spells, feats, and both description tables. See the header for the full list
+-- spells, feats, both description tables, and spent use counters (153), so
+-- every demo character starts rested. See the header for the full list
 -- and for what is deliberately left alone.
 --
 -- This takes the DM's own character too, if they made one. That is correct --

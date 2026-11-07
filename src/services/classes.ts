@@ -2,10 +2,15 @@ import { supabase } from "../lib/supabase";
 import { parseOneOf, requireField } from "../lib/parse";
 import {
   ABILITIES,
+  CASTER_TYPES,
   FEATURE_EFFECTS,
+  RESOURCE_FORMULAS,
+  RESOURCE_RECHARGES,
   SPELL_ABILITIES,
   type Ability,
+  type CasterType,
   type FeatureEffect,
+  type ResourceRule,
   type SpellAbility,
 } from "../data/rules";
 import type { Tables } from "../types/database.types";
@@ -29,6 +34,8 @@ export interface CharacterClass {
   /** Unarmored Defense: the ability added to 10 + DEX with no armour on. */
   unarmoredAbility: Ability | null;
   /** The level the subclass is chosen at. */
+  /** Which slot table the class casts from (158); null for none. */
+  casterType: CasterType | null;
   subclassLevel: number;
   /** What this class calls its subclass: "Divine Domain", "Primal Path" (066). */
   subclassTitle: string;
@@ -47,6 +54,8 @@ export interface Subclass {
   /** Null for homebrew. */
   source: SubclassSource | null;
   spellAbility: SpellAbility | null;
+  /** Set on the two third-casters, whose class has none (158). */
+  casterType: CasterType | null;
   isHomebrew: boolean;
 }
 
@@ -78,7 +87,19 @@ export interface ClassFeature {
    * feature. rules.ts holds the maths for each key.
    */
   effect: FeatureEffect | null;
+  /** The use counters this feature gives (153), in their listed order. */
+  resources: FeatureResource[];
   isHomebrew: boolean;
+}
+
+/**
+ * One use counter a class feature or feat gives (153): Action Surge,
+ * superiority dice. The rule is what rules.ts turns into a maximum; the
+ * spent count lives on the character (character_resource_uses).
+ */
+export interface FeatureResource extends ResourceRule {
+  id: string;
+  name: string;
 }
 
 /**
@@ -160,6 +181,10 @@ export function toCharacterClass(row: Tables<"classes">): CharacterClass {
       row.unarmored_ability == null
         ? null
         : parseOneOf(row.unarmored_ability, ABILITIES, "unarmored_ability", subject),
+    casterType:
+      row.caster_type == null
+        ? null
+        : parseOneOf(row.caster_type, CASTER_TYPES, "caster_type", subject),
     subclassLevel: row.subclass_level,
     subclassTitle: row.subclass_title,
     isHomebrew: row.campaign_id !== null,
@@ -181,6 +206,10 @@ export function toSubclass(row: Tables<"subclasses">): Subclass {
       row.spell_ability == null
         ? null
         : parseOneOf(row.spell_ability, SPELL_ABILITIES, "spell_ability", subject),
+    casterType:
+      row.caster_type == null
+        ? null
+        : parseOneOf(row.caster_type, CASTER_TYPES, "caster_type", subject),
     isHomebrew: row.campaign_id !== null,
   };
 }
@@ -221,7 +250,29 @@ export async function getSubclasses(campaignId: string): Promise<Subclass[]> {
 type ClassFeatureRow = Tables<"class_features"> & {
   class_feature_options: Pick<Tables<"class_feature_options">, "option_id">[];
   class_feature_picks: Pick<Tables<"class_feature_picks">, "level" | "total">[];
+  feature_resources: Tables<"feature_resources">[];
 };
+
+/** Shared with feats (153 hangs a counter off either). */
+export function toFeatureResource(row: Tables<"feature_resources">): FeatureResource {
+  const subject = `Feature resource ${row.id}`;
+  return {
+    id: row.id,
+    name: row.name,
+    formula: parseOneOf(row.formula, RESOURCE_FORMULAS, "formula", subject),
+    ability:
+      row.ability == null ? null : parseOneOf(row.ability, ABILITIES, "ability", subject),
+    multiplier: row.multiplier,
+    bonus: row.bonus,
+    // 153's CHECK keeps the two arrays the same length.
+    steps: row.step_levels.map((level, i) => ({ level, total: row.step_totals[i] })),
+    recharge: parseOneOf(row.recharge, RESOURCE_RECHARGES, "recharge", subject),
+    shortRestFrom: row.short_rest_from,
+  };
+}
+
+const bySort = (a: Tables<"feature_resources">, b: Tables<"feature_resources">) =>
+  a.sort - b.sort || a.name.localeCompare(b.name);
 
 export function toClassFeature(row: ClassFeatureRow): ClassFeature {
   return {
@@ -237,6 +288,7 @@ export function toClassFeature(row: ClassFeatureRow): ClassFeature {
       row.effect == null
         ? null
         : parseOneOf(row.effect, FEATURE_EFFECTS, "effect", `Class feature ${row.id}`),
+    resources: [...row.feature_resources].sort(bySort).map(toFeatureResource),
     isHomebrew: row.campaign_id !== null,
   };
 }
@@ -249,7 +301,9 @@ export function toClassFeature(row: ClassFeatureRow): ClassFeature {
 export async function getClassFeatures(campaignId: string): Promise<ClassFeature[]> {
   const { data, error } = await supabase
     .from("class_features")
-    .select("*, class_feature_options(option_id), class_feature_picks(level, total)")
+    .select(
+      "*, class_feature_options(option_id), class_feature_picks(level, total), feature_resources(*)",
+    )
     .or(`campaign_id.is.null,campaign_id.eq.${campaignId}`)
     .order("level")
     .order("name");

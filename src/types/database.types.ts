@@ -420,6 +420,35 @@ export type Database = {
           },
         ]
       }
+      character_resource_uses: {
+        Row: {
+          character_id: string
+          resource_key: string
+          updated_at: string
+          used: number
+        }
+        Insert: {
+          character_id: string
+          resource_key: string
+          updated_at?: string
+          used: number
+        }
+        Update: {
+          character_id?: string
+          resource_key?: string
+          updated_at?: string
+          used?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_resource_uses_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       character_spell_descriptions: {
         Row: {
           character_id: string
@@ -725,6 +754,7 @@ export type Database = {
       classes: {
         Row: {
           campaign_id: string | null
+          caster_type: string | null
           created_at: string
           description: string
           hit_die: number
@@ -739,6 +769,7 @@ export type Database = {
         }
         Insert: {
           campaign_id?: string | null
+          caster_type?: string | null
           created_at?: string
           description?: string
           hit_die: number
@@ -753,6 +784,7 @@ export type Database = {
         }
         Update: {
           campaign_id?: string | null
+          caster_type?: string | null
           created_at?: string
           description?: string
           hit_die?: number
@@ -900,6 +932,69 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feature_resources: {
+        Row: {
+          ability: string | null
+          bonus: number
+          feat_id: string | null
+          feature_id: string | null
+          formula: string
+          id: string
+          multiplier: number
+          name: string
+          recharge: string
+          short_rest_from: number | null
+          sort: number
+          step_levels: number[]
+          step_totals: number[]
+        }
+        Insert: {
+          ability?: string | null
+          bonus?: number
+          feat_id?: string | null
+          feature_id?: string | null
+          formula: string
+          id?: string
+          multiplier?: number
+          name: string
+          recharge: string
+          short_rest_from?: number | null
+          sort?: number
+          step_levels?: number[]
+          step_totals?: number[]
+        }
+        Update: {
+          ability?: string | null
+          bonus?: number
+          feat_id?: string | null
+          feature_id?: string | null
+          formula?: string
+          id?: string
+          multiplier?: number
+          name?: string
+          recharge?: string
+          short_rest_from?: number | null
+          sort?: number
+          step_levels?: number[]
+          step_totals?: number[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_resources_feat_id_fkey"
+            columns: ["feat_id"]
+            isOneToOne: false
+            referencedRelation: "feats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feature_resources_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "class_features"
             referencedColumns: ["id"]
           },
         ]
@@ -1459,6 +1554,7 @@ export type Database = {
       subclasses: {
         Row: {
           campaign_id: string | null
+          caster_type: string | null
           class_id: string
           created_at: string
           description: string
@@ -1469,6 +1565,7 @@ export type Database = {
         }
         Insert: {
           campaign_id?: string | null
+          caster_type?: string | null
           class_id: string
           created_at?: string
           description?: string
@@ -1479,6 +1576,7 @@ export type Database = {
         }
         Update: {
           campaign_id?: string | null
+          caster_type?: string | null
           class_id?: string
           created_at?: string
           description?: string
@@ -1595,6 +1693,15 @@ export type Database = {
       set_display_name: {
         Args: { new_display_name: string }
         Returns: undefined
+      }
+      use_resource: {
+        Args: {
+          cap: number
+          delta: number
+          target_character: string
+          target_key: string
+        }
+        Returns: number
       }
     }
     Enums: {

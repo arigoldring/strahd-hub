@@ -499,3 +499,155 @@ export function picksAllowed(
   if (reached.length === 0) return 0;
   return reached.reduce((a, b) => (b.level > a.level ? b : a)).total;
 }
+
+// ---------------------------------------------------------------------------
+// Use counters (153)
+// ---------------------------------------------------------------------------
+
+/**
+ * How a counter's maximum is worked out. One list in two places with the
+ * CHECK on feature_resources.formula (153). resourceMax is the maths.
+ */
+export const RESOURCE_FORMULAS = ["steps", "proficiency", "level", "ability"] as const;
+export type ResourceFormula = (typeof RESOURCE_FORMULAS)[number];
+
+export const RESOURCE_RECHARGES = ["short", "long"] as const;
+/** 'short' recharges on a short or a long rest; 'long' on a long rest only. */
+export type ResourceRecharge = (typeof RESOURCE_RECHARGES)[number];
+
+/** The rule for one counter, as feature_resources stores it. */
+export interface ResourceRule {
+  formula: ResourceFormula;
+  /** Set exactly when formula is 'ability' (153's CHECK). */
+  ability: Ability | null;
+  multiplier: number;
+  bonus: number;
+  /** For 'steps': from each level on, this many uses. */
+  steps: readonly { level: number; total: number }[];
+  recharge: ResourceRecharge;
+  /** From this class level on, a 'long' counter recharges on a short rest. */
+  shortRestFrom: number | null;
+}
+
+/**
+ * A counter's maximum for one character. `level` is the granting class's
+ * level for a class feature, the character's total level for a feat.
+ *
+ * 'steps' uses picksAllowed's step rule: the highest step at or below the
+ * level, or 0 before the first. A 0 means the counter isn't shown yet.
+ * Every other formula has a floor of 1, the book's "(minimum of once)".
+ */
+export function resourceMax(
+  rule: Pick<ResourceRule, "formula" | "ability" | "multiplier" | "bonus" | "steps">,
+  ctx: { level: number; pb: number; mods: Readonly<Record<Ability, number>> },
+): number {
+  switch (rule.formula) {
+    case "steps": {
+      const reached = rule.steps.filter((s) => s.level <= ctx.level);
+      if (reached.length === 0) return 0;
+      return reached.reduce((a, b) => (b.level > a.level ? b : a)).total;
+    }
+    case "proficiency":
+      return Math.max(1, ctx.pb * rule.multiplier + rule.bonus);
+    case "level":
+      return Math.max(1, ctx.level * rule.multiplier + rule.bonus);
+    case "ability":
+      // 153's CHECK means a null here can't come from the database.
+      return Math.max(1, (rule.ability ? ctx.mods[rule.ability] : 0) * rule.multiplier + rule.bonus);
+  }
+}
+
+/** Which rest refills a counter at this level (Font of Inspiration, 5th). */
+export function resourceRecharge(
+  rule: Pick<ResourceRule, "recharge" | "shortRestFrom">,
+  level: number,
+): ResourceRecharge {
+  return rule.shortRestFrom != null && level >= rule.shortRestFrom ? "short" : rule.recharge;
+}
+
+/**
+ * The counters a rest clears. A long rest clears every counter, since each
+ * recharges on one. A short rest clears only the short-rest ones.
+ */
+export function keysClearedByRest(
+  counters: readonly { key: string; recharge: ResourceRecharge }[],
+  rest: ResourceRecharge,
+): string[] {
+  return counters.filter((c) => rest === "long" || c.recharge === "short").map((c) => c.key);
+}
+
+// ---------------------------------------------------------------------------
+// Spell slots (158)
+// ---------------------------------------------------------------------------
+
+/** One list in two places with the CHECK on classes/subclasses.caster_type. */
+export const CASTER_TYPES = ["full", "half", "half_up", "third", "pact"] as const;
+export type CasterType = (typeof CASTER_TYPES)[number];
+
+// The PHB's Spellcaster table: slots per spell level (index 0 = 1st) for a
+// full caster of each level (index 0 = 1st).
+const FULL_CASTER_SLOTS: readonly (readonly number[])[] = [
+  [2],
+  [3],
+  [4, 2],
+  [4, 3],
+  [4, 3, 2],
+  [4, 3, 3],
+  [4, 3, 3, 1],
+  [4, 3, 3, 2],
+  [4, 3, 3, 3, 1],
+  [4, 3, 3, 3, 2],
+  [4, 3, 3, 3, 2, 1],
+  [4, 3, 3, 3, 2, 1],
+  [4, 3, 3, 3, 2, 1, 1],
+  [4, 3, 3, 3, 2, 1, 1],
+  [4, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 2, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 2, 1, 1],
+];
+
+/**
+ * Spell slots for a single-class caster of a class level, index 0 = 1st
+ * level. Empty for no slots (a non-caster, a Paladin at 1st, Pact Magic,
+ * which is pactSlots).
+ *
+ * The half and third tables in the PHB and Tasha's are the full table read at
+ * the level divided and rounded up, from the level each class starts casting:
+ * a Paladin 5 has a full caster 3's slots, an Eldritch Knight 7 a full
+ * caster 3's. rules.test.ts checks this against the printed tables.
+ */
+export function spellSlots(type: CasterType | null, classLevel: number): readonly number[] {
+  const at = (n: number) => FULL_CASTER_SLOTS[Math.min(20, n) - 1] ?? [];
+  switch (type) {
+    case "full":
+      return classLevel >= 1 ? at(classLevel) : [];
+    case "half":
+      return classLevel >= 2 ? at(Math.ceil(classLevel / 2)) : [];
+    case "half_up":
+      return classLevel >= 1 ? at(Math.ceil(classLevel / 2)) : [];
+    case "third":
+      return classLevel >= 3 ? at(Math.ceil(classLevel / 3)) : [];
+    case "pact":
+    case null:
+      return [];
+  }
+}
+
+/**
+ * Pact Magic (Warlock): how many slots, all of one level, back on a short
+ * rest. Null below 1st level.
+ */
+export function pactSlots(warlockLevel: number): { count: number; slotLevel: number } | null {
+  if (warlockLevel < 1) return null;
+  const count = warlockLevel >= 17 ? 4 : warlockLevel >= 11 ? 3 : warlockLevel >= 2 ? 2 : 1;
+  const slotLevel = Math.min(5, Math.ceil(warlockLevel / 2));
+  return { count, slotLevel };
+}
+
+/** "1st", "2nd", "3rd", "4th"... for a spell level. */
+export function ordinal(n: number): string {
+  return n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`;
+}

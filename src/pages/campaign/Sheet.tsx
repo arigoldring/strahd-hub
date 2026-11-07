@@ -4,6 +4,7 @@ import { useAuth } from "../../services/AuthContext";
 import { useCharacter } from "../../hooks/useCharacter";
 import { useParty } from "../../hooks/useParty";
 import { useCharacterInventory } from "../../hooks/useCharacterInventory";
+import { useCharacterFeats } from "../../hooks/useCharacterFeats";
 import { useCharacterSheet, type FeaturePickWrite } from "../../hooks/useCharacterSheet";
 import { useClasses } from "../../hooks/useClasses";
 import { useRaces } from "../../hooks/useRaces";
@@ -28,11 +29,16 @@ import {
   martialArtsDie,
   martialArtsWeapon,
   picksAllowed,
+  ordinal,
+  pactSlots,
   proficiencyBonus,
+  resourceMax,
+  resourceRecharge,
   saveAura,
   skillBonus,
   sneakAttackDice,
   speedBonus,
+  spellSlots,
   styleAttackBonus,
   totalLevel,
   untrainedCheckBonus,
@@ -71,6 +77,8 @@ import {
   CharacterPurse,
   CharacterSpells,
 } from "./Character";
+import { SheetResources, type SheetCounter } from "./SheetResources";
+import { featureResourceKey } from "../../services/characterResources";
 import "./character.css";
 import "./sheet.css";
 
@@ -174,6 +182,9 @@ function FullSheet({
   const { data: races = [] } = useRaces(campaign.id);
   // Same key as the Carried section below, so this is a cache hit.
   const { data: gear = [], setEquipped } = useCharacterInventory(character.id);
+  // Same key as the Feats section below, so this is a cache hit too. Read
+  // here for the feats' use counters.
+  const { data: ownFeats = [] } = useCharacterFeats(character.id);
 
   // One error line under the header for any failed save. Each control could
   // own its own, but on a sheet of ~40 inputs one shared line is easier to
@@ -236,6 +247,67 @@ function FullSheet({
   const mods = Object.fromEntries(ABILITIES.map((a) => [a, mod(a)])) as Record<Ability, number>;
   const init = initiative(mods, pb, effects);
   const aura = saveAura(mod("cha"), effects);
+  // Use counters (153) from the starting class's features up to its level,
+  // the Class Features list's own rule. The maximum is derived here every
+  // render, so a level-up or a new score changes it at once. A counter at 0
+  // (before its first step) isn't shown.
+  const classLevel = startingEntry?.level ?? 0;
+  const counters: SheetCounter[] = startingEntry
+    ? featureCatalog
+        .filter(
+          (f) =>
+            f.classId === startingEntry.classId &&
+            f.level <= classLevel &&
+            (f.subclassId == null || f.subclassId === startingEntry.subclassId),
+        )
+        .flatMap((f) =>
+          f.resources.map((r) => ({
+            key: featureResourceKey(r.id),
+            name: r.name,
+            source: f.name,
+            max: resourceMax(r, { level: classLevel, pb, mods }),
+            recharge: resourceRecharge(r, classLevel),
+          })),
+        )
+        .filter((c) => c.max > 0)
+    : [];
+  // Spell slots (158), ahead of the feature counters: the class's slot table,
+  // else the subclass's (Eldritch Knight, Arcane Trickster). Starting class
+  // only, like everything above.
+  const casterType = cls?.casterType ?? subclass?.casterType ?? null;
+  const slotCounters: SheetCounter[] = spellSlots(casterType, classLevel).map((max, i) => ({
+    key: `slot:${i + 1}`,
+    name: `${ordinal(i + 1)}-level slots`,
+    source: "Spell Slots",
+    max,
+    recharge: "long",
+  }));
+  const pact = casterType === "pact" ? pactSlots(classLevel) : null;
+  if (pact) {
+    slotCounters.push({
+      key: "pact",
+      name: `Pact slots (${ordinal(pact.slotLevel)} level)`,
+      source: "Pact Magic",
+      max: pact.count,
+      recharge: "short",
+    });
+  }
+  counters.unshift(...slotCounters);
+  // Feats' counters (157) read the character's total level, not a class's.
+  for (const feat of ownFeats) {
+    for (const r of feat.resources) {
+      const max = resourceMax(r, { level, pb, mods });
+      if (max > 0) {
+        counters.push({
+          key: featureResourceKey(r.id),
+          name: r.name,
+          source: feat.name,
+          max,
+          recharge: resourceRecharge(r, level),
+        });
+      }
+    }
+  }
   // Eldritch Knight and Arcane Trickster cast through a class that doesn't.
   const spellAbility = cls?.spellAbility ?? subclass?.spellAbility ?? null;
 
@@ -430,6 +502,8 @@ function FullSheet({
           value={spellAbility ? formatModifier(pb + mod(spellAbility)) : "—"}
         />
       </div>
+
+      <SheetResources characterId={character.id} counters={counters} canEdit={canEdit} />
 
       {/* Two columns on a wide screen: the numbers on the left, the lists on
           the right. Each column is a plain stack of bands, so collapsing to

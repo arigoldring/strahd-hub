@@ -66,6 +66,7 @@
 .sm-stat select,
 .sm-combat select,
 .sm-combat input,
+.sm-resource__pool input,
 .sm-feature__choice select,
 .sm-ability__score {
   padding: 6px 10px;
@@ -84,6 +85,7 @@
 .sm-stat select:focus,
 .sm-combat select:focus,
 .sm-combat input:focus,
+.sm-resource__pool input:focus,
 .sm-feature__choice select:focus,
 .sm-ability__score:focus {
   outline: none;
@@ -618,4 +620,109 @@
 .sm-pick__remove:hover,
 .sm-pick__remove:focus-visible {
   color: var(--sh-gold);
+}
+
+/* ---------- use counters and rests (153) ---------- */
+
+.ch-band .sm-rest {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.sm-resources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sm-resource {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sh-rule);
+}
+
+.sm-resource__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.sm-resource__name {
+  font-weight: 600;
+}
+
+.sm-resource__source {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--sh-dim);
+}
+
+.sm-resource__recharge {
+  margin-left: auto;
+  font: 400 10px/1 var(--sh-mono);
+  text-transform: uppercase;
+  color: var(--sh-dim);
+}
+
+.sm-resource__recharge--short {
+  color: var(--sh-gold);
+}
+
+.sm-resource__pips,
+.sm-resource__pool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* A bigger target than the skills' pips: these get tapped mid-fight. */
+.sm-resource__pip {
+  width: 22px;
+  height: 22px;
+}
+
+.sm-resource__count {
+  font: 400 12px/1 var(--sh-mono);
+  color: var(--sh-dim);
+}
+
+.sm-resource__pool input {
+  width: 64px;
+  padding: 5px 8px;
+  text-align: center;
+  font: 400 14px/1.3 var(--sh-mono);
+}
+
+.sm-resource__pool .ch-button {
+  padding: 6px 10px;
+  font-size: 9.5px;
+}
+
+/* The band is a fixed 44px strip; on a phone the label and both buttons
+   don't fit on one line, so it grows instead of clipping them. */
+.ch-band:has(.sm-rest) {
+  height: auto;
+  min-height: 44px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.sm-rest .ch-button {
+  padding: 6px 12px;
+  font-size: 9.5px;
+}
+
+/* The count gets its own line, so the field and both buttons fit beside
+   each other on a phone. */
+.sm-resource__pool .sm-resource__count {
+  flex-basis: 100%;
 }
