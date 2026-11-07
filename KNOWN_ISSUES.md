@@ -5,7 +5,7 @@ size, and written down so they stay decisions rather than becoming discoveries.
 Each entry says what it takes to trigger, what it costs, and what the fix would
 be if the answer ever changes.
 
-**Current through migration 137. Last updated 2026-11-05.**
+**Current through migration 152. Last updated 2026-11-07.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below.
@@ -627,8 +627,8 @@ campaign on every write.
 054 ships SELECT and INSERT policies on all three, so a DM is allowed to
 create homebrew, but there is no form for it yet, and no UPDATE policy at all.
 A homebrew class also needs its `subclass_title` set (066), or its picker
-reads "Subclass". The shared subclasses are seeded (067-078), Artificer
-excepted: it's a class 055 never seeded, so it has nothing to hang them on.
+reads "Subclass". The shared subclasses are seeded (067-078, and Battle
+Smith in 149), except three of the Artificer's (below).
 
 **Fix:** a CreateFeat-style form; 053's homebrew-edit policy plus a pin
 trigger for editing.
@@ -636,8 +636,9 @@ trigger for editing.
 ### Class features are mostly display only (noted 2026-10-11, widened by 081/082, 084-094 and 097-120, narrowed 2026-11-05 by 095 and 121)
 
 079-094 and 097-120 store and show the text for every class and subclass.
-The sheet computes from two fighting styles and from the 21 rows that carry
-a 121 `effect` key; every other row is text.
+The sheet computes from two fighting styles and from the 23 rows that carry
+a 121 `effect` key (two of them the Battle Smith's, 150); every other row is
+text.
 
 - **Fighting style:** Defense (+1 AC while body armour is worn) and Archery
   (+2 to-hit on ranged weapons) are applied by `armorClass` and
@@ -659,7 +660,9 @@ a 121 `effect` key; every other row is text.
   strikes), Jack of All Trades and Remarkable Athlete on untrained skills,
   passives and initiative, Dread Ambusher, Tactical Wit and Rakish Audacity
   on initiative, Aura of Protection on saves, Fast Movement and Unarmored
-  Movement on speed, and Draconic Resilience's AC 13 + DEX.
+  Movement on speed, Draconic Resilience's AC 13 + DEX, and Battle Ready's
+  martial weapons and INT on a magic weapon (150; the INT half has a gap,
+  below).
 - **Shown, but the condition is the player's:** Sneak Attack still needs
   advantage or an ally beside the target; Aura of Protection needs the
   paladin conscious and within range; Dread Ambusher's first-turn extra
@@ -677,8 +680,10 @@ a 121 `effect` key; every other row is text.
   every racial trait and feat (Alert's +5 initiative among them).
 - **Uses nothing tracks:** Second Wind, Action Surge, Indomitable, superiority
   dice, Rage, Bardic Inspiration, Channel Divinity, Wild Shape, ki, Lay on
-  Hands' pool, sorcery points, Pact Magic slots, Arcane Recovery, and every
-  "once per short or long rest" feature.
+  Hands' pool, sorcery points, Pact Magic slots, Arcane Recovery, Flash of
+  Genius, Arcane Jolt, which items hold an infusion, and every "once per
+  short or long rest" feature. The steel defender has no stat block on the
+  sheet; its numbers are in its feature text.
 
 **Trigger:** any feature whose effect is a number the sheet derives or a use
 that recharges on a rest.
@@ -710,8 +715,9 @@ arrived, so the design can start.
 122 added the machinery: `class_feature_picks` says how many picks a
 feature allows per class level, and the sheet shows a checklist picker for
 any feature with linked options and steps. Battle Master maneuvers (122),
-Metamagic (123), Arcane Shots (124), runes (125) and Eldritch Invocations
-(126) are on it, Tasha's options included and labelled. Every other such pick is still
+Metamagic (123), Arcane Shots (124), runes (125), Eldritch Invocations
+(126) and Artificer infusions (151) are on it, Tasha's options included and
+labelled. Every other such pick is still
 text the player notes by hand, with the options listed in the row: Expertise (Bard, Rogue),
 Magical Secrets, Favored Enemy and Natural Explorer, the Hunter's four
 picks, Totem animals (three picks, which can differ), the Circle of the
@@ -806,6 +812,103 @@ goods total as the party's wealth.
 and `!showDmUi` (a client gate, like Give and Teach; RLS on `party_inventory`
 is membership). For value, a per-rarity price table in code, used only by the
 total.
+
+### The 81 original spells read differently from the other 394 (noted 2026-11-06)
+
+023/024 wrote near-verbatim book text with the upcast rule inside
+`description`, and never filled `material_component` or `higher_levels`.
+139-146 write own-words summaries, upcasting in `higher_levels` and every
+material component. 138 repaired the old rows' levels, components and class
+lists, and wrote the material component on the 36 rows it touched, but left
+their text alone. So 26 old rows still show "M" with no component (counted
+live 2026-11-06), and none of the 81 has an "At Higher Levels" block.
+
+**Trigger:** opening, say, Fireball beside Chain Lightning in the grimoire.
+
+**Cost:** cosmetic; nothing is missing, just in a different place.
+
+**Fix:** a backfill in 138's shape: a temp table of (name, material_component,
+higher_levels, description) for the 81 rows, an update, and an assertion.
+
+### Three Artificer specialists are unseeded (noted 2026-11-07)
+
+149 seeds the Artificer with Battle Smith only. Alchemist, Armorer and
+Artillerist aren't in the catalogue, so the "Artificer Specialist" picker
+offers one choice.
+
+**Trigger:** a player wanting one of the other three.
+
+**Cost:** none until then. A DM could add one as homebrew, but there is no
+form for it (above).
+
+**Fix:** one migration per specialist, or one for all three: a subclass
+insert in 149's shape (bump its end-state count), plus feature rows in 098's
+shape (subclass rows only; 150 already holds the base rows). Each has a
+spell list row at 3rd and features at 3, 5, 9 and 15. The Armorer's Arcane
+Armor and the Artillerist's Eldritch Cannon are text, like the steel
+defender. Alchemist and Artillerist would need no new effect key; the
+Armorer's model choice (Guardian or Infiltrator) is a single pick, a new
+`feature_options` kind.
+
+### Battle Ready's INT never reaches a seeded magic weapon (noted 2026-11-07)
+
+`battleReadyAbility` swaps in INT when the weapon is magic, and "magic"
+means `items.rarity is not null`. But every seeded magic item is
+`kind = 'general'` (see "Magic items are text", above), so none of them is
+on the attack table at all. The swap fires only for a homebrew item with
+`kind = 'weapon'` and a rarity. The martial-weapons half of Battle Ready
+works for every weapon.
+
+**Trigger:** a Battle Smith carrying a +1 Weapon from the shop.
+
+**Cost:** the player uses INT in their head for that one weapon, as with
+the +1 itself.
+
+**Fix:** comes free with the magic-items fix above: once a magic weapon
+is a weapon row with a bonus, `w.rarity !== null` on the attack row is
+already true for it.
+
+### Replicate Magic Item can be learned only once (noted 2026-11-07)
+
+The book lets an artificer take Replicate Magic Item more than once, a
+different item each time. `character_feature_choices` is
+`unique (character_id, option_id)` (095), so the picker allows it once.
+
+**Trigger:** an artificer wanting two replicated items.
+
+**Cost:** the second item is noted by hand.
+
+**Fix:** a nullable `detail` on the pick naming the item (the free-text
+column `feat/feature-choices` had), with the unique widened to include it
+for this option. Not worth it for one infusion.
+
+### 152's Artificer spell list was written from memory (noted 2026-11-07)
+
+Like 147, the 95 names in 152 were written from memory of TCoE's table.
+The guard proves each is a real shared spell, not that it belongs on the
+list.
+
+**Trigger:** a player asking why a spell is or isn't on the artificer list.
+
+**Cost:** one wrong line on a detail card; the sheet doesn't gate spells by
+class.
+
+**Fix:** check against TCoE's Artificer spell list, then `array_remove` or
+add the difference in a follow-up migration.
+
+### 147's TCoE expanded spell lists were written from memory (noted 2026-11-06)
+
+The 63 (spell, class) pairs in 147 were not copied from the book. The
+likeliest slips are named in its header: Sorcerer's Flame Blade and the
+8th/9th rows.
+
+**Trigger:** a player asking why a spell is or isn't on their list.
+
+**Cost:** one wrong line on a detail card; the sheet doesn't gate spells by
+class.
+
+**Fix:** check the 63 pairs against TCoE's "Expanded Spell Lists" tables,
+then add or `array_remove` the difference in a follow-up migration.
 
 ### Editing a homebrew item rewrites every stack that holds it (noted 2026-09-30)
 
@@ -1227,6 +1330,14 @@ Small, understood, not worth an entry of their own.
 ---
 
 ## Resolved
+
+### Spell class lists left out the Artificer (noted 2026-11-06, resolved 2026-11-07 by 149 and 152)
+
+138-147 left 'Artificer' out of every spell's `classes` array, because the
+catalogue had no such class. 149 seeds the class, and 152 adds it to the 95
+spells on its TCoE list in 147's shape. Battle Smith's always-prepared
+spells stay in its feature text, as no domain or oath list was ever written
+into `classes`.
 
 ### XGtE and TCoE subclasses had no features (noted 2026-10-20, resolved 2026-11-05 by 097-120)
 

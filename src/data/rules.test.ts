@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   armorClass,
   attacksPerAction,
+  battleReadyAbility,
   collectEffects,
   critThreshold,
   hpBonus,
@@ -20,6 +21,7 @@ import {
   styleAttackBonus,
   untrainedCheckBonus,
   weaponAbility,
+  weaponTraining,
   type ArmorLike,
   type EffectLevels,
   type FeatureEffect,
@@ -179,6 +181,28 @@ describe("Martial Arts on weapons", () => {
     expect(martialArtsWeapon(quarterstaff, 8, false)).toEqual({ finesse: false, dice: "1d6" });
     expect(martialArtsWeapon(longsword, 8, true)).toEqual({ finesse: false, dice: "1d8" });
     expect(martialArtsWeapon(quarterstaff, null, true)).toEqual({ finesse: false, dice: "1d6" });
+  });
+});
+
+describe("Battle Ready", () => {
+  const ready = fx([["battle_ready", 3]]);
+  const smith = { str: 1, dex: 2, int: 4 };
+
+  it("raises the class's training to martial", () => {
+    expect(weaponTraining("simple", none)).toBe("simple");
+    expect(weaponTraining("simple", ready)).toBe("martial");
+    expect(weaponTraining(null, ready)).toBe("martial");
+  });
+
+  it("uses INT on a magic weapon only when INT is higher", () => {
+    expect(battleReadyAbility("str", smith, true, ready)).toBe("int");
+    expect(battleReadyAbility("dex", { str: 0, dex: 5, int: 4 }, true, ready)).toBe("dex");
+    expect(battleReadyAbility("str", { str: 4, dex: 0, int: 4 }, true, ready)).toBe("str");
+  });
+
+  it("never touches a mundane weapon, or a character without the feature", () => {
+    expect(battleReadyAbility("str", smith, false, ready)).toBe("str");
+    expect(battleReadyAbility("str", smith, true, none)).toBe("str");
   });
 });
 
