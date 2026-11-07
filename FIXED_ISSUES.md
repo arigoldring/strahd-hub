@@ -6,6 +6,16 @@ fixed it, and which migration did it.
 
 ---
 
+### Racial weapon training wasn't automatic (noted 2026-11-07, resolved 2026-11-07 by 164 and 165)
+
+Dwarven Combat Training and Elf/Drow Weapon Training weren't data on
+`races`, and subraces weren't rows (055), so the Elf row couldn't say which
+list applied. 164 added `subraces` and `weapon_proficiencies text[]` on both
+tables, read by 161's proficiency rule after the class lists; 165 seeded the
+Dwarf's list on the race and the High Elf's, Wood Elf's and Drow's on their
+subraces. The same change made the rest of a race's traits automatic too
+(skills, armour, darkvision, speed, counters); see CLAUDE.md, Races.
+
 ### Battle Ready's INT never reached a seeded magic weapon (noted 2026-11-07, resolved 2026-11-07 by 161 and 163)
 
 `battleReadyAbility` swaps in INT on a magic weapon, but every seeded magic

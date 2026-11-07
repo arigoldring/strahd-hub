@@ -538,6 +538,7 @@ export type Database = {
           race_id: string | null
           speed_override: number | null
           strength: number
+          subrace_id: string | null
           updated_at: string
           wisdom: number
         }
@@ -554,6 +555,7 @@ export type Database = {
           race_id?: string | null
           speed_override?: number | null
           strength?: number
+          subrace_id?: string | null
           updated_at?: string
           wisdom?: number
         }
@@ -570,6 +572,7 @@ export type Database = {
           race_id?: string | null
           speed_override?: number | null
           strength?: number
+          subrace_id?: string | null
           updated_at?: string
           wisdom?: number
         }
@@ -587,6 +590,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "races"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_stats_subrace_fkey"
+            columns: ["subrace_id", "race_id"]
+            isOneToOne: false
+            referencedRelation: "subraces"
+            referencedColumns: ["id", "race_id"]
           },
         ]
       }
@@ -955,6 +965,7 @@ export type Database = {
           id: string
           multiplier: number
           name: string
+          race_trait_id: string | null
           recharge: string
           short_rest_from: number | null
           sort: number
@@ -970,6 +981,7 @@ export type Database = {
           id?: string
           multiplier?: number
           name: string
+          race_trait_id?: string | null
           recharge: string
           short_rest_from?: number | null
           sort?: number
@@ -985,6 +997,7 @@ export type Database = {
           id?: string
           multiplier?: number
           name?: string
+          race_trait_id?: string | null
           recharge?: string
           short_rest_from?: number | null
           sort?: number
@@ -1004,6 +1017,13 @@ export type Database = {
             columns: ["feature_id"]
             isOneToOne: false
             referencedRelation: "class_features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feature_resources_race_trait_id_fkey"
+            columns: ["race_trait_id"]
+            isOneToOne: false
+            referencedRelation: "race_traits"
             referencedColumns: ["id"]
           },
         ]
@@ -1398,36 +1418,112 @@ export type Database = {
         }
         Relationships: []
       }
-      races: {
+      race_traits: {
         Row: {
           campaign_id: string | null
           created_at: string
           description: string
-          effect: string | null
           id: string
           name: string
-          size: string
-          speed: number
+          race_id: string
+          sort: number
+          subrace_id: string | null
         }
         Insert: {
           campaign_id?: string | null
           created_at?: string
           description?: string
-          effect?: string | null
           id?: string
           name: string
-          size?: string
-          speed: number
+          race_id: string
+          sort?: number
+          subrace_id?: string | null
         }
         Update: {
           campaign_id?: string | null
           created_at?: string
           description?: string
-          effect?: string | null
           id?: string
           name?: string
+          race_id?: string
+          sort?: number
+          subrace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "race_traits_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "race_traits_race_id_fkey"
+            columns: ["race_id"]
+            isOneToOne: false
+            referencedRelation: "races"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "race_traits_subrace_id_race_id_fkey"
+            columns: ["subrace_id", "race_id"]
+            isOneToOne: false
+            referencedRelation: "subraces"
+            referencedColumns: ["id", "race_id"]
+          },
+        ]
+      }
+      races: {
+        Row: {
+          armor_proficiencies: string[]
+          campaign_id: string | null
+          created_at: string
+          darkvision: number | null
+          description: string
+          effect: string | null
+          id: string
+          languages: string[]
+          name: string
+          resistances: string[]
+          size: string
+          skill_proficiencies: string[]
+          speed: number
+          tool_proficiencies: string[]
+          weapon_proficiencies: string[]
+        }
+        Insert: {
+          armor_proficiencies?: string[]
+          campaign_id?: string | null
+          created_at?: string
+          darkvision?: number | null
+          description?: string
+          effect?: string | null
+          id?: string
+          languages?: string[]
+          name: string
+          resistances?: string[]
           size?: string
+          skill_proficiencies?: string[]
+          speed: number
+          tool_proficiencies?: string[]
+          weapon_proficiencies?: string[]
+        }
+        Update: {
+          armor_proficiencies?: string[]
+          campaign_id?: string | null
+          created_at?: string
+          darkvision?: number | null
+          description?: string
+          effect?: string | null
+          id?: string
+          languages?: string[]
+          name?: string
+          resistances?: string[]
+          size?: string
+          skill_proficiencies?: string[]
           speed?: number
+          tool_proficiencies?: string[]
+          weapon_proficiencies?: string[]
         }
         Relationships: [
           {
@@ -1627,6 +1723,75 @@ export type Database = {
           },
         ]
       }
+      subraces: {
+        Row: {
+          armor_proficiencies: string[]
+          campaign_id: string | null
+          created_at: string
+          darkvision: number | null
+          description: string
+          effect: string | null
+          id: string
+          languages: string[]
+          name: string
+          race_id: string
+          resistances: string[]
+          skill_proficiencies: string[]
+          speed: number | null
+          tool_proficiencies: string[]
+          weapon_proficiencies: string[]
+        }
+        Insert: {
+          armor_proficiencies?: string[]
+          campaign_id?: string | null
+          created_at?: string
+          darkvision?: number | null
+          description?: string
+          effect?: string | null
+          id?: string
+          languages?: string[]
+          name: string
+          race_id: string
+          resistances?: string[]
+          skill_proficiencies?: string[]
+          speed?: number | null
+          tool_proficiencies?: string[]
+          weapon_proficiencies?: string[]
+        }
+        Update: {
+          armor_proficiencies?: string[]
+          campaign_id?: string | null
+          created_at?: string
+          darkvision?: number | null
+          description?: string
+          effect?: string | null
+          id?: string
+          languages?: string[]
+          name?: string
+          race_id?: string
+          resistances?: string[]
+          skill_proficiencies?: string[]
+          speed?: number | null
+          tool_proficiencies?: string[]
+          weapon_proficiencies?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subraces_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subraces_race_id_fkey"
+            columns: ["race_id"]
+            isOneToOne: false
+            referencedRelation: "races"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1659,6 +1824,7 @@ export type Database = {
           race_id: string | null
           speed_override: number | null
           strength: number
+          subrace_id: string | null
           updated_at: string
           wisdom: number
         }[]

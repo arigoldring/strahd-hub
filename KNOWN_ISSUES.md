@@ -304,6 +304,14 @@ key too (below).
   these in by hand are now double-counted** (Warforged's +1 in the AC bonus
   box most likely); 160's BLOCK 1 lists the Warforged ones. Decided
   2026-11-07 to tell them rather than zero the box in a migration.
+- **Computed since 164-166 (races):** Dwarven Toughness (+1 HP per level,
+  in the average-HP hint), Savage Attacks (in the attack legend, stacking
+  with Brutal Critical), the Dwarf's full speed in heavy armour, a
+  subrace's speed and darkvision, and racial skill, weapon and armour
+  proficiencies. Skills and weapons that players added by hand before this
+  are now granted twice; harmless, since the higher level wins, and the
+  weapon extra stays removable. Racial score increases and choices are
+  manual (ACCEPTED_ISSUES).
 - **Shown, but the condition is the player's:** Sneak Attack still needs
   advantage or an ally beside the target; Aura of Protection needs the
   paladin conscious and within range; Dread Ambusher's first-turn extra
@@ -318,10 +326,9 @@ key too (below).
   proficiencies (the player can add those by hand), Potent Spellcasting and
   Agonizing Blast on cantrip damage (the sheet shows no cantrip damage),
   Extra Attack from an invocation (Thirsting Blade), Dual Wielder's +1 AC
-  (the sheet doesn't track hands), proficiencies a race or feat grants, and
-  subrace traits (subraces aren't rows, 055, so Hill Dwarf's hit points have
-  nowhere to live). A homebrew race or feat can carry a key on insert, but
-  CreateFeat offers no effect picker and races have no form.
+  (the sheet doesn't track hands), and proficiencies a feat grants. A
+  homebrew race, subrace or feat can carry a key on insert, but CreateFeat
+  offers no effect picker and races have no form.
 - **Uses the counters don't cover:** 153-157 track every feature and feat
   whose text says it recharges on a rest, with these exceptions. The Rune
   Knight's runes want one counter per rune picked (each is once per short
@@ -490,24 +497,6 @@ Armor and the Artillerist's Eldritch Cannon are text, like the steel
 defender. Alchemist and Artillerist would need no new effect key; the
 Armorer's model choice (Guardian or Infiltrator) is a single pick, a new
 `feature_options` kind.
-
-### Racial weapon training isn't automatic (noted 2026-11-07)
-
-Dwarven Combat Training (battleaxe, handaxe, light hammer, warhammer) and
-Elf Weapon Training (longsword, shortsword, shortbow, longbow for High and
-Wood Elves; Drow get rapier, shortsword and hand crossbow instead) are not
-data on `races`. Subraces aren't rows (055), so the Elf row can't say which
-list applies.
-
-**Trigger:** a Dwarf or Elf wizard attacking with a racial weapon.
-
-**Cost:** the player adds each weapon by hand as an extra weapon
-proficiency, the same path a feat like Weapon Master uses.
-
-**Fix:** a `races.weapon_proficiencies text[]` in the shape the class lists
-use, read by the same proficiency rule. Dwarf can be seeded at once; Elf
-needs subraces, or a pick between the two lists. Planned next, after the
-weapon proficiency work.
 
 ### Replicate Magic Item can be learned only once (noted 2026-11-07)
 

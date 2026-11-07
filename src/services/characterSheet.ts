@@ -22,6 +22,8 @@ import type { Tables, TablesUpdate } from "../types/database.types";
 export interface CharacterStats {
   characterId: string;
   raceId: string | null;
+  /** A subrace of raceId (164); the composite FK refuses any other. */
+  subraceId: string | null;
   scores: Record<Ability, number>;
   hpMax: number;
   hpCurrent: number;
@@ -91,6 +93,7 @@ function toCharacterStats(row: Tables<"character_stats">): CharacterStats {
   return {
     characterId: row.character_id,
     raceId: row.race_id,
+    subraceId: row.subrace_id,
     scores: Object.fromEntries(
       ABILITIES.map((a) => [a, row[SCORE_COLUMNS[a]]]),
     ) as Record<Ability, number>,
@@ -188,6 +191,7 @@ export async function updateCharacterStats(
 ): Promise<CharacterStats> {
   const columns: TablesUpdate<"character_stats"> = {};
   if (patch.raceId !== undefined) columns.race_id = patch.raceId;
+  if (patch.subraceId !== undefined) columns.subrace_id = patch.subraceId;
   if (patch.hpMax !== undefined) columns.hp_max = patch.hpMax;
   if (patch.hpCurrent !== undefined) columns.hp_current = patch.hpCurrent;
   if (patch.hpTemp !== undefined) columns.hp_temp = patch.hpTemp;

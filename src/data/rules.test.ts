@@ -9,7 +9,11 @@ import {
   brutalCriticalDice,
   collectEffects,
   critThreshold,
+  effectiveSkillLevel,
+  heavyArmorSlows,
   hpBonus,
+  meleeCritExtraDice,
+  raceGrants,
   initiative,
   isMonkWeapon,
   isRangedWeapon,
@@ -35,6 +39,7 @@ import {
   type ClassWeaponsLike,
   type EffectLevels,
   type FeatureEffect,
+  type RaceGrantsLike,
   type ResourceRule,
   type WeaponLike,
 } from "./rules";
@@ -649,5 +654,86 @@ describe("pactSlots", () => {
     expect(pactSlots(11)).toEqual({ count: 3, slotLevel: 5 });
     expect(pactSlots(17)).toEqual({ count: 4, slotLevel: 5 });
     expect(pactSlots(0)).toBeNull();
+  });
+});
+
+describe("racial grants (164)", () => {
+  const grant = (name: string, over: Partial<RaceGrantsLike> = {}): RaceGrantsLike => ({
+    name,
+    speed: null,
+    darkvision: null,
+    skillProficiencies: [],
+    weaponProficiencies: [],
+    armorProficiencies: [],
+    toolProficiencies: [],
+    languages: [],
+    resistances: [],
+    ...over,
+  });
+  const elf = grant("Elf", {
+    speed: 30,
+    darkvision: 60,
+    skillProficiencies: ["perception"],
+    languages: ["Common", "Elvish"],
+  });
+  const drow = grant("Drow", {
+    darkvision: 120,
+    weaponProficiencies: ["Rapier", "Shortsword", "Crossbow, Hand"],
+  });
+  const woodElf = grant("Wood Elf", { speed: 35, weaponProficiencies: ["Longsword"] });
+
+  it("unions a subrace onto its race, the better darkvision winning", () => {
+    const g = raceGrants(elf, drow);
+    expect(g.darkvision).toBe(120);
+    expect(g.speed).toBe(30);
+    expect(g.skills.get("perception")).toBe("Elf");
+    expect(g.weapons.get("Rapier")).toBe("Drow");
+    expect(g.languages).toEqual(["Common", "Elvish"]);
+  });
+
+  it("takes a subrace's speed when it has one", () => {
+    expect(raceGrants(elf, woodElf).speed).toBe(35);
+    expect(raceGrants(elf, null).speed).toBe(30);
+    expect(raceGrants(null, null)).toMatchObject({ speed: null, darkvision: null });
+  });
+
+  it("raises a racial skill to proficient but keeps stored expertise", () => {
+    expect(effectiveSkillLevel(0, true)).toBe(1);
+    expect(effectiveSkillLevel(2, true)).toBe(2);
+    expect(effectiveSkillLevel(0, false)).toBe(0);
+  });
+
+  it("puts racial weapons after the class and before extras", () => {
+    const g = raceGrants(elf, drow);
+    const p = weaponProficiencies([{ cls: rogue, isStarting: true }], ["Rapier", "Whip"], none, g.weapons);
+    // The rogue's own rapier reads as the class's, not the race's.
+    expect(p.named.get("Rapier")).toBe("Rogue");
+    expect(p.named.get("Crossbow, Hand")).toBe("Rogue");
+    expect(p.named.get("Whip")).toBe("added");
+    const wiz = weaponProficiencies([{ cls: wizard, isStarting: true }], [], none, g.weapons);
+    expect(weaponProficiency({ name: "Rapier", category: "martial" }, wiz).source).toBe("Drow");
+  });
+
+  it("adds Dwarven Toughness's 1 per level", () => {
+    expect(hpBonus(fx([["dwarven_toughness", 4]]))).toEqual({
+      bonus: 4,
+      parts: ["Dwarven Toughness +4"],
+    });
+  });
+
+  it("stacks Savage Attacks with Brutal Critical", () => {
+    expect(meleeCritExtraDice(fx([["savage_attacks", 1]]))).toEqual({
+      dice: 1,
+      parts: ["Savage Attacks +1"],
+    });
+    expect(meleeCritExtraDice(fx([["savage_attacks", 13], ["brutal_critical", 13]])).dice).toBe(3);
+    expect(meleeCritExtraDice(none).dice).toBe(0);
+  });
+
+  it("lets a dwarf wear heavy armour without the Strength at full speed", () => {
+    expect(heavyArmorSlows(15, 13, none)).toBe(true);
+    expect(heavyArmorSlows(15, 13, fx([["heavy_armor_speed", 1]]))).toBe(false);
+    expect(heavyArmorSlows(15, 15, none)).toBe(false);
+    expect(heavyArmorSlows(null, 8, none)).toBe(false);
   });
 });

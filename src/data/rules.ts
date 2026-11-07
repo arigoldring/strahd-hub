@@ -291,6 +291,10 @@ export const FEATURE_EFFECTS = [
   "mobile",
   "tough",
   "medium_armor_master",
+  // 164: Hill Dwarf (on its subrace), Half-Orc and Dwarf (on the race).
+  "dwarven_toughness",
+  "savage_attacks",
+  "heavy_armor_speed",
 ] as const;
 export type FeatureEffect = (typeof FEATURE_EFFECTS)[number];
 
@@ -372,6 +376,20 @@ export function brutalCriticalDice(effects: EffectLevels): number {
   return barbarian >= 17 ? 3 : barbarian >= 13 ? 2 : 1;
 }
 
+/**
+ * Every extra weapon die a melee crit rolls: Brutal Critical's, plus one for
+ * Savage Attacks (Half-Orc). They stack: different sources, and the books
+ * never say otherwise. `parts` names each for the attack legend.
+ */
+export function meleeCritExtraDice(effects: EffectLevels): { dice: number; parts: string[] } {
+  const parts: string[] = [];
+  const brutal = brutalCriticalDice(effects);
+  if (brutal > 0) parts.push(`Brutal Critical +${brutal}`);
+  const savage = effects.has("savage_attacks") ? 1 : 0;
+  if (savage) parts.push("Savage Attacks +1");
+  return { dice: brutal + savage, parts };
+}
+
 // ---------- weapon proficiency (161) ----------
 //
 // A class knows a whole category ('simple', 'martial', or 'none') plus a list
@@ -418,6 +436,8 @@ export function weaponProficiencies(
   classes: readonly { cls: ClassWeaponsLike; isStarting: boolean }[],
   extras: readonly string[],
   effects: EffectLevels,
+  /** The race's and subrace's weapons (164), each with its source: raceGrants. */
+  racial: ReadonlyMap<string, string> = new Map(),
 ): WeaponProficiencies {
   let category: WeaponTrainingLevel = "none";
   let categorySource: string | null = null;
@@ -435,6 +455,7 @@ export function weaponProficiencies(
     for (const w of cls.weaponProficiencies) if (!named.has(w)) named.set(w, cls.name);
   }
   if (effects.has("battle_ready")) raise("martial", "Battle Ready");
+  for (const [w, source] of racial) if (!named.has(w)) named.set(w, source);
   for (const w of extras) if (!named.has(w)) named.set(w, "added");
   return { category, categorySource, named };
 }
@@ -695,7 +716,100 @@ export function hpBonus(effects: EffectLevels): { bonus: number; parts: string[]
     bonus += 2 * level;
     parts.push(`Tough +${2 * level}`);
   }
+  const dwarf = effects.get("dwarven_toughness");
+  if (dwarf != null) {
+    bonus += dwarf;
+    parts.push(`Dwarven Toughness +${dwarf}`);
+  }
   return { bonus, parts };
+}
+
+/**
+ * Whether heavy armour slows this character: worn without the Strength it
+ * asks for (−10 ft, PHB), unless they're a Dwarf (heavy_armor_speed).
+ */
+export function heavyArmorSlows(
+  strengthRequirement: number | null | undefined,
+  strScore: number,
+  effects: EffectLevels,
+): boolean {
+  if (strengthRequirement == null || effects.has("heavy_armor_speed")) return false;
+  return strScore < strengthRequirement;
+}
+
+// ---------- racial grants (164) ----------
+//
+// What a race and its subrace give, read off the catalogue every render the
+// way class weapon lists are (161). Nothing is written to the character, so
+// changing race needs no cleanup. A subrace only adds: its lists are unioned
+// with the race's, its speed replaces the race's when set, and the better
+// darkvision wins (Drow's 120 over the Elf's 60).
+
+export interface RaceGrantsLike {
+  name: string;
+  /** Null on a subrace means "the race's". */
+  speed: number | null;
+  darkvision: number | null;
+  skillProficiencies: readonly string[];
+  weaponProficiencies: readonly string[];
+  armorProficiencies: readonly string[];
+  toolProficiencies: readonly string[];
+  languages: readonly string[];
+  resistances: readonly string[];
+}
+
+export interface RaceGrants {
+  speed: number | null;
+  darkvision: number | null;
+  /** Each granted skill with the race or subrace that grants it. */
+  skills: ReadonlyMap<SkillKey, string>;
+  /** Each weapon name with its source, for weaponProficiencies. */
+  weapons: ReadonlyMap<string, string>;
+  armor: readonly string[];
+  tools: readonly string[];
+  languages: readonly string[];
+  resistances: readonly string[];
+}
+
+const SKILL_KEYS: ReadonlySet<string> = new Set(SKILLS.map((s) => s.key));
+
+export function raceGrants(
+  race: RaceGrantsLike | null,
+  subrace: RaceGrantsLike | null,
+): RaceGrants {
+  const sources = [race, subrace].filter((s): s is RaceGrantsLike => s != null);
+  const union = (pick: (s: RaceGrantsLike) => readonly string[]) => [
+    ...new Set(sources.flatMap(pick)),
+  ];
+  const sourced = <K extends string>(pick: (s: RaceGrantsLike) => readonly string[]) => {
+    const out = new Map<K, string>();
+    for (const s of sources) for (const k of pick(s)) if (!out.has(k as K)) out.set(k as K, s.name);
+    return out;
+  };
+  const vision = sources.map((s) => s.darkvision).filter((d): d is number => d != null);
+
+  const skills = sourced<SkillKey>((s) => s.skillProficiencies);
+  // 164's CHECK keeps unknown codes out; this keeps a stray one off the map.
+  for (const k of skills.keys()) if (!SKILL_KEYS.has(k)) skills.delete(k);
+
+  return {
+    speed: subrace?.speed ?? race?.speed ?? null,
+    darkvision: vision.length > 0 ? Math.max(...vision) : null,
+    skills,
+    weapons: sourced((s) => s.weaponProficiencies),
+    armor: union((s) => s.armorProficiencies),
+    tools: union((s) => s.toolProficiencies),
+    languages: union((s) => s.languages),
+    resistances: union((s) => s.resistances),
+  };
+}
+
+/**
+ * A skill's level once the race is counted: a granted skill is at least
+ * proficient. A stored row can still raise it to expertise.
+ */
+export function effectiveSkillLevel(stored: ProficiencyLevel, granted: boolean): ProficiencyLevel {
+  return granted && stored === 0 ? 1 : stored;
 }
 
 // ---------- feature pick allowances (122) ----------

@@ -7,7 +7,7 @@ import { useCharacterInventory } from "../../hooks/useCharacterInventory";
 import { useCharacterFeats } from "../../hooks/useCharacterFeats";
 import { useCharacterSheet, type FeaturePickWrite } from "../../hooks/useCharacterSheet";
 import { useClasses } from "../../hooks/useClasses";
-import { useRaces } from "../../hooks/useRaces";
+import { useRaceTraits, useRaces, useSubraces } from "../../hooks/useRaces";
 import { useSubclasses } from "../../hooks/useSubclasses";
 import { useClassFeatures } from "../../hooks/useClassFeatures";
 import { useFeatureOptions } from "../../hooks/useFeatureOptions";
@@ -20,19 +20,22 @@ import {
   armorClass,
   attacksPerAction,
   averageHp,
-  brutalCriticalDice,
   collectEffects,
   critThreshold,
   damageString,
+  effectiveSkillLevel,
   formatModifier,
+  heavyArmorSlows,
   hpBonus,
   initiative,
   martialArtsDie,
+  meleeCritExtraDice,
   picksAllowed,
   ordinal,
   pactSlots,
   passiveBonus,
   proficiencyBonus,
+  raceGrants,
   resourceMax,
   resourceRecharge,
   saveAura,
@@ -50,9 +53,11 @@ import {
   type EffectLevels,
   type FightingStyleKey,
   type ProficiencyLevel,
+  type RaceGrants,
   type SkillKey,
   type WeaponProficiencies,
 } from "../../data/rules";
+import type { Race, RaceTrait, Subrace } from "../../services/races";
 import {
   saveSet,
   skillLevels,
@@ -182,6 +187,8 @@ function FullSheet({
   const { data: featureCatalog = [] } = useClassFeatures(campaign.id);
   const { data: featureOptions = [] } = useFeatureOptions(campaign.id);
   const { data: races = [] } = useRaces(campaign.id);
+  const { data: subraceCatalog = [] } = useSubraces(campaign.id);
+  const { data: raceTraitCatalog = [] } = useRaceTraits(campaign.id);
   // Same key as the Carried section below, so this is a cache hit.
   const { data: gear = [], setEquipped } = useCharacterInventory(character.id);
   // Same key as the Feats section below, so this is a cache hit too. Read
@@ -233,17 +240,34 @@ function FullSheet({
       ? `Chosen at level ${cls.subclassLevel}`
       : undefined;
   const race = races.find((r) => r.id === stats.raceId) ?? null;
+  const raceSubraces = subraceCatalog.filter((s) => s.raceId === race?.id);
+  const subrace = raceSubraces.find((s) => s.id === stats.subraceId) ?? null;
+  // What the race and subrace give (164), derived every render like a
+  // class's weapon list: nothing is written to the character, so a change of
+  // race needs no cleanup. Ability score increases are not here (055).
+  const grants = raceGrants(race, subrace);
+  const raceTraits = race
+    ? raceTraitCatalog.filter(
+        (t) => t.raceId === race.id && (t.subraceId == null || t.subraceId === subrace?.id),
+      )
+    : [];
   const level = totalLevel(classes);
   const pb = proficiencyBonus(level);
   const mod = (a: Ability) => abilityModifier(stats.scores[a]);
   const saves = saveSet(proficiencies);
-  const skills = skillLevels(proficiencies);
+  // The stored levels, the race's skills raised to at least proficient. The
+  // pip still writes the stored level, so a racial skill can take expertise.
+  const storedSkills = skillLevels(proficiencies);
+  const skills = Object.fromEntries(
+    SKILLS.map((s) => [s.key, effectiveSkillLevel(storedSkills[s.key], grants.skills.has(s.key))]),
+  ) as Record<SkillKey, ProficiencyLevel>;
   // Every effect the character has: class features' (121), each with the
-  // level of the class that grants it, plus the race's and the feats' (159)
-  // at total level. The numbers below read from this; a row with no effect
-  // key is display only.
+  // level of the class that grants it, plus the race's, subrace's and feats'
+  // (159, 164) at total level. The numbers below read from this; a row with
+  // no effect key is display only.
   const effects = collectEffects(classes, featureCatalog, [
     race?.effect ?? null,
+    subrace?.effect ?? null,
     ...ownFeats.map((f) => f.effect),
   ]);
   // Untrained skills take Jack of All Trades or Remarkable Athlete, and so
@@ -320,6 +344,22 @@ function FullSheet({
       }
     }
   }
+  // Racial traits' counters (164) read total level too: Infernal Legacy's
+  // hellish rebuke arrives at character level 3, whatever the class.
+  for (const trait of raceTraits) {
+    for (const r of trait.resources) {
+      const max = resourceMax(r, { level, pb, mods });
+      if (max > 0) {
+        counters.push({
+          key: featureResourceKey(r.id),
+          name: r.name,
+          source: trait.name,
+          max,
+          recharge: resourceRecharge(r, level),
+        });
+      }
+    }
+  }
   // Eldritch Knight and Arcane Trickster cast through a class that doesn't.
   const spellAbility = cls?.spellAbility ?? subclass?.spellAbility ?? null;
 
@@ -342,6 +382,7 @@ function FullSheet({
     }),
     proficiencies.filter((p) => p.kind === "weapon").map((p) => p.key),
     effects,
+    grants.weapons,
   );
 
   const armors = gear.filter((i): i is ArmorEntry => i.kind === "armor");
@@ -395,10 +436,12 @@ function FullSheet({
               value={stats.raceId ?? ""}
               disabled={!canEdit}
               // A new race resets the speed override, so speed follows the
-              // race again until someone types a different number.
+              // race again until someone types a different number. It also
+              // clears the subrace in the same write: 164's composite FK
+              // refuses a subrace of another race.
               onChange={(e) =>
                 updateStats(
-                  { raceId: e.target.value || null, speedOverride: null },
+                  { raceId: e.target.value || null, subraceId: null, speedOverride: null },
                   "race",
                 )
               }
@@ -411,6 +454,31 @@ function FullSheet({
               ))}
             </select>
           </label>
+          {raceSubraces.length > 0 && (
+            <label>
+              <span>Subrace</span>
+              <select
+                value={stats.subraceId ?? ""}
+                disabled={!canEdit}
+                // Wood Elf's 35 ft is the subrace's, so the override resets
+                // here too.
+                onChange={(e) =>
+                  updateStats(
+                    { subraceId: e.target.value || null, speedOverride: null },
+                    "subrace",
+                  )
+                }
+              >
+                <option value="">Choose a subrace...</option>
+                {raceSubraces.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                    {s.isHomebrew ? " (Homebrew)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label>
             <span>Class</span>
             <select
@@ -494,7 +562,8 @@ function FullSheet({
         cls={cls}
         level={level}
         conMod={mod("con")}
-        raceSpeed={race?.speed ?? null}
+        raceSpeed={grants.speed}
+        tooHeavy={heavyArmorSlows(armor?.strengthRequirement, stats.scores.str, effects)}
         ac={ac}
         armor={armor}
         shield={shield}
@@ -598,20 +667,31 @@ function FullSheet({
               <ul className="sm-list">
                 {SKILLS.map((s) => {
                   const prof = skills[s.key];
+                  // A racial skill (164) cycles proficient ↔ expertise: the
+                  // race's proficiency can't be switched off, the 161 rule
+                  // for a class's weapons. Expertise is a stored row; going
+                  // back deletes it, and the race's proficiency remains.
+                  const racial = grants.skills.get(s.key);
+                  const next: ProficiencyLevel = racial
+                    ? prof === 2 ? 0 : 2
+                    : (((prof + 1) % 3) as ProficiencyLevel);
+                  const label = racial
+                    ? `${PROF_LABELS[prof]} (${racial})`
+                    : PROF_LABELS[prof];
                   return (
                     <li key={s.key} className="sm-row">
                       <button
                         type="button"
                         className={`sm-pip sm-pip--${prof}`}
-                        title={PROF_LABELS[prof]}
-                        aria-label={`${s.label}: ${PROF_LABELS[prof]}`}
+                        title={label}
+                        aria-label={`${s.label}: ${label}`}
                         disabled={!canEdit}
                         onClick={() =>
                           run(
                             sheetQuery.setProficiency({
                               kind: "skill",
                               key: s.key,
-                              level: ((prof + 1) % 3) as ProficiencyLevel,
+                              level: next,
                             }),
                             s.label,
                           )
@@ -619,7 +699,9 @@ function FullSheet({
                       />
                       <span className="sm-row__name">
                         {s.label}
-                        <span className="sm-row__ability">{s.ability}</span>
+                        <span className="sm-row__ability">
+                          {racial ? `${s.ability} · ${racial}` : s.ability}
+                        </span>
                         {s.key === "stealth" && armor?.stealthDisadvantage && (
                           <span
                             className="sm-row__flag"
@@ -675,6 +757,17 @@ function FullSheet({
           <CharacterCarried characterId={character.id} isOwn={isOwn} />
           <CharacterPurse character={character} />
 
+          <Band label="Racial Traits" />
+          <div className="ch-body">
+            <RacialTraits
+              race={race}
+              subrace={subrace}
+              hasSubraces={raceSubraces.length > 0}
+              grants={grants}
+              traits={raceTraits}
+            />
+          </div>
+
           <Band label="Class Features" />
           <div className="ch-body">
             {subclass && cls && (
@@ -715,6 +808,7 @@ function CombatBlock({
   level,
   conMod,
   raceSpeed,
+  tooHeavy,
   ac,
   armor,
   shield,
@@ -730,7 +824,10 @@ function CombatBlock({
   cls: CharacterClass | null;
   level: number;
   conMod: number;
+  /** The race's speed, or the subrace's where it has one (Wood Elf). */
   raceSpeed: number | null;
+  /** Heavy armour without its STR, and no Dwarf to shrug it off. */
+  tooHeavy: boolean;
   ac: { total: number; parts: string[] };
   armor: ArmorEntry | null;
   shield: ArmorEntry | null;
@@ -746,10 +843,7 @@ function CombatBlock({
   const [hpDelta, setHpDelta] = useState("");
 
   const baseSpeed = stats.speedOverride ?? raceSpeed ?? 30;
-  // Heavy armour without the Strength for it costs 10 ft of speed (PHB).
-  const tooHeavy =
-    armor?.strengthRequirement != null &&
-    stats.scores.str < armor.strengthRequirement;
+  // Heavy armour without the Strength for it costs 10 ft (heavyArmorSlows).
   const speed = Math.max(0, baseSpeed - (tooHeavy ? 10 : 0) + featureSpeed.bonus);
 
   const applyHp = (sign: 1 | -1) => {
@@ -1032,6 +1126,82 @@ function ClassFeatures({
   );
 }
 
+/**
+ * The race's and subrace's traits (164), with the facts the sheet applies
+ * from them in one short list above: senses, resistances, languages, armour
+ * and tools. Skills and weapons aren't repeated here; they show on their own
+ * rows, marked with the race. Ability score increases are the player's to
+ * type (055), and so is every choice a trait offers (the trait text says
+ * so). Use counters show with the others, under Resources.
+ */
+function RacialTraits({
+  race,
+  subrace,
+  hasSubraces,
+  grants,
+  traits,
+}: {
+  race: Race | null;
+  subrace: Subrace | null;
+  hasSubraces: boolean;
+  grants: RaceGrants;
+  traits: RaceTrait[];
+}) {
+  if (!race) return <p className="ch-empty">Pick a race first.</p>;
+
+  const facts = [
+    ["Size", race.size],
+    ["Senses", grants.darkvision ? `Darkvision ${grants.darkvision} ft` : null],
+    ["Resistances", grants.resistances.join(", ")],
+    ["Languages", grants.languages.join(", ")],
+    ["Armour", grants.armor.map((a) => (a === "shield" ? "shields" : `${a} armour`)).join(", ")],
+    ["Tools", grants.tools.join(", ")],
+  ].filter((f): f is [string, string] => !!f[1]);
+
+  return (
+    <>
+      <p className="sm-subclass">
+        <span className="sm-subclass__name">{race.name}:</span> {race.description}
+      </p>
+      {subrace && (
+        <p className="sm-subclass">
+          <span className="sm-subclass__name">{subrace.name}:</span> {subrace.description}
+        </p>
+      )}
+      {hasSubraces && !subrace && (
+        <p className="sm-legend">Choose a subrace above for the rest of this race's traits.</p>
+      )}
+      <ul className="sm-race-facts">
+        {facts.map(([label, value]) => (
+          <li key={label}>
+            <span className="sm-race-facts__label">{label}</span> {value}
+          </li>
+        ))}
+      </ul>
+      {traits.length === 0 ? (
+        <p className="ch-empty">No traits recorded for this race yet.</p>
+      ) : (
+        <ul className="sm-features">
+          {traits.map((t) => (
+            <li key={t.id} className="sm-feature">
+              <div className="sm-feature__head">
+                <span className="sm-feature__name">{t.name}</span>
+                <span className="sm-feature__level">
+                  {t.subraceId ? subrace?.name : race.name}
+                </span>
+              </div>
+              <p className="sm-feature__text">{t.description}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="sm-legend">
+        Racial ability score increases aren't added for you: include them in the scores above.
+      </p>
+    </>
+  );
+}
+
 /** "(Tasha's)", "(Homebrew)" or nothing for the PHB, after an option's name. */
 function optionSourceLabel(o: FeatureOption): string {
   if (o.source && o.source !== "phb") return ` (${SUBCLASS_SOURCE_LABELS[o.source]})`;
@@ -1175,14 +1345,14 @@ function AttacksBlock({
   const attacks = attacksPerAction(effects);
   const crit = critThreshold(effects);
   const sneak = sneakAttackDice(effects);
-  const brutal = brutalCriticalDice(effects);
+  const critDice = meleeCritExtraDice(effects);
   const maDie = martialArtsDie(effects);
   const martial = maDie != null && unarmored;
   const summary = [
     attacks > 1 && `${attacks} attacks per Attack action`,
     crit < 20 && `crit on ${crit}–20`,
-    brutal > 0 &&
-      `Brutal Critical +${brutal} weapon ${brutal === 1 ? "die" : "dice"} on a melee crit`,
+    critDice.dice > 0 &&
+      `+${critDice.dice} weapon ${critDice.dice === 1 ? "die" : "dice"} on a melee crit (${critDice.parts.join(", ")})`,
     sneak > 0 && `Sneak Attack ${sneak}d6 once per turn (finesse or ranged)`,
     maDie != null &&
       (martial

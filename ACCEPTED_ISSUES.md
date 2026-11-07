@@ -11,6 +11,43 @@ answer does change, move the entry back to `KNOWN_ISSUES.md` as open work.
 
 ---
 
+### Racial ability score increases and racial choices are added by hand (noted 2026-11-07)
+
+Since 164/165 the sheet applies a race's and subrace's traits by itself:
+speed, darkvision, skill, weapon and armour proficiencies, languages,
+resistances, the Racial Traits list, use counters (Breath Weapon, Relentless
+Endurance, Drow Magic, Infernal Legacy) and four effect keys (Integrated
+Protection, Dwarven Toughness, Savage Attacks, and the Dwarf's heavy-armour
+speed). Two things it leaves to the player on purpose:
+
+- **Ability score increases (the "+2 DEX").** The sheet takes final scores
+  (055), so a racial bonus is part of the number the player types. Storing
+  base scores plus the increase would mean a second set of six columns,
+  every score derived, and a race change rewriting someone's stats.
+- **Every choice a race offers.** Half-Elf's two skills, the Dwarf's tool,
+  a High Elf's wizard cantrip, Dragonborn ancestry (and so its resistance
+  and breath damage type), Warforged's Specialized Design, and the extra
+  language of Humans, Half-Elves, High Elves and Warforged. The trait text
+  says what to pick; the player sets it with the ordinary controls (a skill
+  pip, a weapon extra, the Spells section). Innate cantrips (Thaumaturgy,
+  Dancing Lights, Minor Illusion) are trait text too, not spell-list rows.
+
+Also not seeded: Variant Human (an optional rule whose feat and skill are
+both choices) and every non-PHB race but Warforged.
+
+**Trigger:** any new character, at creation.
+
+**Cost:** a few typed numbers and clicks once per character. A forgotten
++2 shows as a wrong modifier, which the player notices the first time they
+roll.
+
+**What would change the answer:** a character-creation flow that starts
+from base scores (point buy or rolled), at which point the increase is one
+more input. For the choices, extending 095's pickers to races: the picks
+table is keyed to a class entry today, so it would need a second parent.
+
+---
+
 ### The demo account can rewrite its own sheet, and the reset is the only undo (noted 2026-08-31)
 
 The public `/demo` login is a shared `'player'` seat, and a player's ordinary

@@ -143,6 +143,23 @@
   color: var(--sh-gold);
 }
 
+/* ---------- racial traits (164) ---------- */
+
+.sm-race-facts {
+  margin: 10px 0 4px;
+  padding: 0;
+  list-style: none;
+  font: 400 14px/1.6 var(--sh-body);
+  color: var(--sh-bone);
+}
+
+.sm-race-facts__label {
+  font: 400 10px/1 var(--sh-mono);
+  text-transform: uppercase;
+  color: var(--sh-dim);
+  margin-right: 6px;
+}
+
 /* ---------- class features ---------- */
 
 .sm-features {
