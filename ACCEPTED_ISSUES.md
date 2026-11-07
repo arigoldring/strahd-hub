@@ -16,7 +16,8 @@ answer does change, move the entry back to `KNOWN_ISSUES.md` as open work.
 Since 164/165 the sheet applies a race's and subrace's traits by itself:
 speed, darkvision, skill, weapon and armour proficiencies, languages,
 resistances, the Racial Traits list, use counters (Breath Weapon, Relentless
-Endurance, Drow Magic, Infernal Legacy) and four effect keys (Integrated
+Endurance, Drow Magic, Infernal Legacy, and since 169 Pallid Elf's spells,
+Eladrin's Fey Step and Reborn's Knowledge from a Past Life) and four effect keys (Integrated
 Protection, Dwarven Toughness, Savage Attacks, and the Dwarf's heavy-armour
 speed). Two things it leaves to the player on purpose:
 
@@ -33,7 +34,10 @@ speed). Two things it leaves to the player on purpose:
   Dancing Lights, Minor Illusion) are trait text too, not spell-list rows.
 
 Also not seeded: Variant Human (an optional rule whose feat and skill are
-both choices) and every non-PHB race but Warforged.
+both choices) and every non-PHB race but Warforged and 169's three (Pallid
+Elf, MToF Eladrin, Reborn). Those three bring choices of their own, also
+manual: an Eladrin's season, and a Reborn's size, extra language and
+Ancestral Legacy skills.
 
 **Trigger:** any new character, at creation.
 
