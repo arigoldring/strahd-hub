@@ -20,6 +20,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 export function useCharacterCompanions(characterId: string) {
   const queryClient = useQueryClient();
   const queryKey = ["characterCompanions", characterId];
+  // Lets useCampaignRealtime hold back an echo while a write is in flight.
+  const mutationKey = [...queryKey, "write"];
 
   const { data, isLoading, error } = useQuery({
     queryKey,
@@ -50,6 +52,7 @@ export function useCharacterCompanions(characterId: string) {
   };
 
   const adjustMutation = useMutation({
+    mutationKey,
     mutationFn: (vars: { kind: CompanionKind; delta: number; cap: number }) =>
       adjustCompanionHp(characterId, vars.kind, vars.delta, vars.cap),
     onSuccess: (companion) => {
@@ -58,6 +61,7 @@ export function useCharacterCompanions(characterId: string) {
   });
 
   const saveMutation = useMutation({
+    mutationKey,
     mutationFn: (vars: { current: Companion; patch: CompanionPatch }) =>
       saveCompanion(characterId, vars.current.kind, vars.patch),
     onMutate: ({ current, patch }) => snapshot((list) => put(list, { ...current, ...patch })),
@@ -66,6 +70,7 @@ export function useCharacterCompanions(characterId: string) {
   });
 
   const restMutation = useMutation({
+    mutationKey,
     mutationFn: (_vars: void) => restCompanions(characterId),
     onMutate: () => snapshot((list) => list.map((c) => ({ ...c, damage: 0 }))),
     onError: restore,

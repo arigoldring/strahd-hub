@@ -4,6 +4,8 @@ import { AccountControls, PreviewToggle } from "./RailControls";
 import { MobileNav } from "./MobileNav";
 import { visibleNavItems, isDmStyled, type NavItem } from "./navItems";
 import { useFortunes } from "../hooks/useFortunes";
+import { useCampaignRealtime } from "../hooks/useCampaignRealtime";
+import type { RealtimeStatus } from "../services/realtime";
 import "./layout.css";
 
 export function Layout() {
@@ -17,6 +19,10 @@ export function Layout() {
   // the cost of it appearing a moment late is nothing.
   const { data: fortunes = [] } = useFortunes(campaign.id);
   const fortunesRead = fortunes.some((f) => f.isRevealed);
+  // Live updates for every page below. Here rather than in CampaignLayout
+  // because this is where the indicator renders, and it covers the same
+  // routes: Layout is CampaignLayout's only child.
+  const liveStatus = useCampaignRealtime(campaign.id);
   const items = visibleNavItems(campaign.isDm, fortunesRead);
   const navClass = (item: NavItem) =>
     isDmStyled(item, fortunesRead) ? "app-nav__dm" : undefined;
@@ -37,6 +43,7 @@ export function Layout() {
           </span>
           {/* The rail itself is not part of what preview hides — the badge
               above and the DM links below stay exactly as they are. */}
+          <LiveStatus status={liveStatus} />
           {campaign.isDm && <PreviewToggle />}
         </div>
 
@@ -74,7 +81,37 @@ export function Layout() {
         <Outlet context={campaign} />
       </main>
 
+      {/* Every width: the rail is hidden on a phone, and a phone is what
+          drops the socket most (locked screen, backgrounded tab). Shown only
+          when it matters, so the page isn't carrying a badge for the normal
+          case. */}
+      {liveStatus === "reconnecting" && (
+        <p className="app-live-lost" role="status">
+          Reconnecting… changes from others may be missing
+        </p>
+      )}
+
       <MobileNav campaign={campaign} items={items} navClass={navClass} />
     </div>
+  );
+}
+
+const LIVE_LABELS: Record<RealtimeStatus, string> = {
+  connecting: "Connecting",
+  live: "Live",
+  reconnecting: "Reconnecting",
+};
+
+/**
+ * The rail's connection dot. "Live" means other people's changes reach this
+ * page as they happen; anything else means they arrive only on a refocus or a
+ * refetch, as they did before realtime.
+ */
+function LiveStatus({ status }: { status: RealtimeStatus }) {
+  return (
+    <p className={`app-rail__live app-rail__live--${status}`} role="status">
+      <span className="app-rail__live-dot" aria-hidden="true" />
+      {LIVE_LABELS[status]}
+    </p>
   );
 }

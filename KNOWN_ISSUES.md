@@ -81,7 +81,14 @@ direction. It will not show up in a first-run smoke test.
 same note belongs on `getOrCreateProfile`, where the argument is different (the
 losing insert is expected) but the mechanism is the same.
 
-### The party cache goes stale for a minute after a write from a sheet (noted 2026-08-17, corrected 2026-08-22)
+### The party cache goes stale for a minute after a write from a sheet (noted 2026-08-17, corrected 2026-08-22, narrowed 2026-11-09 by 170)
+
+**Half fixed by realtime (170).** `character_inventory` is published, and every
+write echoes back as an event that invalidates `["party", campaignId]`
+(`keysForChange` in `src/lib/realtimeKeys.ts`), so the item half is correct
+while the socket is live. `character_spells` is not published yet, so the spell
+half below still stands. Publishing it in realtime's phase 2 (WANTED_FEATURES)
+closes this entry without the hook change the Fix proposes.
 
 `useCharacterSpells` and `useCharacterInventory` invalidate only their own key.
 The same rows are read through a _second_ cache entry, `["party", campaignId]`,
@@ -845,6 +852,41 @@ a review of migrations 034–037 managed to conclude the file wasn't committed a
 all.
 
 **Fix:** three lines at the top saying what it cleans and that it is idempotent.
+
+### Nothing runs the checks automatically, and RLS is verified only by hand (noted 2026-11-09)
+
+There is no `.github/` and no CI of any kind. `npm run typecheck`, `npm run
+lint` and `npm test` exist, but they run only when someone remembers to type
+them, and Cloudflare Pages builds with `vite build`, which strips types without
+checking them. So a commit that fails `tsc` deploys. The only test file is
+`src/data/rules.test.ts`. Services, hooks and pages have none.
+
+The bigger gap is the database. This app's security model is its RLS policies
+and the security-definer RPCs, and the checks for those are the verification
+blocks at the bottom of each migration. Those run only when pasted into the
+Supabase SQL editor one at a time, against the live database, and only on the
+day the migration lands. A later migration that loosens a policy, or replaces a
+seed function from an older copy (the seed-function caution in CLAUDE.md),
+re-runs none of the earlier blocks.
+
+**Trigger:** any change that breaks a type, or a policy that an older
+migration's block would have caught. The second fails silently: a policy that
+lets too much through raises nothing.
+
+**Cost:** so far, none that anyone has seen. That is the problem: a regression
+in a reveal-gating policy hands players DM-only rows with no visible symptom.
+
+**Fix, in two steps that are worth doing separately:**
+
+1. A GitHub Action on push running `typecheck`, `lint` and `test`. About twenty
+   minutes of work, and it covers the client.
+2. Run RLS checks automatically against a local database (`supabase start`,
+   with the migrations applied in order), either by porting the verification
+   blocks to pgTAP (`supabase test db`) or by a vitest suite that signs in as a
+   DM, a player and a non-member and asserts what each can read and write.
+   This is the larger job. It also needs a decision on whether `db/` replays
+   cleanly from 001 into an empty database, which nothing has tested since
+   about 010.
 
 ---
 

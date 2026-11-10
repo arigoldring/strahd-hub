@@ -33,6 +33,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 export function useCharacterSheet(characterId: string) {
   const queryClient = useQueryClient();
   const queryKey = ["characterSheet", characterId];
+  // Lets useCampaignRealtime hold back an echo while a write is in flight.
+  const mutationKey = [...queryKey, "write"];
 
   const { data, isLoading, error } = useQuery({
     queryKey,
@@ -62,6 +64,7 @@ export function useCharacterSheet(characterId: string) {
   };
 
   const updateStatsMutation = useMutation({
+    mutationKey,
     mutationFn: (patch: CharacterStatsPatch) =>
       updateCharacterStats(characterId, patch),
     onMutate: (patch) =>
@@ -78,6 +81,7 @@ export function useCharacterSheet(characterId: string) {
   });
 
   const setProficiencyMutation = useMutation({
+    mutationKey,
     mutationFn: (vars: { kind: ProficiencyKind; key: string; level: ProficiencyLevel }) =>
       setProficiency(characterId, vars.kind, vars.key, vars.level),
     onMutate: ({ kind, key, level }) =>
@@ -97,6 +101,7 @@ export function useCharacterSheet(characterId: string) {
   // Not optimistic: the server computes the result (temp HP first, cap at
   // max), so the cache takes the row it returns rather than guessing.
   const adjustHpMutation = useMutation({
+    mutationKey,
     mutationFn: (delta: number) => adjustCharacterHp(characterId, delta),
     onSuccess: (stats) => {
       queryClient.setQueryData<CharacterSheetData>(queryKey, (sheet) =>
@@ -107,6 +112,7 @@ export function useCharacterSheet(characterId: string) {
 
   // Several requests (class row, then saves), so plain invalidate-and-wait.
   const setClassMutation = useMutation({
+    mutationKey,
     mutationFn: (vars: {
       existing: CharacterClassEntry | undefined;
       classId: string;
@@ -116,6 +122,7 @@ export function useCharacterSheet(characterId: string) {
   });
 
   const setLevelMutation = useMutation({
+    mutationKey,
     mutationFn: (vars: { entryId: string; level: number }) =>
       setClassLevel(vars.entryId, vars.level),
     onMutate: ({ entryId, level }) =>
@@ -128,6 +135,7 @@ export function useCharacterSheet(characterId: string) {
   });
 
   const setSubclassMutation = useMutation({
+    mutationKey,
     mutationFn: (vars: { entryId: string; subclassId: string | null }) =>
       setSubclass(vars.entryId, vars.subclassId),
     onMutate: ({ entryId, subclassId }) =>
@@ -145,6 +153,7 @@ export function useCharacterSheet(characterId: string) {
   // race on the same row. Optimistic like the other selects: an added pick
   // gets a placeholder id until the refetch on settle brings the real row.
   const featurePickMutation = useMutation({
+    mutationKey,
     mutationFn: (vars: FeaturePickWrite) => {
       switch (vars.kind) {
         case "add":
