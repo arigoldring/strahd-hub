@@ -1250,3 +1250,50 @@ export function rollInitiative(
   const roll = d20();
   return { roll, total: roll + bonus };
 }
+
+/** What the tracker needs of a PC, from the same rules the sheet uses. */
+export interface CombatStats {
+  /** The DEX score, the order's first tiebreak. */
+  dex: number;
+  /** initiative()'s total and the parts that make it. */
+  initiativeBonus: number;
+  initiativeParts: string[];
+  /** The steel defender's maximum HP, or null if the character has none. */
+  defenderMaxHp: number | null;
+}
+
+export function combatStats(input: {
+  scores: Record<Ability, number>;
+  classes: Parameters<typeof collectEffects>[0];
+  features: Parameters<typeof collectEffects>[1];
+  race: { effect: FeatureEffect | null } | null;
+  subrace: { effect: FeatureEffect | null } | null;
+  feats: readonly { effect: FeatureEffect | null }[];
+}): CombatStats {
+  const { scores, classes, features, race, subrace, feats } = input;
+  const effects = characterEffects(classes, features, race, subrace, feats);
+  const pb = proficiencyBonus(totalLevel(classes));
+  const mods = Object.fromEntries(
+    ABILITIES.map((a) => [a, abilityModifier(scores[a])]),
+  ) as Record<Ability, number>;
+  const init = initiative(mods, pb, effects);
+  // The sheet's rule: the defender's level is the Artificer's own level.
+  const defenderLevel = effects.get("steel_defender");
+  return {
+    dex: scores.dex,
+    initiativeBonus: init.total,
+    initiativeParts: init.parts,
+    defenderMaxHp:
+      defenderLevel != null ? steelDefender(defenderLevel, { intMod: mods.int, pb }).maxHp : null,
+  };
+}
+
+/**
+ * Monster names for the tracker: "Zombie" x3 is "Zombie 1", "Zombie 2",
+ * "Zombie 3", so the DM can tell them apart. One is just "Zombie".
+ */
+export function numberedNames(name: string, count: number): string[] {
+  const base = name.trim();
+  if (count <= 1) return [base];
+  return Array.from({ length: count }, (_, i) => `${base} ${i + 1}`);
+}

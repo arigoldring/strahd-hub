@@ -7,6 +7,8 @@ import {
   attacksPerAction,
   battleReadyAbility,
   brutalCriticalDice,
+  characterEffects,
+  combatStats,
   collectEffects,
   critThreshold,
   effectiveSkillLevel,
@@ -20,6 +22,7 @@ import {
   keysClearedByRest,
   martialArtsDie,
   martialArtsWeapon,
+  numberedNames,
   pactSlots,
   passiveBonus,
   picksAllowed,
@@ -897,5 +900,48 @@ describe("rollInitiative", () => {
       expect(n).toBeLessThanOrEqual(20);
       expect(Number.isInteger(n)).toBe(true);
     }
+  });
+});
+
+describe("combatStats", () => {
+  const scores = { str: 10, dex: 14, con: 12, int: 16, wis: 10, cha: 8 };
+  const artificer = [{ classId: "art", subclassId: "bs", level: 3 }];
+  const features = [
+    { classId: "art", subclassId: "bs", level: 3, effect: "steel_defender" as const },
+  ];
+
+  it("reads the DEX score and the sheet's initiative bonus", () => {
+    const stats = combatStats({
+      scores,
+      classes: artificer,
+      features: [],
+      race: null,
+      subrace: null,
+      feats: [{ effect: "alert" }],
+    });
+    expect(stats.dex).toBe(14);
+    expect(stats.initiativeBonus).toBe(7);
+    expect(stats.initiativeParts).toEqual(["DEX +2", "Alert +5"]);
+    expect(stats.defenderMaxHp).toBeNull();
+  });
+
+  it("finds the steel defender by its key, at the artificer's level", () => {
+    // 2 + INT +3 + 5 x 3rd level.
+    const stats = combatStats({ scores, classes: artificer, features, race: null, subrace: null, feats: [] });
+    expect(stats.defenderMaxHp).toBe(20);
+  });
+
+  it("collects race and subrace effects the way the sheet does", () => {
+    const fromRace = characterEffects(artificer, [], { effect: "alert" }, null, []);
+    const fromSubrace = characterEffects(artificer, [], null, { effect: "alert" }, []);
+    expect(fromRace.get("alert")).toBe(3);
+    expect(fromSubrace.get("alert")).toBe(3);
+  });
+});
+
+describe("numberedNames", () => {
+  it("numbers a group and leaves one alone", () => {
+    expect(numberedNames(" Zombie ", 3)).toEqual(["Zombie 1", "Zombie 2", "Zombie 3"]);
+    expect(numberedNames("Strahd", 1)).toEqual(["Strahd"]);
   });
 });
