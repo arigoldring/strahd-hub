@@ -896,6 +896,134 @@ export type Database = {
           },
         ]
       }
+      encounter_combatants: {
+        Row: {
+          character_id: string | null
+          created_at: string
+          dex: number | null
+          encounter_id: string
+          id: string
+          initiative: number | null
+          kind: string
+          name: string | null
+          status: string | null
+        }
+        Insert: {
+          character_id?: string | null
+          created_at?: string
+          dex?: number | null
+          encounter_id: string
+          id?: string
+          initiative?: number | null
+          kind: string
+          name?: string | null
+          status?: string | null
+        }
+        Update: {
+          character_id?: string | null
+          created_at?: string
+          dex?: number | null
+          encounter_id?: string
+          id?: string
+          initiative?: number | null
+          kind?: string
+          name?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encounter_combatants_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encounter_combatants_encounter_id_fkey"
+            columns: ["encounter_id"]
+            isOneToOne: false
+            referencedRelation: "encounters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      encounter_monster_stats: {
+        Row: {
+          ac: number | null
+          combatant_id: string
+          hp_current: number
+          hp_max: number
+          hp_temp: number
+          init_bonus: number
+          kind: string
+        }
+        Insert: {
+          ac?: number | null
+          combatant_id: string
+          hp_current: number
+          hp_max: number
+          hp_temp?: number
+          init_bonus?: number
+          kind?: string
+        }
+        Update: {
+          ac?: number | null
+          combatant_id?: string
+          hp_current?: number
+          hp_max?: number
+          hp_temp?: number
+          init_bonus?: number
+          kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encounter_monster_stats_combatant_id_kind_fkey"
+            columns: ["combatant_id", "kind"]
+            isOneToOne: false
+            referencedRelation: "encounter_combatants"
+            referencedColumns: ["id", "kind"]
+          },
+        ]
+      }
+      encounters: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          id: string
+          round: number
+          turn_combatant_id: string | null
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          id?: string
+          round?: number
+          turn_combatant_id?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          id?: string
+          round?: number
+          turn_combatant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encounters_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: true
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encounters_turn_fkey"
+            columns: ["turn_combatant_id", "id"]
+            isOneToOne: false
+            referencedRelation: "encounter_combatants"
+            referencedColumns: ["id", "encounter_id"]
+          },
+        ]
+      }
       feats: {
         Row: {
           benefits: string[]
@@ -1892,6 +2020,24 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      adjust_monster_hp: {
+        Args: { delta: number; target_combatant: string }
+        Returns: {
+          ac: number | null
+          combatant_id: string
+          hp_current: number
+          hp_max: number
+          hp_temp: number
+          init_bonus: number
+          kind: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "encounter_monster_stats"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       adjust_party_currency: {
         Args: { delta: number; denomination: string; target_campaign: string }
         Returns: number
@@ -1930,6 +2076,10 @@ export type Database = {
         Returns: boolean
       }
       is_dm: { Args: never; Returns: boolean }
+      monster_status: {
+        Args: { hp_current: number; hp_max: number }
+        Returns: string
+      }
       move_character_item_to_party: {
         Args: { target_entry: string }
         Returns: undefined
