@@ -363,7 +363,8 @@ function CombatantRow({
         <span className="combat__meta">
           {entry.kind === "monster" ? "Monster" : isCompanion ? "Companion" : "PC"}
           {showDmUi && bonus !== null && ` · init ${formatModifier(bonus)}`}
-          {entry.kind === "monster" && ` · DEX ${entry.dex}`}
+          {/* Label only: the DEX is still on the public row, for turnOrder. */}
+          {showDmUi && entry.kind === "monster" && ` · DEX ${entry.dex}`}
         </span>
       </div>
 
