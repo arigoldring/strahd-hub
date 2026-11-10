@@ -12,6 +12,7 @@ import { Fortunes } from "./pages/campaign/Fortunes";
 import { Inventory } from "./pages/campaign/Inventory";
 import { Character, CharacterDetail } from "./pages/campaign/Character";
 import { Sheet } from "./pages/campaign/Sheet";
+import { Combat } from "./pages/campaign/Combat";
 // import { Party } from "./pages/campaign/Party";
 import { CreateItem } from "./pages/campaign/CreateItem";
 import { CreateFeat } from "./pages/campaign/CreateFeat";
@@ -95,6 +96,10 @@ function App() {
                     stored in 054-057's tables. Beside Character rather than
                     replacing it until it has been played with. */}
                   <Route path="Sheet" element={<Sheet />} />
+                  {/* The initiative tracker (171-172). Not DM-gated: players
+                    watch the order and enter their own initiative, and RLS
+                    decides every write. */}
+                  <Route path="Combat" element={<Combat />} />
                   {/* The same read one level up: every character in the
                     campaign rather than only yours. Not DM-gated — 028 lets any
                     member read the whole table, and the page's one write is.

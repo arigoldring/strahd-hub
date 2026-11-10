@@ -33,6 +33,10 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "Character", label: (isDm) => (isDm ? "Characters" : "Character") },
   // The full sheet (054-057). Beside Character until it replaces it.
   { to: "Sheet", label: () => "Sheet" },
+  // The initiative tracker (171). For everyone, since players watch the
+  // order too. Not a tab: the four slots are taken, so a phone at the table
+  // reaches it through More.
+  { to: "Combat", label: () => "Combat" },
   // Directly after Character, because Inventory is now half a personal page —
   // your own pack, with the party's hoard beside it — rather than the shared
   // pile alone.

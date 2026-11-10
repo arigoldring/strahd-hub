@@ -155,15 +155,24 @@ export async function startEncounter(campaignId: string, pcs: StartingPc[]): Pro
     fail(error);
   }
 
+  await addPcs(data.id, pcs);
+}
+
+/**
+ * PCs into a running fight: everyone at the start, or a latecomer. A PC
+ * already in it fails on 171's unique (encounter_id, kind, character_id),
+ * which the page avoids by offering only the missing ones.
+ */
+export async function addPcs(encounterId: string, pcs: StartingPc[]): Promise<void> {
   const rows = pcs.flatMap((pc) => [
-    { encounter_id: data.id, kind: "pc", character_id: pc.characterId },
+    { encounter_id: encounterId, kind: "pc", character_id: pc.characterId },
     ...(pc.hasDefender
-      ? [{ encounter_id: data.id, kind: "companion", character_id: pc.characterId }]
+      ? [{ encounter_id: encounterId, kind: "companion", character_id: pc.characterId }]
       : []),
   ]);
   if (rows.length === 0) return;
-  const { error: addError } = await supabase.from("encounter_combatants").insert(rows);
-  if (addError) fail(addError);
+  const { error } = await supabase.from("encounter_combatants").insert(rows);
+  if (error) fail(error);
 }
 
 /** Ends the fight. Its combatants and their stats cascade with it. */

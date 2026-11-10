@@ -1,6 +1,7 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   addMonsters,
+  addPcs,
   adjustMonsterHp,
   endEncounter,
   getEncounter,
@@ -91,6 +92,13 @@ export function useEncounter(campaignId: string) {
     onSettled: invalidate,
   });
 
+  const addPcsMutation = useMutation({
+    mutationKey,
+    mutationFn: (vars: { encounterId: string; pcs: StartingPc[] }) =>
+      addPcs(vars.encounterId, vars.pcs),
+    onSettled: invalidate,
+  });
+
   const addMonstersMutation = useMutation({
     mutationKey,
     mutationFn: (vars: { encounterId: string; monsters: NewMonsters }) =>
@@ -152,6 +160,7 @@ export function useEncounter(campaignId: string) {
     start: startMutation.mutateAsync,
     end: endMutation.mutateAsync,
     setTurn: setTurnMutation.mutateAsync,
+    addPcs: addPcsMutation.mutateAsync,
     addMonsters: addMonstersMutation.mutateAsync,
     remove: removeMutation.mutateAsync,
     update: updateMutation.mutateAsync,
