@@ -29,7 +29,12 @@ import {
   sneakAttackDice,
   speedBonus,
   spellSlots,
+  nextTurn,
+  previousTurn,
+  rollD20,
+  rollInitiative,
   steelDefender,
+  turnOrder,
   styleAttackBonus,
   untrainedCheckBonus,
   weaponAbility,
@@ -42,6 +47,7 @@ import {
   type FeatureEffect,
   type RaceGrantsLike,
   type ResourceRule,
+  type TurnEntry,
   type WeaponLike,
 } from "./rules";
 
@@ -778,5 +784,118 @@ describe("steelDefender (167)", () => {
 
   it("never has fewer than 1 hit point", () => {
     expect(steelDefender(0, { intMod: -5, pb: 2 }).maxHp).toBe(1);
+  });
+});
+
+describe("turnOrder", () => {
+  const pc = (id: string, name: string, initiative: number | null, dex: number): TurnEntry => ({
+    id,
+    kind: "pc",
+    characterId: `char-${id}`,
+    name,
+    initiative,
+    dex,
+  });
+  const monster = (id: string, name: string, initiative: number | null, dex: number): TurnEntry => ({
+    id,
+    kind: "monster",
+    characterId: null,
+    name,
+    initiative,
+    dex,
+  });
+  const defender = (id: string, ownerId: string): TurnEntry => ({
+    id,
+    kind: "companion",
+    characterId: `char-${ownerId}`,
+    name: "Steel Defender",
+    initiative: null,
+    dex: 12,
+  });
+  const ids = (entries: TurnEntry[]) => turnOrder(entries).map((e) => e.id);
+
+  it("sorts by initiative, highest first", () => {
+    expect(ids([pc("a", "Ana", 8, 10), monster("z", "Zombie", 15, 6), pc("b", "Bo", 12, 10)]))
+      .toEqual(["z", "b", "a"]);
+  });
+
+  it("breaks a tie on the higher DEX score, then on the name", () => {
+    expect(ids([pc("a", "Ana", 12, 14), pc("b", "Bo", 12, 16)])).toEqual(["b", "a"]);
+    expect(ids([monster("g", "ghoul", 12, 10), pc("a", "Ana", 12, 10)])).toEqual(["a", "g"]);
+  });
+
+  it("breaks identical names on the id, so every screen agrees", () => {
+    const order = ids([monster("m2", "Zombie", 9, 6), monster("m1", "Zombie", 9, 6)]);
+    expect(order).toEqual(["m1", "m2"]);
+  });
+
+  it("puts anyone who hasn't rolled last", () => {
+    expect(ids([pc("a", "Ana", null, 20), monster("z", "Zombie", -1, 6)])).toEqual(["z", "a"]);
+  });
+
+  it("puts the steel defender right after its artificer, even through a tie", () => {
+    // Bo ties with Cy on 14 and has the higher DEX, so the defender lands
+    // between them rather than after both.
+    expect(
+      ids([pc("c", "Cy", 14, 10), defender("d", "b"), pc("b", "Bo", 14, 16), pc("a", "Ana", 20, 10)]),
+    ).toEqual(["a", "b", "d", "c"]);
+  });
+
+  it("keeps a defender with its artificer when the artificer hasn't rolled", () => {
+    expect(ids([defender("d", "b"), pc("b", "Bo", null, 10), pc("a", "Ana", 3, 10)]))
+      .toEqual(["a", "b", "d"]);
+  });
+
+  it("puts a defender whose artificer isn't in the fight at the end", () => {
+    expect(ids([defender("d", "x"), pc("a", "Ana", 3, 10)])).toEqual(["a", "d"]);
+  });
+});
+
+describe("nextTurn and previousTurn", () => {
+  const order = [{ id: "a" }, { id: "b" }, { id: "c" }];
+
+  it("starts at the top when nobody has had a turn", () => {
+    expect(nextTurn(order, { turnId: null, round: 1 })).toEqual({ turnId: "a", round: 1 });
+  });
+
+  it("moves down the order", () => {
+    expect(nextTurn(order, { turnId: "a", round: 2 })).toEqual({ turnId: "b", round: 2 });
+  });
+
+  it("wraps to the top and starts a new round", () => {
+    expect(nextTurn(order, { turnId: "c", round: 2 })).toEqual({ turnId: "a", round: 3 });
+  });
+
+  it("restarts at the top, same round, when the current combatant is gone", () => {
+    expect(nextTurn(order, { turnId: "gone", round: 4 })).toEqual({ turnId: "a", round: 4 });
+  });
+
+  it("has no turn in an empty fight", () => {
+    expect(nextTurn([], { turnId: null, round: 1 })).toEqual({ turnId: null, round: 1 });
+  });
+
+  it("goes back one, and back across a round", () => {
+    expect(previousTurn(order, { turnId: "b", round: 2 })).toEqual({ turnId: "a", round: 2 });
+    expect(previousTurn(order, { turnId: "a", round: 2 })).toEqual({ turnId: "c", round: 1 });
+  });
+
+  it("never goes back before the first turn of round 1", () => {
+    expect(previousTurn(order, { turnId: "a", round: 1 })).toEqual({ turnId: "a", round: 1 });
+  });
+});
+
+describe("rollInitiative", () => {
+  it("adds the bonus to the d20", () => {
+    expect(rollInitiative(3, () => 14)).toEqual({ roll: 14, total: 17 });
+    expect(rollInitiative(-1, () => 1)).toEqual({ roll: 1, total: 0 });
+  });
+
+  it("rolls 1 to 20 by default", () => {
+    for (let i = 0; i < 200; i++) {
+      const n = rollD20();
+      expect(n).toBeGreaterThanOrEqual(1);
+      expect(n).toBeLessThanOrEqual(20);
+      expect(Number.isInteger(n)).toBe(true);
+    }
   });
 });

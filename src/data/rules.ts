@@ -1110,3 +1110,122 @@ export function pactSlots(warlockLevel: number): { count: number; slotLevel: num
 export function ordinal(n: number): string {
   return n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`;
 }
+
+// ---------------------------------------------------------------------------
+// The initiative tracker (171)
+// ---------------------------------------------------------------------------
+
+/** encounter_combatants.kind. 171's CHECK; one list in two places. */
+export const COMBATANT_KINDS = ["pc", "companion", "monster"] as const;
+export type CombatantKind = (typeof COMBATANT_KINDS)[number];
+
+/**
+ * What turnOrder needs of a combatant, resolved by the caller: `name` is the
+ * character's name, the defender's name, or the monster's; `dex` is the DEX
+ * score (character_stats for a PC, the combatant row for a monster, unused
+ * for a companion).
+ */
+export interface TurnEntry {
+  id: string;
+  kind: CombatantKind;
+  characterId: string | null;
+  name: string;
+  initiative: number | null;
+  dex: number;
+}
+
+/**
+ * The fixed locale is load-bearing. Every member's browser sorts the order
+ * itself, so a tie must break the same way on all of them; a bare
+ * localeCompare uses each browser's own locale, which can order names
+ * differently.
+ */
+const byName = (a: string, b: string): number =>
+  a.localeCompare(b, "en", { sensitivity: "base" });
+
+/**
+ * The turn order (decided 2026-11-09): initiative high to low, then the
+ * higher DEX score, then name A-Z, then id, so that two "Zombie"s still sort
+ * the same way on every screen. Anyone who hasn't rolled goes last.
+ *
+ * A companion has no initiative of its own. It acts right after its
+ * character, so it's placed directly after them, whatever the tie. One whose
+ * character isn't in the fight goes at the end.
+ */
+export function turnOrder<T extends TurnEntry>(entries: readonly T[]): T[] {
+  const companions = entries.filter((e) => e.kind === "companion");
+  const actors = entries
+    .filter((e) => e.kind !== "companion")
+    .sort((a, b) => {
+      if (a.initiative === null || b.initiative === null) {
+        if (a.initiative !== b.initiative) return a.initiative === null ? 1 : -1;
+      } else if (a.initiative !== b.initiative) {
+        return b.initiative - a.initiative;
+      }
+      if (a.dex !== b.dex) return b.dex - a.dex;
+      return byName(a.name, b.name) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    });
+
+  const placed = new Set<string>();
+  const order: T[] = [];
+  for (const actor of actors) {
+    order.push(actor);
+    if (actor.kind !== "pc") continue;
+    for (const c of companions) {
+      if (c.characterId === actor.characterId) {
+        order.push(c);
+        placed.add(c.id);
+      }
+    }
+  }
+  return [...order, ...companions.filter((c) => !placed.has(c.id))];
+}
+
+export interface TurnState {
+  turnId: string | null;
+  round: number;
+}
+
+/**
+ * The next turn. No current turn (the fight hasn't started, or the current
+ * combatant was removed) starts at the top without changing the round; the
+ * last combatant wraps to the first and starts a new round. Nobody is
+ * skipped: a combatant who is down still takes their turn (death saves), and
+ * one who hasn't rolled is at the bottom where the DM can see them.
+ */
+export function nextTurn(order: readonly { id: string }[], state: TurnState): TurnState {
+  if (order.length === 0) return { turnId: null, round: state.round };
+  const at = order.findIndex((e) => e.id === state.turnId);
+  if (at === -1) return { turnId: order[0].id, round: state.round };
+  if (at === order.length - 1) return { turnId: order[0].id, round: state.round + 1 };
+  return { turnId: order[at + 1].id, round: state.round };
+}
+
+/**
+ * The DM's undo for a Next pressed once too often. Back from the first
+ * combatant is the last one of the round before, never below round 1.
+ */
+export function previousTurn(order: readonly { id: string }[], state: TurnState): TurnState {
+  if (order.length === 0) return { turnId: null, round: state.round };
+  const at = order.findIndex((e) => e.id === state.turnId);
+  if (at === -1) return { turnId: order[0].id, round: state.round };
+  if (at > 0) return { turnId: order[at - 1].id, round: state.round };
+  if (state.round <= 1) return state;
+  return { turnId: order[order.length - 1].id, round: state.round - 1 };
+}
+
+/** 1-20, uniformly. The default die; tests pass their own. */
+export const rollD20 = (): number => 1 + Math.floor(Math.random() * 20);
+
+/**
+ * An initiative roll: d20 plus the bonus (initiative()'s total for a PC, the
+ * typed bonus for a monster). Advantage on initiative (Feral Instinct, the
+ * Sentinel Shield) isn't modelled, see KNOWN_ISSUES.
+ */
+export function rollInitiative(
+  bonus: number,
+  d20: () => number = rollD20,
+): { roll: number; total: number } {
+  const roll = d20();
+  return { roll, total: roll + bonus };
+}
