@@ -74,6 +74,37 @@ describe("keysForChange", () => {
     ).toEqual([["characters", CAMPAIGN], ["party", CAMPAIGN]]);
   });
 
+  it("sends a turn change to the campaign's fight", () => {
+    expect(
+      keysForChange(change("encounters", "UPDATE", { id: "e1", campaign_id: CAMPAIGN }), CAMPAIGN),
+    ).toEqual([["encounter", CAMPAIGN]]);
+  });
+
+  it("ignores another campaign's fight", () => {
+    expect(
+      keysForChange(change("encounters", "UPDATE", { id: "e1", campaign_id: OTHER }), CAMPAIGN),
+    ).toEqual([]);
+  });
+
+  it("invalidates the fight when it ends, though the delete has only the id", () => {
+    expect(
+      keysForChange(change("encounters", "DELETE", { id: "e1" }), CAMPAIGN),
+    ).toEqual([["encounter", CAMPAIGN]]);
+  });
+
+  it("sends a combatant change, which has no campaign_id, to this campaign's fight", () => {
+    // An initiative typed in, a monster turning Bloodied (171's status column).
+    expect(
+      keysForChange(
+        change("encounter_combatants", "UPDATE", { id: "c1", encounter_id: "e1", status: "bloodied" }),
+        CAMPAIGN,
+      ),
+    ).toEqual([["encounter", CAMPAIGN]]);
+    expect(
+      keysForChange(change("encounter_combatants", "DELETE", { id: "c1" }), CAMPAIGN),
+    ).toEqual([["encounter", CAMPAIGN]]);
+  });
+
   it("maps every published table to at least one key", () => {
     for (const table of REALTIME_TABLES) {
       expect(keysForChange(change(table, "UPDATE", {}), CAMPAIGN).length).toBeGreaterThan(0);

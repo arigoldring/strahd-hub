@@ -12,8 +12,8 @@ import type { QueryKey } from "@tanstack/react-query";
 // "this is stale", and the existing queryFn refetches it. One extra request
 // per change, which is nothing at this app's size.
 //
-// Must list every table in 170's publication. Adding a table there without a
-// case here means its events arrive and invalidate nothing.
+// Must list every table in the publication (170, 172). Adding a table there
+// without a case here means its events arrive and invalidate nothing.
 export const REALTIME_TABLES = [
   "characters",
   "character_stats",
@@ -22,6 +22,8 @@ export const REALTIME_TABLES = [
   "character_companions",
   "party_inventory",
   "party_currency",
+  "encounters",
+  "encounter_combatants",
 ] as const;
 
 export type RealtimeTable = (typeof REALTIME_TABLES)[number];
@@ -78,6 +80,17 @@ export function keysForChange(change: RowChange, campaignId: string): QueryKey[]
       return [["partyInventory", campaignId]];
     case "party_currency":
       return [["partyCurrency", campaignId]];
+    case "encounters":
+      // Round and whose turn. useEncounter reads the fight and its
+      // combatants under this one key.
+      return [["encounter", campaignId]];
+    case "encounter_combatants":
+      // No campaign_id (171), so another campaign's combatant can't be told
+      // apart and refetches this campaign's fight: one wasted request. Not
+      // the ["encounter"] prefix: the other campaign's fight is not on
+      // screen, and opening it within staleTime (60 s) of the change is the
+      // only way to see it out of date, for a DM running two fights at once.
+      return [["encounter", campaignId]];
   }
 }
 
@@ -97,5 +110,6 @@ export function keysAfterReconnect(campaignId: string): QueryKey[] {
     ["characterCompanions"],
     ["partyInventory", campaignId],
     ["partyCurrency", campaignId],
+    ["encounter", campaignId],
   ];
 }
