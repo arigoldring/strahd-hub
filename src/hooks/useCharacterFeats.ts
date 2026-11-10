@@ -4,7 +4,17 @@ import {
   removeFeatFromCharacter,
 } from "../services/characterFeats";
 import { errorMessage } from "../lib/errors";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+/** Exported for the initiative tracker's useQueries, characterSheetQuery's reason. */
+export const characterFeatsQuery = (characterId: string) =>
+  queryOptions({
+    queryKey: ["characterFeats", characterId],
+    queryFn: () =>
+      getCharacterFeats(characterId).catch((err) => {
+        throw new Error(errorMessage(err, "Failed to load this character's feats"));
+      }),
+  });
 
 // Keyed by character alone, with no campaign in the key, for
 // useCharacterSpells' reason: a character id already implies exactly one
@@ -16,15 +26,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 export function useCharacterFeats(characterId: string) {
   const queryClient = useQueryClient();
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["characterFeats", characterId],
-    queryFn: () =>
-      getCharacterFeats(characterId).catch((err) => {
-        throw new Error(
-          errorMessage(err, "Failed to load this character's feats"),
-        );
-      }),
-  });
+  const { data, isLoading, error } = useQuery(characterFeatsQuery(characterId));
 
   // Invalidate rather than patch. The add cannot report what it wrote — it
   // upserts with ignoreDuplicates, so a duplicate comes back with no row —

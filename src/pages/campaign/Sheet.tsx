@@ -21,7 +21,7 @@ import {
   armorClass,
   attacksPerAction,
   averageHp,
-  collectEffects,
+  characterEffects,
   critThreshold,
   damageString,
   effectiveSkillLevel,
@@ -272,11 +272,7 @@ function FullSheet({
   // level of the class that grants it, plus the race's, subrace's and feats'
   // (159, 164) at total level. The numbers below read from this; a row with
   // no effect key is display only.
-  const effects = collectEffects(classes, featureCatalog, [
-    race?.effect ?? null,
-    subrace?.effect ?? null,
-    ...ownFeats.map((f) => f.effect),
-  ]);
+  const effects = characterEffects(classes, featureCatalog, race, subrace, ownFeats);
   // Untrained skills take Jack of All Trades or Remarkable Athlete, and so
   // do the passives, which are built from this.
   const skillTotal = (key: SkillKey) => {

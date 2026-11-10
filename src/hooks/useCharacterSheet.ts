@@ -16,7 +16,21 @@ import {
 } from "../services/characterSheet";
 import type { Ability, ProficiencyLevel } from "../data/rules";
 import { errorMessage } from "../lib/errors";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+/**
+ * The sheet's query, exported so the initiative tracker can read every PC's
+ * sheet with useQueries under the same key and the same queryFn. One
+ * definition, so the two can't cache different shapes under one key.
+ */
+export const characterSheetQuery = (characterId: string) =>
+  queryOptions({
+    queryKey: ["characterSheet", characterId],
+    queryFn: () =>
+      getCharacterSheet(characterId).catch((err) => {
+        throw new Error(errorMessage(err, "Failed to load this character's sheet"));
+      }),
+  });
 
 // Keyed by character alone, useCharacterInventory's reasoning: a character id
 // already implies one campaign.
@@ -32,17 +46,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 // failed save belongs next to the control that caused it.
 export function useCharacterSheet(characterId: string) {
   const queryClient = useQueryClient();
-  const queryKey = ["characterSheet", characterId];
+  const query = characterSheetQuery(characterId);
+  const queryKey = query.queryKey;
   // Lets useCampaignRealtime hold back an echo while a write is in flight.
   const mutationKey = [...queryKey, "write"];
 
-  const { data, isLoading, error } = useQuery({
-    queryKey,
-    queryFn: () =>
-      getCharacterSheet(characterId).catch((err) => {
-        throw new Error(errorMessage(err, "Failed to load this character's sheet"));
-      }),
-  });
+  const { data, isLoading, error } = useQuery(query);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey });
 

@@ -345,6 +345,27 @@ export function collectEffects(
 }
 
 /**
+ * Every effect a character has, from every source: class features at each
+ * class's level, and the race's, subrace's and feats' keys at total level.
+ * The one place that lists the sources, so the sheet and the initiative
+ * tracker can't disagree, and a new source (Dark Gifts, WANTED_FEATURES) is
+ * added once.
+ */
+export function characterEffects(
+  classes: Parameters<typeof collectEffects>[0],
+  features: Parameters<typeof collectEffects>[1],
+  race: { effect: FeatureEffect | null } | null,
+  subrace: { effect: FeatureEffect | null } | null,
+  feats: readonly { effect: FeatureEffect | null }[],
+): Map<FeatureEffect, number> {
+  return collectEffects(classes, features, [
+    race?.effect ?? null,
+    subrace?.effect ?? null,
+    ...feats.map((f) => f.effect),
+  ]);
+}
+
+/**
  * Attacks per Attack action. Extra Attack from two classes doesn't stack
  * (PHB multiclassing), so this is the best single source: 2 for Extra
  * Attack, or the Fighter's 3 at 11th and 4 at 20th.
