@@ -127,8 +127,13 @@
   color: var(--sh-mute);
 }
 
-.combat__init-input {
+/* [type="number"] is load-bearing: theme.css's input[type="number"] (0,1,1)
+   outranks a bare class (0,1,0), and its 14px side padding left one digit's
+   room in the box, so a 12 showed as a 1 or a 2. */
+.combat__init-input[type="number"] {
   width: 56px;
+  -moz-appearance: textfield;
+  appearance: textfield;
   padding: 4px 2px;
   font: 500 18px/1 var(--sh-display);
   text-align: center;
@@ -179,7 +184,15 @@
   color: var(--sh-mute);
 }
 
-.combat__num {
+/* The spinner arrows would take a third of a 56px box. */
+.combat__init-input::-webkit-inner-spin-button,
+.combat__init-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* [type="number"]: see .combat__init-input. */
+.combat__num[type="number"] {
   width: 52px;
   padding: 2px 4px;
   font: inherit;
