@@ -428,6 +428,37 @@ pickers read `getClasses(campaignId)` / `getRaces(campaignId)`.
 leaving it open: closing it needs a trigger re-deriving the character's
 campaign on every write.
 
+### The initiative tracker: what the first version leaves out (noted 2026-11-09)
+
+The tracker (171-172, the Combat page) was scoped on 2026-11-09. Each item
+below was decided with the design and is not an oversight. Conditions are a
+wanted feature, not an accepted gap (WANTED_FEATURES).
+
+- **A PC from another campaign can be put in a fight by hand.** 041's hole
+  again: `encounter_combatants` has no `campaign_id` (the sibling-table
+  rule), so nothing ties a combatant's character to the fight's campaign. A
+  DM of A and B can insert B's character into A's fight, where A's players
+  can't read the character and the row shows "Unknown". The client never
+  offers it: Start and the "+ Name" buttons read `useParty(campaignId)`.
+  *What would change it:* nothing short of a trigger, the same answer as
+  for feats and classes.
+- **Ties can't be overridden.** Initiative, then DEX score, then name, then
+  id, on every screen. The PHB lets the DM decide a tie; the table chose DEX
+  instead, so there is no `tiebreak` column. *Fix:* a stored `tiebreak`
+  smallint, sorted after DEX, set by ▲/▼ on tied rows.
+- **Monster stats aren't live across DM tabs.** `encounter_monster_stats` is
+  never published (172), so a second DM tab or device sees HP changes on
+  refocus or after `staleTime`. The Bloodied/Down badge is live, since it
+  rides on the published combatant row. *What would change it:* a DM
+  running the fight from two devices at once.
+- **Start is two requests, not a transaction.** The fight row, then its
+  combatants. If the second fails, the fight exists with nobody in it, which
+  the page shows as an empty fight with "+ Name" buttons and End. A
+  security-invoker RPC would make it one transaction; not worth it for a
+  failure that repairs itself in one click.
+- **The confirms are `window.confirm`.** End fight and Roll everyone use the
+  browser's dialog, which is plain next to the rest of the app.
+
 ### Use counters and rests: what the first version leaves out (noted 2026-11-07)
 
 The counters work (`features-count`, 153 on) tracks uses of class features,

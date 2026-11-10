@@ -3,7 +3,7 @@
 Open work: things that are wrong and still want fixing. Each entry says what it
 takes to trigger, what it costs, and what the fix would be.
 
-**Current through migration 168. Last updated 2026-11-07.**
+**Current through migration 172. Last updated 2026-11-09.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below. Two sibling
@@ -546,6 +546,27 @@ class.
 
 **Fix:** check the 63 pairs against TCoE's "Expanded Spell Lists" tables,
 then add or `array_remove` the difference in a follow-up migration.
+
+### The tracker rolls initiative without advantage (noted 2026-11-09)
+
+The Combat page's Roll buttons are `rollInitiative`: one d20 plus the
+sheet's `initiative()` bonus. Nothing models advantage on initiative, which
+the 2014 books grant through Feral Instinct (Barbarian 7th), the Weapon of
+Warning, the Sentinel Shield and the Helm of Awareness infusion (151).
+
+**Trigger:** the DM pressing Roll, Roll the unrolled or Roll everyone for
+a character who has one of those.
+
+**Cost:** that PC's roll is one d20 instead of the better of two. The player
+can type their own roll over it, so nothing is lost but the convenience.
+
+**Fix:** an `initiative_advantage` effect key on Feral Instinct (the
+159/160 two-migration order: domain and client first, then the key on the
+row), read by `combatStats`, and an `advantage` flag on `rollInitiative`.
+The magic items need item effects, which don't exist (items have no
+`effect` column). A related follow-up: the "regain one use when you roll
+initiative" features (ACCEPTED_ISSUES, use counters) could be triggered from
+the same button.
 
 ### EditItem forgets where it came from on a refresh (noted 2026-09-30)
 

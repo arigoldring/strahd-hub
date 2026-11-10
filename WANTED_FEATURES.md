@@ -41,64 +41,25 @@ case in `keysForChange` and a test, plus the table's keys in
   each table's key before publishing it. A DM-only table (`*_dm_notes`) should
   never be published.
 
-## Initiative and encounter tracker (noted 2026-11-09)
+## Conditions in the initiative tracker (noted 2026-11-09)
 
-A DM page for running combat: turn order, whose turn it is, rounds, and
-conditions. It would be the first page built for _using_ the app at the table
-rather than looking things up in it.
+The tracker (171-172) shipped without conditions, by decision: turn order and
+HP first, conditions once it has been used at the table. Wanted: poisoned,
+frightened, concentrating and the rest on a combatant, ideally with a round
+count that ticks down at the start of that combatant's turn.
 
-**What it would hold:**
+**Questions to answer first:**
 
-- **PCs**, with HP read from `character_stats` and damage applied through
-  `adjust_character_hp`, so the tracker and the sheet are the same number.
-- **The steel defender**, through `adjust_companion_hp`, found by its effect key
-  as the sheet finds it.
-- **Ad-hoc monsters**: a name, initiative, HP and AC typed in on the spot. No
-  monster catalogue, which would be a project of its own.
-- **Conditions** per combatant (poisoned, frightened, concentrating), ideally
-  with a round count.
-
-**Decided (2026-11-09):**
-
-- **Stored, one live fight per campaign.** `encounters` is unique on
-  `campaign_id` and holds `round` plus `turn_combatant_id` (an id, not an
-  index, so adding or removing a monster mid-fight doesn't shift the turn).
-  Ending the fight deletes it, and the combatants cascade with it.
-  `encounters` and `encounter_combatants` are published to Realtime.
-- **One "Combat" page for everyone.** The DM gets the controls, players get
-  the order read-only, and the page shows an empty state when no fight is
-  running.
-- **Players see a monster's Bloodied/Down state, never its numbers.** HP, AC
-  and the initiative bonus live in `encounter_monster_stats`, which is
-  DM-only and never published. A trigger on it writes `status` onto the
-  combatant row. That is a stored derived column on purpose: a definer RPC
-  would hide the HP just as well, but players would never hear the status
-  change, because the DM-only table can't be published. The combatant pin
-  trigger refuses direct writes to `status`, DM included, unless
-  `pg_trigger_depth() > 1`.
-- **The DM can roll for everyone, and a player can enter their own PC's
-  initiative.** `encounter_combatants` UPDATE is `can_edit_character` for a
-  PC row, plus an allowlist pin trigger (095's shape) that leaves a non-DM
-  only `initiative`. A roll is d20 plus the sheet's `initiative()`; advantage
-  on initiative is not modelled.
-- **Order:** initiative, then the higher DEX score, then name A-Z. The DM has
-  no manual override. A PC's DEX is read from `character_stats` and a
-  monster's is a public column on its combatant row, because players compute
-  the order too. Alphabetical rather than random, because a random tiebreak
-  would have to be stored, or each client would sort the tie differently.
-  The steel defender has no initiative: it always sits directly after its
-  Artificer.
-- **Down combatants keep their turn** (death saves), dimmed. The DM removes
-  them.
-- **No conditions in v1.**
-- **Left open:** a DM of two campaigns can attach a PC of the other campaign
-  by hand (041 BLOCK 6's shape). Goes in ACCEPTED_ISSUES.
-
-**Build order (one commit each):** 171 schema, policies, pins, status trigger
-and verification blocks, then `gen:types` · 172 publication + `keysForChange`
-cases and tests · `turnOrder`, `nextTurn` and `rollInitiative` in `rules.ts`
-with tests · services and hooks (PC HP through `adjust_character_hp`, the
-defender's through `adjust_companion_hp`) · page, route and nav · docs.
+- **On the combatant or on the character?** A condition outlives a fight now
+  and then (poisoned until a long rest), which argues for the character, and
+  the sheet would show it. Most don't, and a monster has no character, so a
+  character table still leaves monsters needing their own. Two places to look
+  is the cost of putting it on the character.
+- **Do players see monsters' conditions?** Probably yes (they can see a
+  zombie is prone), which would make it a public column or table, unlike HP.
+- **Free text or a closed list?** The 2014 PHB's fifteen conditions plus
+  exhaustion's six levels are a closed list, which is a CHECK and a tuple
+  (one list in two places). Concentration isn't a condition but belongs here.
 
 ## Curse of Strahd campaign state (noted 2026-11-09)
 
