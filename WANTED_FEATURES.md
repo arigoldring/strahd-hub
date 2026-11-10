@@ -58,20 +58,47 @@ rather than looking things up in it.
 - **Conditions** per combatant (poisoned, frightened, concentrating), ideally
   with a round count.
 
-**Questions to answer first:**
+**Decided (2026-11-09):**
 
-- **Stored or session-only?** Session-only (React state, perhaps
-  `localStorage`) needs no schema, but a refresh mid-fight loses it and players
-  can't see it. Stored means an `encounters` table plus a combatants table,
-  DM-write and member-read, and that turn order reaches players' screens.
-  That second point is what makes realtime (see the plan for it) the
-  dependency.
-- **Do players see monster HP?** Probably not exact numbers. If it's stored,
-  that is a reveal-gating question, and CLAUDE.md's rule applies: a separate
-  DM-only table, not a hidden column.
-- **Are conditions on the character or on the encounter?** A condition outlives
-  a fight now and then (poisoned until a long rest), which argues for the
-  character. Most don't.
+- **Stored, one live fight per campaign.** `encounters` is unique on
+  `campaign_id` and holds `round` plus `turn_combatant_id` (an id, not an
+  index, so adding or removing a monster mid-fight doesn't shift the turn).
+  Ending the fight deletes it, and the combatants cascade with it.
+  `encounters` and `encounter_combatants` are published to Realtime.
+- **One "Combat" page for everyone.** The DM gets the controls, players get
+  the order read-only, and the page shows an empty state when no fight is
+  running.
+- **Players see a monster's Bloodied/Down state, never its numbers.** HP, AC
+  and the initiative bonus live in `encounter_monster_stats`, which is
+  DM-only and never published. A trigger on it writes `status` onto the
+  combatant row. That is a stored derived column on purpose: a definer RPC
+  would hide the HP just as well, but players would never hear the status
+  change, because the DM-only table can't be published. The combatant pin
+  trigger refuses direct writes to `status`, DM included, unless
+  `pg_trigger_depth() > 1`.
+- **The DM can roll for everyone, and a player can enter their own PC's
+  initiative.** `encounter_combatants` UPDATE is `can_edit_character` for a
+  PC row, plus an allowlist pin trigger (095's shape) that leaves a non-DM
+  only `initiative`. A roll is d20 plus the sheet's `initiative()`; advantage
+  on initiative is not modelled.
+- **Order:** initiative, then the higher DEX score, then name A-Z. The DM has
+  no manual override. A PC's DEX is read from `character_stats` and a
+  monster's is a public column on its combatant row, because players compute
+  the order too. Alphabetical rather than random, because a random tiebreak
+  would have to be stored, or each client would sort the tie differently.
+  The steel defender has no initiative: it always sits directly after its
+  Artificer.
+- **Down combatants keep their turn** (death saves), dimmed. The DM removes
+  them.
+- **No conditions in v1.**
+- **Left open:** a DM of two campaigns can attach a PC of the other campaign
+  by hand (041 BLOCK 6's shape). Goes in ACCEPTED_ISSUES.
+
+**Build order (one commit each):** 171 schema, policies, pins, status trigger
+and verification blocks, then `gen:types` · 172 publication + `keysForChange`
+cases and tests · `turnOrder`, `nextTurn` and `rollInitiative` in `rules.ts`
+with tests · services and hooks (PC HP through `adjust_character_hp`, the
+defender's through `adjust_companion_hp`) · page, route and nav · docs.
 
 ## Curse of Strahd campaign state (noted 2026-11-09)
 
