@@ -1,5 +1,6 @@
 import { Outlet, NavLink } from "react-router-dom";
 import { useCampaign } from "./CampaignLayout";
+import { useDmView } from "../hooks/useDmView";
 import { AccountControls, PreviewToggle } from "./RailControls";
 import { MobileNav } from "./MobileNav";
 import { visibleNavItems, isDmStyled, type NavItem } from "./navItems";
@@ -23,7 +24,12 @@ export function Layout() {
   // because this is where the indicator renders, and it covers the same
   // routes: Layout is CampaignLayout's only child.
   const liveStatus = useCampaignRealtime(campaign.id);
-  const items = visibleNavItems(campaign.isDm, fortunesRead);
+  // showDmUi, so a previewing DM's nav is a player's: no New Item or Invites,
+  // and no Fortunes until the reading is revealed. The pages behind those
+  // links keep their own bare-isDm guards, so preview never bounces a DM who
+  // is already on one.
+  const { showDmUi } = useDmView();
+  const items = visibleNavItems(showDmUi, fortunesRead);
   const navClass = (item: NavItem) =>
     isDmStyled(item, fortunesRead) ? "app-nav__dm" : undefined;
 
@@ -41,8 +47,9 @@ export function Layout() {
           >
             {campaign.isDm ? "Dungeon Master" : "Player"}
           </span>
-          {/* The rail itself is not part of what preview hides — the badge
-              above and the DM links below stay exactly as they are. */}
+          {/* The badge above and the toggle below are who is signed in, so
+              preview leaves them alone; the DM links are filtered out of
+              `items` above. */}
           <LiveStatus status={liveStatus} />
           {campaign.isDm && <PreviewToggle />}
         </div>
