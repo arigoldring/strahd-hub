@@ -635,41 +635,59 @@ as of `6b7dee5`) with feats added to its embed.
 **Fix:** the same one the spells entry wants — a mutation that invalidates both
 keys, or a shared invalidator that knows a character belongs to a campaign.
 
-### Player preview is a per-page discipline with nothing enforcing it (noted 2026-08-19)
+### Reveal-gated reads in player preview are opt-in per page (noted 2026-08-19, narrowed 2026-11-12)
 
-Preview is two independent opt-ins that every page has to remember separately:
-`asPlayer: previewing` on each reveal-gated read, and `showDmUi` in place of
-`campaign.isDm` on each DM control. Nothing checks that a page did either. A new
-page is preview-blind by default, and a preview-blind page looks completely
-normal — the leak is only visible to someone who knows what the row should have
-said.
+**The controls half is fixed** (FIXED_ISSUES, "DM controls showed in player
+preview"): `useDmView` answers `showDmUi` once, and
+`src/lib/dmViewDiscipline.test.ts` fails on any unexplained bare
+`campaign.isDm` in pages or components.
 
-That is how three of them accumulated on Home.tsx, the page a DM lands on
-straight after toggling: an unfiltered `useLocations` drawing a pin at the true
-coordinates of every unrevealed location, a "Roads Known" count reading 4 / 17
-where a player sees 4 / 4, and a band captioned "For the DM's eyes only" still
-standing in player view. All three fixed 2026-08-19, along with the same gate on
-Inventory's forge link, Recaps' New-recap form and Delete, and Party's Give and
-Teach footers.
+What remains is the reads. Every reveal-gated hook (`useLocations`,
+`useNpcs`, `useFortunes`, `useMaps`) still has to be passed
+`{ asPlayer }` from `useDmView`, and nothing checks that a page did. A page
+that forgets draws a previewing DM the unrevealed rows, and looks normal while
+doing it. Home once drew a pin at the true coordinates of every unrevealed
+location this way (fixed 2026-08-19).
 
 **Trigger:** adding a page, or adding a reveal-gated read to an existing one.
 
-**Cost:** the mode exists to be trusted. A DM who has checked the dashboard in
-preview and found it clean has been told something false about their table.
+**Cost:** the DM is told less is hidden than really is. Not a leak to players:
+RLS has already filtered their rows, and for them `asPlayer` is a no-op
+except on the client-side map registry.
 
-**Fix:** the two halves want different answers. The reads could stop being
-opt-in — a `useRevealGated` wrapper, or the preview flag moving into the query
-layer — but the hooks deliberately take `asPlayer` as an argument rather than
-reading the context, so that they stay data and work outside the provider, and
-that is worth keeping. The controls are the more tractable half: `showDmUi` is
-recomputed identically in six files now, and belongs on the campaign context
-beside `isDm` where a page gets it without knowing to ask.
+**Fix:** the hooks deliberately take `asPlayer` as an argument rather than
+reading the context, so they stay data and work outside the provider; that is
+worth keeping. The cheap enforcement is a second case in
+`dmViewDiscipline.test.ts` failing on a call to one of the four hooks without
+`asPlayer` (or a marker saying why not). Wrapper hooks per page would also
+do it, at the cost of four more names.
 
-Note the coupling, which is what makes this worse than a checklist item: fixing
-only the read half is a **regression**, not a partial fix. Home's DM band counts
-`hidden` and `annotated` off the location list, so filtering the list without
-also hiding the band leaves it confidently reporting "Every road revealed" while
-ten locations are hidden. Any page doing both must change both in one edit.
+Note the coupling, which is what makes this worse than a checklist item:
+fixing only the read half is a **regression**, not a partial fix. Home's DM
+band counts `hidden` and `annotated` off the location list, so filtering the
+list without also hiding the band leaves it confidently reporting "Every road
+revealed" while ten locations are hidden. Any page doing both must change both
+in one edit.
+
+### `npm run lint` checks no source files (noted 2026-11-12)
+
+`eslint.config.js` matches only `**/*.{js,jsx}`, and the app is all
+`.ts`/`.tsx`, so `eslint .` passes having linted nothing but the config
+itself. That includes `react-hooks/rules-of-hooks` and `exhaustive-deps`,
+which a codebase this hook-heavy wants most.
+
+The obvious fix, typescript-eslint, supports TypeScript `>=4.8.4 <6.1.0`
+(v8.72.2, checked 2026-11-12). This repo is on 7.0.2, the native compiler,
+which has no JS API for the parser to call.
+
+**Cost:** a CI job that runs `lint` is green by construction, which reads as
+coverage. The preview check that was planned as a lint rule is a vitest text
+scan instead for this reason.
+
+**Fix:** wait for typescript-eslint to support TypeScript 7; or install a 5.x
+compiler beside it for ESLint alone (an npm alias), which means two compilers
+to keep in step; or take `lint` out of CI until then, so nothing claims it
+ran.
 
 ### `asPlayerView` cannot filter a field that came from another table (noted 2026-08-19)
 

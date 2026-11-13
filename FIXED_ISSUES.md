@@ -6,6 +6,22 @@ fixed it, and which migration did it.
 
 ---
 
+### DM controls showed in player preview (noted 2026-08-19, resolved 2026-11-12, no migration)
+
+Eleven pages each recomputed `showDmUi = campaign.isDm && !previewing`, and
+anything that read bare `campaign.isDm` instead showed its DM controls in
+preview. Four places did: the nav (New Item, Invites, and Fortunes before the
+reading was revealed), the Give form on a player's pack, and the edit controls
+on other players' sheets (CharacterSpells, CharacterFeats, the full Sheet).
+
+`src/hooks/useDmView.ts` now answers `showDmUi` and `asPlayer` once, those
+four read it, and `src/lib/dmViewDiscipline.test.ts` fails on any bare
+`.isDm` in pages or components without a `dm-identity:` comment. The
+legitimate ones (route guards, the role badge, the preview toggle, the
+Character/Sheet dispatch) carry one. The hook stays out of `useCampaign()`
+on purpose; see PlayerPreviewContext. The read half is still open
+(KNOWN_ISSUES, "Reveal-gated reads in player preview are opt-in per page").
+
 ### The steel defender had no stat block (noted 2026-11-07, resolved 2026-11-07 by 167 and 168)
 
 The Battle Smith's defender was one text row (150); its HP, AC and attacks
