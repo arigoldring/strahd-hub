@@ -41,6 +41,7 @@ import "./character.css";
  */
 export function Character() {
   const campaign = useCampaign();
+  // dm-identity: a DM has no character; preview is handled on the sheets.
   return campaign.isDm ? <CharacterRoster /> : <OwnCharacter />;
 }
 

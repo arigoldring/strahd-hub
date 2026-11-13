@@ -27,6 +27,7 @@ export function CreateFeat() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  // dm-identity: route guard; preview must not bounce a DM off this page.
   if (!campaign.isDm)
     return <Navigate to={`/campaign/${campaign.id}`} replace />;
 

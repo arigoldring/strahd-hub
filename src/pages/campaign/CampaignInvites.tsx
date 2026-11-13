@@ -30,6 +30,7 @@ export function CampaignInvites() {
   // sitting in someone else's campaign as a player passes the old global check
   // and fails both of these, so gating on it would have offered them a page that
   // can only disappoint.
+  // dm-identity: route guard; preview must not bounce a DM off this page.
   if (!campaign.isDm)
     return <Navigate to={`/campaign/${campaign.id}`} replace />;
 

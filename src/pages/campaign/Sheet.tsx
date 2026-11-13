@@ -111,6 +111,7 @@ export function Sheet() {
   const campaign = useCampaign();
   return (
     <div className="ch sm-wide">
+      {/* dm-identity: a DM has no character; canEdit handles preview. */}
       {campaign.isDm ? <DmSheetPicker /> : <OwnSheet />}
     </div>
   );

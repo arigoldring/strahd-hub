@@ -30,6 +30,10 @@ export function Layout() {
   // is already on one.
   const { showDmUi } = useDmView();
   const items = visibleNavItems(showDmUi, fortunesRead);
+  // The role badge, the nav labels and the preview toggle say who is signed
+  // in, so preview leaves them alone. The toggle has to survive its own
+  // effect, or switching preview on would remove the way back.
+  const signedInAsDm = campaign.isDm; // dm-identity: see above
   const navClass = (item: NavItem) =>
     isDmStyled(item, fortunesRead) ? "app-nav__dm" : undefined;
 
@@ -43,15 +47,12 @@ export function Layout() {
           <p className="app-rail__eyebrow">Campaign</p>
           <p className="app-rail__name">{campaign.name}</p>
           <span
-            className={`app-rail__role${campaign.isDm ? " app-rail__role--dm" : ""}`}
+            className={`app-rail__role${signedInAsDm ? " app-rail__role--dm" : ""}`}
           >
-            {campaign.isDm ? "Dungeon Master" : "Player"}
+            {signedInAsDm ? "Dungeon Master" : "Player"}
           </span>
-          {/* The badge above and the toggle below are who is signed in, so
-              preview leaves them alone; the DM links are filtered out of
-              `items` above. */}
           <LiveStatus status={liveStatus} />
-          {campaign.isDm && <PreviewToggle />}
+          {signedInAsDm && <PreviewToggle />}
         </div>
 
         <div className="app-nav">
@@ -64,7 +65,7 @@ export function Layout() {
                 end={item.end}
                 className={navClass(item)}
               >
-                {item.label(campaign.isDm)}
+                {item.label(signedInAsDm)}
               </NavLink>
             ))}
           <div className="app-nav__rule" />
@@ -76,7 +77,7 @@ export function Layout() {
                 to={item.to}
                 className={navClass(item)}
               >
-                {item.label(campaign.isDm)}
+                {item.label(signedInAsDm)}
               </NavLink>
             ))}
         </div>

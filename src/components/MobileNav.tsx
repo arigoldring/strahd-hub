@@ -25,6 +25,8 @@ export function MobileNav({
   navClass: (item: NavItem) => string | undefined;
 }) {
   const [open, setOpen] = useState(false);
+  // dm-identity: badge, labels and preview toggle, as in Layout.
+  const signedInAsDm = campaign.isDm;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const { pathname } = useLocation();
 
@@ -64,7 +66,7 @@ export function MobileNav({
         {tabs.map((tab) => (
           <NavLink key={tab.to} to={tab.to} end={tab.end} className="tabbar__tab">
             {TAB_ICONS[tab.to]}
-            <span>{tab.label(campaign.isDm)}</span>
+            <span>{tab.label(signedInAsDm)}</span>
           </NavLink>
         ))}
         <button
@@ -99,9 +101,9 @@ export function MobileNav({
               <p className="sheet__campaign">{campaign.name}</p>
             </div>
             <span
-              className={`app-rail__role${campaign.isDm ? " app-rail__role--dm" : ""}`}
+              className={`app-rail__role${signedInAsDm ? " app-rail__role--dm" : ""}`}
             >
-              {campaign.isDm ? "Dungeon Master" : "Player"}
+              {signedInAsDm ? "Dungeon Master" : "Player"}
             </span>
           </div>
 
@@ -116,12 +118,12 @@ export function MobileNav({
                 // would leave the sheet open over the page you asked for.
                 onClick={() => setOpen(false)}
               >
-                {item.label(campaign.isDm)}
+                {item.label(signedInAsDm)}
               </NavLink>
             ))}
           </div>
 
-          {campaign.isDm && (
+          {signedInAsDm && (
             <div className="sheet__preview">
               <PreviewToggle />
             </div>

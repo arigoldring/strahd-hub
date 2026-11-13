@@ -25,6 +25,7 @@ export function EditItem() {
   // Same guard as CreateItem: bare isDm, not showDmUi, so toggling player
   // preview doesn't throw the DM off a half-finished edit. 053 refuses a
   // non-DM's save regardless.
+  // dm-identity: route guard; preview must not bounce a DM off this page.
   if (!campaign.isDm)
     return <Navigate to={`/campaign/${campaign.id}`} replace />;
   if (isLoading) return <p>Loading item...</p>;
