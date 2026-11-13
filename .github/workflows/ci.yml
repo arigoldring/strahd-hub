@@ -1,0 +1,36 @@
+# Runs the client-side checks on every push and pull request.
+#
+# Cloudflare Pages deploys independently of this workflow, so a red run here
+# does not stop a deploy. What stops a type error from deploying is the build
+# script itself (`tsc --noEmit && vite build`). This workflow adds lint and
+# tests on top, which the build does not run.
+#
+# Database/RLS checks are not covered here (KNOWN_ISSUES: "Nothing runs the
+# checks automatically").
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test

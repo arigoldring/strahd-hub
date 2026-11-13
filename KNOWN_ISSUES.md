@@ -892,15 +892,16 @@ all.
 
 **Fix:** three lines at the top saying what it cleans and that it is idempotent.
 
-### Nothing runs the checks automatically, and RLS is verified only by hand (noted 2026-11-09)
+### RLS is verified only by hand (noted 2026-11-09)
 
-There is no `.github/` and no CI of any kind. `npm run typecheck`, `npm run
-lint` and `npm test` exist, but they run only when someone remembers to type
-them, and Cloudflare Pages builds with `vite build`, which strips types without
-checking them. So a commit that fails `tsc` deploys. The only test file is
-`src/data/rules.test.ts`. Services, hooks and pages have none.
+The client half is covered as of 2026-11-12: `.github/workflows/ci.yml` runs
+`typecheck`, `lint` and `test` on every push and PR, and `build` is now
+`tsc --noEmit && vite build`, so Cloudflare Pages refuses to deploy a type
+error. The workflow does not gate deploys, so a lint or test failure still
+deploys; it only shows red on GitHub. The tests cover `rules.ts` and
+`realtimeKeys.ts`. Services, hooks and pages have none.
 
-The bigger gap is the database. This app's security model is its RLS policies
+The remaining gap is the database. This app's security model is its RLS policies
 and the security-definer RPCs, and the checks for those are the verification
 blocks at the bottom of each migration. Those run only when pasted into the
 Supabase SQL editor one at a time, against the live database, and only on the
@@ -908,24 +909,19 @@ day the migration lands. A later migration that loosens a policy, or replaces a
 seed function from an older copy (the seed-function caution in CLAUDE.md),
 re-runs none of the earlier blocks.
 
-**Trigger:** any change that breaks a type, or a policy that an older
-migration's block would have caught. The second fails silently: a policy that
-lets too much through raises nothing.
+**Trigger:** a policy that an older migration's block would have caught. It
+fails silently: a policy that lets too much through raises nothing.
 
 **Cost:** so far, none that anyone has seen. That is the problem: a regression
 in a reveal-gating policy hands players DM-only rows with no visible symptom.
 
-**Fix, in two steps that are worth doing separately:**
-
-1. A GitHub Action on push running `typecheck`, `lint` and `test`. About twenty
-   minutes of work, and it covers the client.
-2. Run RLS checks automatically against a local database (`supabase start`,
-   with the migrations applied in order), either by porting the verification
-   blocks to pgTAP (`supabase test db`) or by a vitest suite that signs in as a
-   DM, a player and a non-member and asserts what each can read and write.
-   This is the larger job. It also needs a decision on whether `db/` replays
-   cleanly from 001 into an empty database, which nothing has tested since
-   about 010.
+**Fix:** run RLS checks automatically against a local database (`supabase
+start`, with the migrations applied in order), either by porting the
+verification blocks to pgTAP (`supabase test db`) or by a vitest suite that
+signs in as a DM, a player and a non-member and asserts what each can read and
+write. Then add it as a job in `ci.yml`. This also needs a decision on whether
+`db/` replays cleanly from 001 into an empty database, which nothing has tested
+since about 010.
 
 ---
 
