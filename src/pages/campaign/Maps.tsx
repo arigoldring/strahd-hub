@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../../services/AuthContext";
 import { useCampaign } from "../../components/CampaignLayout";
-import { usePlayerPreview } from "../../components/PlayerPreviewContext";
+import { useDmView } from "../../hooks/useDmView";
 import { useMaps } from "../../hooks/useMaps";
 import { errorMessage } from "../../lib/errors";
 import "./maps.css";
@@ -15,19 +15,17 @@ export function Maps() {
   const { loading: authLoading } = useAuth();
   // Non-null by construction — this route sits under CampaignLayout.
   const campaign = useCampaign();
-  const { previewing } = usePlayerPreview();
-  const showDmUi = campaign.isDm && !previewing;
+  const { showDmUi, asPlayer } = useDmView();
   // See MapView.tsx's identical comment: the registry has no RLS behind it, so
   // this flag is the only thing keeping a hidden map's card off a player's
   // screen.
-  const mapsAsPlayer = !campaign.isDm || previewing;
   const {
     data: maps = [],
     isLoading: mapsLoading,
     error,
     toggleReveal,
     toggleRevealError,
-  } = useMaps(campaign.id, { asPlayer: mapsAsPlayer });
+  } = useMaps(campaign.id, { asPlayer });
 
   if (authLoading || mapsLoading) return <p>Loading...</p>;
   if (error) return <p>{error.message}</p>;

@@ -1,6 +1,6 @@
 import { KeyboardEvent, SubmitEvent, useEffect, useRef, useState } from "react";
 import { useCampaign } from "../../components/CampaignLayout";
-import { usePlayerPreview } from "../../components/PlayerPreviewContext";
+import { useDmView } from "../../hooks/useDmView";
 import { useAuth } from "../../services/AuthContext";
 import { useParty } from "../../hooks/useParty";
 import {
@@ -46,9 +46,8 @@ import "./combat.css";
  */
 export function Combat() {
   const campaign = useCampaign();
-  const { previewing } = usePlayerPreview();
   const { profile } = useAuth();
-  const showDmUi = campaign.isDm && !previewing;
+  const { showDmUi } = useDmView();
 
   const { data: party = [], isLoading: partyLoading, error: partyError } = useParty(campaign.id);
   const fight = useEncounter(campaign.id);

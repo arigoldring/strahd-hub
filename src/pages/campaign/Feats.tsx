@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useSearchBar } from "../../hooks/useSearchBar";
 import { useFeats } from "../../hooks/useFeats";
 import { useCampaign } from "../../components/CampaignLayout";
-import { usePlayerPreview } from "../../components/PlayerPreviewContext";
+import { useDmView } from "../../hooks/useDmView";
 import { FeatDetailCard } from "../../components/FeatDetailCard";
 import {
   featCategories,
@@ -17,7 +17,6 @@ export function Feats() {
   // Resolved by CampaignLayout above this route; scopes the catalogue to shared
   // plus this campaign's homebrew, same as the grimoire and the Shop.
   const campaign = useCampaign();
-  const { previewing } = usePlayerPreview();
   const { data: feats = [], isLoading: loading, error } = useFeats(campaign.id);
   const [categoryFilter, setCategoryFilter] = useState<FeatCategory | null>(null);
   const { setSearch, filtered: searchFiltered } = useSearchBar(feats);
@@ -32,7 +31,7 @@ export function Feats() {
   // Gates the authoring link only. The route guard on CreateFeat itself uses
   // bare campaign.isDm, because a guard that tripped on preview would bounce a
   // DM out of a page they had already navigated to before toggling.
-  const showDmUi = campaign.isDm && !previewing;
+  const { showDmUi } = useDmView();
 
   if (loading) return <p>Loading feats...</p>;
   if (error) return <p>Couldn't load feats: {error.message}</p>;

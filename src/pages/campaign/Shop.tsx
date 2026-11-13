@@ -9,7 +9,7 @@ import {
   rarityLabel,
 } from "../../services/items";
 import { useCampaign } from "../../components/CampaignLayout";
-import { usePlayerPreview } from "../../components/PlayerPreviewContext";
+import { useDmView } from "../../hooks/useDmView";
 import { addToPartyInventory } from "../../services/partyInventory";
 import { errorMessage } from "../../lib/errors";
 import {
@@ -24,10 +24,9 @@ export function Shop() {
   // the catalog (shared SRD plus this campaign's homebrew — see getItems) and
   // adding to a party's inventory are scoped to it.
   const campaign = useCampaign();
-  const { previewing } = usePlayerPreview();
   // Gates the Edit link on a homebrew card, nothing else. showDmUi rather
   // than bare isDm so player preview shows the card a player would see.
-  const showDmUi = campaign.isDm && !previewing;
+  const { showDmUi } = useDmView();
   const { data: items = [], isLoading: loading, error } = useItems(campaign.id);
   // The open item is held by id, not as the Item itself — same as Maps holds a
   // location id. Storing the object would leave `panel` pointing at whichever

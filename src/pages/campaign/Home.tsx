@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useCampaign } from "../../components/CampaignLayout";
-import { usePlayerPreview } from "../../components/PlayerPreviewContext";
+import { useDmView } from "../../hooks/useDmView";
 import { useRecaps } from "../../hooks/useRecaps";
 import { useLocations } from "../../hooks/useLocations";
 import { usePartyInventory } from "../../hooks/usePartyInventory";
@@ -32,7 +32,6 @@ function byline(recap: Recap): string {
 
 export function Home() {
   const campaign = useCampaign();
-  const { previewing } = usePlayerPreview();
   // The dashboard is the page a DM lands on after toggling, which makes it the
   // page a leak is least likely to be noticed on. Two things have to move
   // together here, and neither is correct alone:
@@ -46,7 +45,7 @@ export function Home() {
   //                    longer in the list — and the DM band starts reporting
   //                    "Every road revealed" while ten locations are hidden.
   //                    A confident lie is worse than the leak it replaced.
-  const showDmUi = campaign.isDm && !previewing;
+  const { showDmUi, asPlayer } = useDmView();
   const {
     data: recaps = [],
     isLoading: recapsLoading,
@@ -56,7 +55,7 @@ export function Home() {
     data: locations = [],
     isLoading: locationsLoading,
     error: locationsError,
-  } = useLocations(campaign.id, { asPlayer: previewing });
+  } = useLocations(campaign.id, { asPlayer });
   const {
     data: entries = [],
     isLoading: hoardLoading,
