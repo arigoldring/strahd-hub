@@ -188,7 +188,7 @@ accidental double-add a no-op. Nothing tells the player the difference.
 **Trigger:** taking either of those two feats twice. 041's BLOCK 5 is the case,
 written from the accident side.
 
-**Cost:** two feats out of forty-two, on a sheet that records no level either, so
+**Cost:** two feats out of seventy-two (none of 170's thirty is repeatable), on a sheet that records no level either, so
 "took it at 8 and again at 12" is not expressible in the first place.
 
 **Fix:** a `times_taken int not null default 1 check (times_taken > 0)` and 030's
@@ -202,15 +202,19 @@ already on the sheet, so the no-op is visible rather than silent.
 The column holds strings like "Strength 13 or higher" and "Proficiency with heavy
 armor". `characters` stores a name, a campaign and an owner — no level, no class,
 no ability scores, no proficiencies — so there is nothing to evaluate them
-against, in the database or the client. Eleven of the forty-two seeded feats carry
-one and any player can take any of them.
+against, in the database or the client. Twenty-nine of the seventy-two shared feats
+carry one (eleven from 040, eighteen from 170) and any player can take any of them.
+Fifteen of 170's are racial ("Halfling", "Elf (drow)"), which are now the easiest to
+check, since a character has a `race_id` (054/056).
 
 **Cost:** none as a bug; the app is a shared reference sheet, and the DM at the
 table is the enforcement layer. It is written down because "prerequisite" is a
 word that implies a check, and the next person to read the schema will look for
 one.
 
-**Fix:** nothing, unless characters grow stats. If they ever do, the honest
+**Fix:** since 056 characters do have stats, classes and a race, so a check is now
+possible but still unwritten. The racial ones are the cheapest place to start. The
+honest
 version is a warning beside the picker rather than a disabled option — a DM
 waiving a prerequisite is a normal thing to do, and a hard block would be wrong.
 
