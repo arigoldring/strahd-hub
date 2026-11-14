@@ -3,7 +3,7 @@
 Open work: things that are wrong and still want fixing. Each entry says what it
 takes to trigger, what it costs, and what the fix would be.
 
-**Current through migration 168. Last updated 2026-11-07.**
+**Current through migration 172. Last updated 2026-11-09.**
 
 This is the single source of truth for open work. `CLAUDE.md` holds decisions
 and invariants and deliberately does not duplicate anything below. Two sibling
@@ -81,7 +81,14 @@ direction. It will not show up in a first-run smoke test.
 same note belongs on `getOrCreateProfile`, where the argument is different (the
 losing insert is expected) but the mechanism is the same.
 
-### The party cache goes stale for a minute after a write from a sheet (noted 2026-08-17, corrected 2026-08-22)
+### The party cache goes stale for a minute after a write from a sheet (noted 2026-08-17, corrected 2026-08-22, narrowed 2026-11-09 by 170)
+
+**Half fixed by realtime (170).** `character_inventory` is published, and every
+write echoes back as an event that invalidates `["party", campaignId]`
+(`keysForChange` in `src/lib/realtimeKeys.ts`), so the item half is correct
+while the socket is live. `character_spells` is not published yet, so the spell
+half below still stands. Publishing it in realtime's phase 2 (WANTED_FEATURES)
+closes this entry without the hook change the Fix proposes.
 
 `useCharacterSpells` and `useCharacterInventory` invalidate only their own key.
 The same rows are read through a _second_ cache entry, `["party", campaignId]`,
@@ -544,6 +551,27 @@ class.
 **Fix:** check the 63 pairs against TCoE's "Expanded Spell Lists" tables,
 then add or `array_remove` the difference in a follow-up migration.
 
+### The tracker rolls initiative without advantage (noted 2026-11-09)
+
+The Combat page's Roll buttons are `rollInitiative`: one d20 plus the
+sheet's `initiative()` bonus. Nothing models advantage on initiative, which
+the 2014 books grant through Feral Instinct (Barbarian 7th), the Weapon of
+Warning, the Sentinel Shield and the Helm of Awareness infusion (151).
+
+**Trigger:** the DM pressing Roll, Roll the unrolled or Roll everyone for
+a character who has one of those.
+
+**Cost:** that PC's roll is one d20 instead of the better of two. The player
+can type their own roll over it, so nothing is lost but the convenience.
+
+**Fix:** an `initiative_advantage` effect key on Feral Instinct (the
+159/160 two-migration order: domain and client first, then the key on the
+row), read by `combatStats`, and an `advantage` flag on `rollInitiative`.
+The magic items need item effects, which don't exist (items have no
+`effect` column). A related follow-up: the "regain one use when you roll
+initiative" features (ACCEPTED_ISSUES, use counters) could be triggered from
+the same button.
+
 ### EditItem forgets where it came from on a refresh (noted 2026-09-30)
 
 The Edit link passes the page it was pressed on as router state, and EditItem
@@ -611,41 +639,59 @@ as of `6b7dee5`) with feats added to its embed.
 **Fix:** the same one the spells entry wants — a mutation that invalidates both
 keys, or a shared invalidator that knows a character belongs to a campaign.
 
-### Player preview is a per-page discipline with nothing enforcing it (noted 2026-08-19)
+### Reveal-gated reads in player preview are opt-in per page (noted 2026-08-19, narrowed 2026-11-12)
 
-Preview is two independent opt-ins that every page has to remember separately:
-`asPlayer: previewing` on each reveal-gated read, and `showDmUi` in place of
-`campaign.isDm` on each DM control. Nothing checks that a page did either. A new
-page is preview-blind by default, and a preview-blind page looks completely
-normal — the leak is only visible to someone who knows what the row should have
-said.
+**The controls half is fixed** (FIXED_ISSUES, "DM controls showed in player
+preview"): `useDmView` answers `showDmUi` once, and
+`src/lib/dmViewDiscipline.test.ts` fails on any unexplained bare
+`campaign.isDm` in pages or components.
 
-That is how three of them accumulated on Home.tsx, the page a DM lands on
-straight after toggling: an unfiltered `useLocations` drawing a pin at the true
-coordinates of every unrevealed location, a "Roads Known" count reading 4 / 17
-where a player sees 4 / 4, and a band captioned "For the DM's eyes only" still
-standing in player view. All three fixed 2026-08-19, along with the same gate on
-Inventory's forge link, Recaps' New-recap form and Delete, and Party's Give and
-Teach footers.
+What remains is the reads. Every reveal-gated hook (`useLocations`,
+`useNpcs`, `useFortunes`, `useMaps`) still has to be passed
+`{ asPlayer }` from `useDmView`, and nothing checks that a page did. A page
+that forgets draws a previewing DM the unrevealed rows, and looks normal while
+doing it. Home once drew a pin at the true coordinates of every unrevealed
+location this way (fixed 2026-08-19).
 
 **Trigger:** adding a page, or adding a reveal-gated read to an existing one.
 
-**Cost:** the mode exists to be trusted. A DM who has checked the dashboard in
-preview and found it clean has been told something false about their table.
+**Cost:** the DM is told less is hidden than really is. Not a leak to players:
+RLS has already filtered their rows, and for them `asPlayer` is a no-op
+except on the client-side map registry.
 
-**Fix:** the two halves want different answers. The reads could stop being
-opt-in — a `useRevealGated` wrapper, or the preview flag moving into the query
-layer — but the hooks deliberately take `asPlayer` as an argument rather than
-reading the context, so that they stay data and work outside the provider, and
-that is worth keeping. The controls are the more tractable half: `showDmUi` is
-recomputed identically in six files now, and belongs on the campaign context
-beside `isDm` where a page gets it without knowing to ask.
+**Fix:** the hooks deliberately take `asPlayer` as an argument rather than
+reading the context, so they stay data and work outside the provider; that is
+worth keeping. The cheap enforcement is a second case in
+`dmViewDiscipline.test.ts` failing on a call to one of the four hooks without
+`asPlayer` (or a marker saying why not). Wrapper hooks per page would also
+do it, at the cost of four more names.
 
-Note the coupling, which is what makes this worse than a checklist item: fixing
-only the read half is a **regression**, not a partial fix. Home's DM band counts
-`hidden` and `annotated` off the location list, so filtering the list without
-also hiding the band leaves it confidently reporting "Every road revealed" while
-ten locations are hidden. Any page doing both must change both in one edit.
+Note the coupling, which is what makes this worse than a checklist item:
+fixing only the read half is a **regression**, not a partial fix. Home's DM
+band counts `hidden` and `annotated` off the location list, so filtering the
+list without also hiding the band leaves it confidently reporting "Every road
+revealed" while ten locations are hidden. Any page doing both must change both
+in one edit.
+
+### `npm run lint` checks no source files (noted 2026-11-12)
+
+`eslint.config.js` matches only `**/*.{js,jsx}`, and the app is all
+`.ts`/`.tsx`, so `eslint .` passes having linted nothing but the config
+itself. That includes `react-hooks/rules-of-hooks` and `exhaustive-deps`,
+which a codebase this hook-heavy wants most.
+
+The obvious fix, typescript-eslint, supports TypeScript `>=4.8.4 <6.1.0`
+(v8.72.2, checked 2026-11-12). This repo is on 7.0.2, the native compiler,
+which has no JS API for the parser to call.
+
+**Cost:** a CI job that runs `lint` is green by construction, which reads as
+coverage. The preview check that was planned as a lint rule is a vitest text
+scan instead for this reason.
+
+**Fix:** wait for typescript-eslint to support TypeScript 7; or install a 5.x
+compiler beside it for ESLint alone (an npm alias), which means two compilers
+to keep in step; or take `lint` out of CI until then, so nothing claims it
+ran.
 
 ### `asPlayerView` cannot filter a field that came from another table (noted 2026-08-19)
 
@@ -849,6 +895,37 @@ a review of migrations 034–037 managed to conclude the file wasn't committed a
 all.
 
 **Fix:** three lines at the top saying what it cleans and that it is idempotent.
+
+### RLS is verified only by hand (noted 2026-11-09)
+
+The client half is covered as of 2026-11-12: `.github/workflows/ci.yml` runs
+`typecheck`, `lint` and `test` on every push and PR, and `build` is now
+`tsc --noEmit && vite build`, so Cloudflare Pages refuses to deploy a type
+error. The workflow does not gate deploys, so a lint or test failure still
+deploys; it only shows red on GitHub. The tests cover `rules.ts` and
+`realtimeKeys.ts`. Services, hooks and pages have none.
+
+The remaining gap is the database. This app's security model is its RLS policies
+and the security-definer RPCs, and the checks for those are the verification
+blocks at the bottom of each migration. Those run only when pasted into the
+Supabase SQL editor one at a time, against the live database, and only on the
+day the migration lands. A later migration that loosens a policy, or replaces a
+seed function from an older copy (the seed-function caution in CLAUDE.md),
+re-runs none of the earlier blocks.
+
+**Trigger:** a policy that an older migration's block would have caught. It
+fails silently: a policy that lets too much through raises nothing.
+
+**Cost:** so far, none that anyone has seen. That is the problem: a regression
+in a reveal-gating policy hands players DM-only rows with no visible symptom.
+
+**Fix:** run RLS checks automatically against a local database (`supabase
+start`, with the migrations applied in order), either by porting the
+verification blocks to pgTAP (`supabase test db`) or by a vitest suite that
+signs in as a DM, a player and a non-member and asserts what each can read and
+write. Then add it as a job in `ci.yml`. This also needs a decision on whether
+`db/` replays cleanly from 001 into an empty database, which nothing has tested
+since about 010.
 
 ---
 

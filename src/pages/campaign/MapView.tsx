@@ -3,7 +3,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { useAuth } from "../../services/AuthContext";
 import { useCampaign } from "../../components/CampaignLayout";
-import { usePlayerPreview } from "../../components/PlayerPreviewContext";
+import { useDmView } from "../../hooks/useDmView";
 import { useLocations } from "../../hooks/useLocations";
 import { useMaps, CampaignMap } from "../../hooks/useMaps";
 import { Location } from "../../services/locations";
@@ -40,23 +40,21 @@ export function MapView() {
   // the pin fetch to this campaign so a DM in two campaigns doesn't get both
   // campaigns' pins merged onto one map.
   const campaign = useCampaign();
-  const { previewing } = usePlayerPreview();
   const { mapId } = useParams();
 
-  // Not `previewing`, and this page is the one place that distinction matters.
-  // On every other reveal-gated read RLS already dropped what a player may not
-  // see, so asPlayer only reproduces that for a DM. The map registry is
-  // client-side — there is no RLS to have done it — so this flag is the ONLY
-  // thing hiding a map from a real player. See src/data/maps.ts.
-  const mapsAsPlayer = !campaign.isDm || previewing;
+  // asPlayer is true for a real player as well as a previewing DM, and on this
+  // read that matters: the map registry is client-side — there is no RLS to
+  // have hidden anything — so this flag is the ONLY thing hiding a map from a
+  // real player. See src/data/maps.ts and useDmView.
+  const { asPlayer } = useDmView();
   const {
     data: maps = [],
     isLoading: mapsLoading,
     error: mapsError,
-  } = useMaps(campaign.id, { asPlayer: mapsAsPlayer });
+  } = useMaps(campaign.id, { asPlayer });
 
-  // Still plain `previewing` here: pin reveal IS RLS-gated, so a real player's
-  // response never carried the hidden rows.
+  // Pin reveal IS RLS-gated, so for a real player this re-filter is a no-op;
+  // it only does work for a previewing DM.
   const {
     data: locations = [],
     isLoading: locationsLoading,
@@ -65,7 +63,7 @@ export function MapView() {
     saveDmNotes,
     toggleVisibility,
     toggleVisibilityError,
-  } = useLocations(campaign.id, { asPlayer: previewing });
+  } = useLocations(campaign.id, { asPlayer });
 
   // mapsLoading is not optional here. Without it the first render has
   // maps = [], the find below misses, and every hard refresh of a viewer URL
@@ -117,7 +115,6 @@ function MapViewInner({
   toggleVisibilityError: Error | null;
 }) {
   const campaign = useCampaign();
-  const { previewing } = usePlayerPreview();
   // campaign.isDm, not profile.role — after 018 "dms update locations" checks
   // is_campaign_dm(campaign_id), so a global DM who's only a player in this
   // campaign must not see the Edit button the update behind it would then
@@ -127,7 +124,7 @@ function MapViewInner({
   // showDmUi is the weaker, presentation-only question the markup below asks:
   // is the DM currently asking to see their own tools. It gates controls, never
   // a write — see PlayerPreviewContext.
-  const showDmUi = campaign.isDm && !previewing;
+  const { showDmUi } = useDmView();
 
   // The open location is held by id, not as a copied Location object: the
   // drawer then re-renders straight from the list, so a saved edit shows up
@@ -165,7 +162,7 @@ function MapViewInner({
     closePanel();
     clearPeek();
     setShowVisibilityPanel(false);
-  }, [previewing, closePanel, clearPeek]);
+  }, [showDmUi, closePanel, clearPeek]);
 
   // The peek is rendered OUTSIDE the zoom transform and positioned from the
   // marker's live screen rect, so it stays a constant size at any zoom level

@@ -1,7 +1,7 @@
 import { SubmitEvent, useEffect, useState } from "react";
 import { useAuth } from "../../services/AuthContext";
 import { useCampaign } from "../../components/CampaignLayout";
-import { usePlayerPreview } from "../../components/PlayerPreviewContext";
+import { useDmView } from "../../hooks/useDmView";
 import { useRecaps } from "../../hooks/useRecaps";
 import { Recap } from "../../services/recaps";
 import { errorMessage } from "../../lib/errors";
@@ -24,7 +24,6 @@ export function Recaps() {
   // already resolved the :campaignId param against the campaigns this user can
   // see. A new recap is filed against this one.
   const campaign = useCampaign();
-  const { previewing } = usePlayerPreview();
   // campaign.isDm, not profile.role — after 019 the "dms create recaps" and
   // "dms delete recaps" policies check is_campaign_dm(campaign_id), so a global
   // DM who's only a player in this campaign must not see the New-recap form or
@@ -35,7 +34,7 @@ export function Recaps() {
   // table — so preview costs the DM nothing here but the two controls only they
   // have, which is exactly what preview is for. It gates controls, never a
   // write: 019 is still the thing that refuses.
-  const showDmUi = campaign.isDm && !previewing;
+  const { showDmUi } = useDmView();
   const {
     data: recaps = [],
     isLoading: loading,
@@ -63,7 +62,7 @@ export function Recaps() {
   useEffect(() => {
     setCreating(false);
     setEditingId(null);
-  }, [previewing]);
+  }, [showDmUi]);
 
   if (authLoading || loading) return <p>Loading...</p>;
   if (error) return <p>{error.message}</p>;

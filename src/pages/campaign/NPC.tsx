@@ -1,7 +1,7 @@
 import { SubmitEvent, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../services/AuthContext";
 import { useCampaign } from "../../components/CampaignLayout";
-import { usePlayerPreview } from "../../components/PlayerPreviewContext";
+import { useDmView } from "../../hooks/useDmView";
 import { useNpcs } from "../../hooks/useNpcs";
 import { useLocations } from "../../hooks/useLocations";
 import { Npc, NpcEdit } from "../../services/npcs";
@@ -27,7 +27,6 @@ export function Npcs() {
   const { loading: authLoading } = useAuth();
   // Non-null by construction — this route sits under CampaignLayout.
   const campaign = useCampaign();
-  const { previewing } = usePlayerPreview();
   // campaign.isDm, not profile.role: the policies behind these controls ask
   // is_campaign_dm, so a global DM who is only a player here must not be shown
   // buttons the database would then refuse. That gate and the RLS agree, and
@@ -37,7 +36,7 @@ export function Npcs() {
   // currently asking to be shown their own tools. Preview may take the controls
   // away; it does not take the permission away, and nothing that talks to the
   // database may be gated on this.
-  const showDmUi = campaign.isDm && !previewing;
+  const { showDmUi, asPlayer } = useDmView();
   const {
     data: allNpcs = [],
     isLoading: npcsLoading,
@@ -46,12 +45,12 @@ export function Npcs() {
     saveDmNotes,
     toggleVisibility,
     toggleVisibilityError,
-  } = useNpcs(campaign.id, { asPlayer: previewing });
+  } = useNpcs(campaign.id, { asPlayer });
   // Two jobs, not one. The obvious one is the DM's location picker in the
   // editor. The other is below: this is the previewed list of locations, and it
   // is what decides which NPCs are allowed to name their home.
   const { data: locations = [] } = useLocations(campaign.id, {
-    asPlayer: previewing,
+    asPlayer,
   });
 
   // The second half of the preview filter, and the half asPlayerView cannot do
@@ -65,8 +64,8 @@ export function Npcs() {
   // useMemo because this feeds a mapped render and the inputs are cache arrays
   // that change identity only on refetch.
   const npcs = useMemo(
-    () => (previewing ? hideUnseenLocationNames(allNpcs, locations) : allNpcs),
-    [previewing, allNpcs, locations],
+    () => (asPlayer ? hideUnseenLocationNames(allNpcs, locations) : allNpcs),
+    [asPlayer, allNpcs, locations],
   );
 
   // Held by id rather than as a copied object, so an open editor re-renders
@@ -85,7 +84,7 @@ export function Npcs() {
     setNotesId(null);
     setShowVisibilityPanel(false);
     setExpandedPortrait(null);
-  }, [previewing]);
+  }, [showDmUi]);
 
   useEffect(() => {
     if (!expandedPortrait) return;

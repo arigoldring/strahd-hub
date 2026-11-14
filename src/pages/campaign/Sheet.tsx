@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useCampaign } from "../../components/CampaignLayout";
+import { useDmView } from "../../hooks/useDmView";
 import { useAuth } from "../../services/AuthContext";
 import { useCharacter } from "../../hooks/useCharacter";
 import { useParty } from "../../hooks/useParty";
@@ -21,7 +22,7 @@ import {
   armorClass,
   attacksPerAction,
   averageHp,
-  collectEffects,
+  characterEffects,
   critThreshold,
   damageString,
   effectiveSkillLevel,
@@ -110,6 +111,7 @@ export function Sheet() {
   const campaign = useCampaign();
   return (
     <div className="ch sm-wide">
+      {/* dm-identity: a DM has no character; canEdit handles preview. */}
       {campaign.isDm ? <DmSheetPicker /> : <OwnSheet />}
     </div>
   );
@@ -183,7 +185,9 @@ function FullSheet({
   const campaign = useCampaign();
   // 056's policies are owner-or-DM; this mirrors them so a player browsing
   // someone else's sheet sees numbers, not inputs that would be refused.
-  const canEdit = isOwn || campaign.isDm;
+  // showDmUi rather than isDm, so a previewing DM sees that read-only sheet.
+  const { showDmUi } = useDmView();
+  const canEdit = isOwn || showDmUi;
 
   const sheetQuery = useCharacterSheet(character.id);
   const { data: classCatalog = [] } = useClasses(campaign.id);
@@ -272,11 +276,7 @@ function FullSheet({
   // level of the class that grants it, plus the race's, subrace's and feats'
   // (159, 164) at total level. The numbers below read from this; a row with
   // no effect key is display only.
-  const effects = collectEffects(classes, featureCatalog, [
-    race?.effect ?? null,
-    subrace?.effect ?? null,
-    ...ownFeats.map((f) => f.effect),
-  ]);
+  const effects = characterEffects(classes, featureCatalog, race, subrace, ownFeats);
   // Untrained skills take Jack of All Trades or Remarkable Athlete, and so
   // do the passives, which are built from this.
   const skillTotal = (key: SkillKey) => {

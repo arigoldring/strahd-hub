@@ -345,6 +345,27 @@ export function collectEffects(
 }
 
 /**
+ * Every effect a character has, from every source: class features at each
+ * class's level, and the race's, subrace's and feats' keys at total level.
+ * The one place that lists the sources, so the sheet and the initiative
+ * tracker can't disagree, and a new source (Dark Gifts, WANTED_FEATURES) is
+ * added once.
+ */
+export function characterEffects(
+  classes: Parameters<typeof collectEffects>[0],
+  features: Parameters<typeof collectEffects>[1],
+  race: { effect: FeatureEffect | null } | null,
+  subrace: { effect: FeatureEffect | null } | null,
+  feats: readonly { effect: FeatureEffect | null }[],
+): Map<FeatureEffect, number> {
+  return collectEffects(classes, features, [
+    race?.effect ?? null,
+    subrace?.effect ?? null,
+    ...feats.map((f) => f.effect),
+  ]);
+}
+
+/**
  * Attacks per Attack action. Extra Attack from two classes doesn't stack
  * (PHB multiclassing), so this is the best single source: 2 for Extra
  * Attack, or the Fighter's 3 at 11th and 4 at 20th.
@@ -1109,4 +1130,170 @@ export function pactSlots(warlockLevel: number): { count: number; slotLevel: num
 /** "1st", "2nd", "3rd", "4th"... for a spell level. */
 export function ordinal(n: number): string {
   return n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`;
+}
+
+// ---------------------------------------------------------------------------
+// The initiative tracker (171)
+// ---------------------------------------------------------------------------
+
+/** encounter_combatants.kind. 171's CHECK; one list in two places. */
+export const COMBATANT_KINDS = ["pc", "companion", "monster"] as const;
+export type CombatantKind = (typeof COMBATANT_KINDS)[number];
+
+/**
+ * What turnOrder needs of a combatant, resolved by the caller: `name` is the
+ * character's name, the defender's name, or the monster's; `dex` is the DEX
+ * score (character_stats for a PC, the combatant row for a monster, unused
+ * for a companion).
+ */
+export interface TurnEntry {
+  id: string;
+  kind: CombatantKind;
+  characterId: string | null;
+  name: string;
+  initiative: number | null;
+  dex: number;
+}
+
+/**
+ * The fixed locale is load-bearing. Every member's browser sorts the order
+ * itself, so a tie must break the same way on all of them; a bare
+ * localeCompare uses each browser's own locale, which can order names
+ * differently.
+ */
+const byName = (a: string, b: string): number =>
+  a.localeCompare(b, "en", { sensitivity: "base" });
+
+/**
+ * The turn order (decided 2026-11-09): initiative high to low, then the
+ * higher DEX score, then name A-Z, then id, so that two "Zombie"s still sort
+ * the same way on every screen. Anyone who hasn't rolled goes last.
+ *
+ * A companion has no initiative of its own. It acts right after its
+ * character, so it's placed directly after them, whatever the tie. One whose
+ * character isn't in the fight goes at the end.
+ */
+export function turnOrder<T extends TurnEntry>(entries: readonly T[]): T[] {
+  const companions = entries.filter((e) => e.kind === "companion");
+  const actors = entries
+    .filter((e) => e.kind !== "companion")
+    .sort((a, b) => {
+      if (a.initiative === null || b.initiative === null) {
+        if (a.initiative !== b.initiative) return a.initiative === null ? 1 : -1;
+      } else if (a.initiative !== b.initiative) {
+        return b.initiative - a.initiative;
+      }
+      if (a.dex !== b.dex) return b.dex - a.dex;
+      return byName(a.name, b.name) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    });
+
+  const placed = new Set<string>();
+  const order: T[] = [];
+  for (const actor of actors) {
+    order.push(actor);
+    if (actor.kind !== "pc") continue;
+    for (const c of companions) {
+      if (c.characterId === actor.characterId) {
+        order.push(c);
+        placed.add(c.id);
+      }
+    }
+  }
+  return [...order, ...companions.filter((c) => !placed.has(c.id))];
+}
+
+export interface TurnState {
+  turnId: string | null;
+  round: number;
+}
+
+/**
+ * The next turn. No current turn (the fight hasn't started, or the current
+ * combatant was removed) starts at the top without changing the round; the
+ * last combatant wraps to the first and starts a new round. Nobody is
+ * skipped: a combatant who is down still takes their turn (death saves), and
+ * one who hasn't rolled is at the bottom where the DM can see them.
+ */
+export function nextTurn(order: readonly { id: string }[], state: TurnState): TurnState {
+  if (order.length === 0) return { turnId: null, round: state.round };
+  const at = order.findIndex((e) => e.id === state.turnId);
+  if (at === -1) return { turnId: order[0].id, round: state.round };
+  if (at === order.length - 1) return { turnId: order[0].id, round: state.round + 1 };
+  return { turnId: order[at + 1].id, round: state.round };
+}
+
+/**
+ * The DM's undo for a Next pressed once too often. Back from the first
+ * combatant is the last one of the round before, never below round 1.
+ */
+export function previousTurn(order: readonly { id: string }[], state: TurnState): TurnState {
+  if (order.length === 0) return { turnId: null, round: state.round };
+  const at = order.findIndex((e) => e.id === state.turnId);
+  if (at === -1) return { turnId: order[0].id, round: state.round };
+  if (at > 0) return { turnId: order[at - 1].id, round: state.round };
+  if (state.round <= 1) return state;
+  return { turnId: order[order.length - 1].id, round: state.round - 1 };
+}
+
+/** 1-20, uniformly. The default die; tests pass their own. */
+export const rollD20 = (): number => 1 + Math.floor(Math.random() * 20);
+
+/**
+ * An initiative roll: d20 plus the bonus (initiative()'s total for a PC, the
+ * typed bonus for a monster). Advantage on initiative (Feral Instinct, the
+ * Sentinel Shield) isn't modelled, see KNOWN_ISSUES.
+ */
+export function rollInitiative(
+  bonus: number,
+  d20: () => number = rollD20,
+): { roll: number; total: number } {
+  const roll = d20();
+  return { roll, total: roll + bonus };
+}
+
+/** What the tracker needs of a PC, from the same rules the sheet uses. */
+export interface CombatStats {
+  /** The DEX score, the order's first tiebreak. */
+  dex: number;
+  /** initiative()'s total and the parts that make it. */
+  initiativeBonus: number;
+  initiativeParts: string[];
+  /** The steel defender's maximum HP, or null if the character has none. */
+  defenderMaxHp: number | null;
+}
+
+export function combatStats(input: {
+  scores: Record<Ability, number>;
+  classes: Parameters<typeof collectEffects>[0];
+  features: Parameters<typeof collectEffects>[1];
+  race: { effect: FeatureEffect | null } | null;
+  subrace: { effect: FeatureEffect | null } | null;
+  feats: readonly { effect: FeatureEffect | null }[];
+}): CombatStats {
+  const { scores, classes, features, race, subrace, feats } = input;
+  const effects = characterEffects(classes, features, race, subrace, feats);
+  const pb = proficiencyBonus(totalLevel(classes));
+  const mods = Object.fromEntries(
+    ABILITIES.map((a) => [a, abilityModifier(scores[a])]),
+  ) as Record<Ability, number>;
+  const init = initiative(mods, pb, effects);
+  // The sheet's rule: the defender's level is the Artificer's own level.
+  const defenderLevel = effects.get("steel_defender");
+  return {
+    dex: scores.dex,
+    initiativeBonus: init.total,
+    initiativeParts: init.parts,
+    defenderMaxHp:
+      defenderLevel != null ? steelDefender(defenderLevel, { intMod: mods.int, pb }).maxHp : null,
+  };
+}
+
+/**
+ * Monster names for the tracker: "Zombie" x3 is "Zombie 1", "Zombie 2",
+ * "Zombie 3", so the DM can tell them apart. One is just "Zombie".
+ */
+export function numberedNames(name: string, count: number): string[] {
+  const base = name.trim();
+  if (count <= 1) return [base];
+  return Array.from({ length: count }, (_, i) => `${base} ${i + 1}`);
 }

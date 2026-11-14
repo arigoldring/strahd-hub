@@ -25,7 +25,7 @@ dist-ssr
 .env
 
 # Local audit notes (not for the repo)
-src/pages/campaign/audit/
+audit/
 
 # Local planning notes (not for the repo)
 NEXT_STEPS.md

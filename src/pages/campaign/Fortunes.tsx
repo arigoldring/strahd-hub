@@ -1,6 +1,6 @@
 import { SubmitEvent, useEffect, useState } from "react";
 import { useCampaign } from "../../components/CampaignLayout";
-import { usePlayerPreview } from "../../components/PlayerPreviewContext";
+import { useDmView } from "../../hooks/useDmView";
 import { useFortunes } from "../../hooks/useFortunes";
 import { Fortune, visionText } from "../../services/fortunes";
 import { errorMessage } from "../../lib/errors";
@@ -17,10 +17,9 @@ const NUMERALS = ["I", "II", "III", "IV", "V"];
  */
 export function Fortunes() {
   const campaign = useCampaign();
-  const { previewing } = usePlayerPreview();
   // The same weaker question NPC and Recaps ask: preview puts the controls
   // away, never the permission.
-  const showDmUi = campaign.isDm && !previewing;
+  const { showDmUi, asPlayer } = useDmView();
   const {
     data: fortunes = [],
     isLoading,
@@ -31,7 +30,7 @@ export function Fortunes() {
     setFound,
     setFoundError,
     saveStanzas,
-  } = useFortunes(campaign.id, { asPlayer: previewing });
+  } = useFortunes(campaign.id, { asPlayer });
 
   // One open editor at a time, by id -- Recaps' shape.
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -40,7 +39,7 @@ export function Fortunes() {
   // it as a DM control on the page meant to show what a player sees.
   useEffect(() => {
     setEditingId(null);
-  }, [previewing]);
+  }, [showDmUi]);
 
   if (isLoading) return <p>Loading...</p>;
   if (error) return <p>{error.message}</p>;

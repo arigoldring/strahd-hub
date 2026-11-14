@@ -1,0 +1,306 @@
+/* ============================================================================
+   Combat — the initiative tracker. Import from pages/campaign/Combat.tsx,
+   AFTER character.css: it borrows .ch (the page frame), .ch-button,
+   .ch-empty and .ch-error from there and adds only the order.
+
+   Every colour is a theme.css custom property, character.css's rule.
+   ========================================================================== */
+
+.combat__heading {
+  margin: 0 0 18px;
+  font: 500 22px/1.1 var(--sh-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--sh-gold);
+}
+
+/* ---------- the round bar ---------- */
+
+.combat__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  padding: 12px 16px;
+  background: var(--sh-panel);
+  border: 1px solid var(--sh-rule-strong);
+  box-shadow: var(--sh-lift);
+}
+
+.combat__round {
+  font: 500 13px/1 var(--sh-display);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--sh-gold);
+}
+
+.combat__turn {
+  font-size: 20px;
+  color: var(--sh-bone-bright);
+}
+
+.combat__turn-label {
+  margin-right: 6px;
+  font: 500 10px/1 var(--sh-display);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--sh-mute);
+}
+
+.combat__controls {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.combat__next {
+  border-color: var(--sh-gold-deep);
+}
+
+.combat__your-turn {
+  margin: 12px 0 0;
+  padding: 8px 14px;
+  font: 500 13px/1.2 var(--sh-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sh-candle);
+  background: linear-gradient(90deg, rgba(106, 10, 10, 0.55), transparent);
+  border-left: 2px solid var(--sh-blood-bright);
+}
+
+/* ---------- DM controls ---------- */
+
+.combat__dm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.combat__end {
+  margin-left: auto;
+}
+
+/* ---------- the order ---------- */
+
+.combat__order {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.combat__row {
+  display: grid;
+  grid-template-columns: 64px minmax(160px, 1fr) minmax(200px, auto) auto;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--sh-rule-faint);
+  border-left: 2px solid transparent;
+}
+
+.combat__row--turn {
+  background: linear-gradient(90deg, rgba(199, 154, 90, 0.14), transparent 70%);
+  border-left-color: var(--sh-gold);
+}
+
+/* Sits under its artificer, a step in, so it reads as theirs. */
+.combat__row--companion {
+  padding-left: 28px;
+}
+
+.combat__row--down {
+  opacity: 0.5;
+}
+
+.combat__init {
+  text-align: center;
+}
+
+.combat__init-value,
+.combat__with {
+  font: 500 20px/1 var(--sh-display);
+  color: var(--sh-bone-bright);
+}
+
+.combat__with {
+  color: var(--sh-mute);
+}
+
+/* [type="number"] is load-bearing: theme.css's input[type="number"] (0,1,1)
+   outranks a bare class (0,1,0), and its 14px side padding left one digit's
+   room in the box, so a 12 showed as a 1 or a 2. */
+.combat__init-input[type="number"] {
+  width: 56px;
+  -moz-appearance: textfield;
+  appearance: textfield;
+  padding: 4px 2px;
+  font: 500 18px/1 var(--sh-display);
+  text-align: center;
+  color: var(--sh-bone-bright);
+  background: var(--sh-panel-sunk);
+  border: 1px solid var(--sh-rule-strong);
+}
+
+.combat__who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.combat__name {
+  font-size: 18px;
+  color: var(--sh-bone-bright);
+}
+
+.combat__meta {
+  font: 400 11px/1.2 var(--sh-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sh-dim);
+}
+
+.combat__hp {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.combat__hp-value {
+  font-family: var(--sh-mono);
+  font-size: 14px;
+  color: var(--sh-bone);
+  white-space: nowrap;
+}
+
+.combat__temp {
+  color: var(--sh-silver);
+}
+
+.combat__ac {
+  font-family: var(--sh-mono);
+  font-size: 13px;
+  color: var(--sh-mute);
+}
+
+/* The spinner arrows would take a third of a 56px box. */
+.combat__init-input::-webkit-inner-spin-button,
+.combat__init-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* [type="number"]: see .combat__init-input. */
+.combat__num[type="number"] {
+  width: 52px;
+  padding: 2px 4px;
+  font: inherit;
+  text-align: right;
+  color: inherit;
+  background: var(--sh-panel-sunk);
+  border: 1px solid var(--sh-rule);
+}
+
+.combat__adjust {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.combat__adjust input {
+  width: 56px;
+  padding: 4px;
+  font-family: var(--sh-mono);
+  color: var(--sh-bone);
+  background: var(--sh-panel-sunk);
+  border: 1px solid var(--sh-rule);
+}
+
+.combat__adjust .ch-button {
+  padding: 5px 8px;
+}
+
+.combat__status {
+  padding: 3px 8px;
+  font: 500 10px/1 var(--sh-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  border: 1px solid;
+}
+
+.combat__status--bloodied {
+  color: var(--sh-blood-ink);
+  border-color: var(--sh-blood-bright);
+}
+
+.combat__status--down {
+  color: var(--sh-dim);
+  border-color: var(--sh-rule-strong);
+}
+
+.combat__row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ---------- add monsters ---------- */
+
+.combat__add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  margin: 28px 0 0;
+  padding: 14px 16px;
+  background: var(--sh-panel);
+  border: 1px solid var(--sh-rule);
+}
+
+.combat__add-title {
+  flex-basis: 100%;
+  margin: 0;
+  font: 500 11px/1 var(--sh-display);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--sh-gold);
+}
+
+.combat__add label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font: 400 10px/1 var(--sh-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sh-mute);
+}
+
+.combat__add input {
+  width: 72px;
+  padding: 6px;
+  font: 400 15px/1.2 var(--sh-body);
+  color: var(--sh-bone);
+  background: var(--sh-panel-sunk);
+  border: 1px solid var(--sh-rule);
+}
+
+.combat__add input[type="text"] {
+  width: 180px;
+}
+
+/* ---------- phones ---------- */
+
+@media (max-width: 720px) {
+  .combat__row {
+    grid-template-columns: 52px 1fr;
+  }
+
+  .combat__hp,
+  .combat__row-actions {
+    grid-column: 2;
+  }
+
+  .combat__controls {
+    margin-left: 0;
+  }
+}

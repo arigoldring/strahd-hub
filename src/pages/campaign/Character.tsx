@@ -2,6 +2,7 @@ import { Fragment, ReactNode, SubmitEvent, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCampaign } from "../../components/CampaignLayout";
+import { useDmView } from "../../hooks/useDmView";
 import { useAuth } from "../../services/AuthContext";
 import { useCharacter } from "../../hooks/useCharacter";
 import { useParty } from "../../hooks/useParty";
@@ -31,13 +32,16 @@ import "./character.css";
 /**
  * The nav rail's "Character" destination. A DM has no PC of their own in the
  * campaign, so for them this is the roster of every player's character
- * (CharacterRoster) rather than the create/own-sheet flow below — isDm is the
- * whole branch, unaffected by player preview, the same as the nav rail's own
- * DM-only links (New Item, Invites) already are: this is a fact about who is
- * signed in, not something preview puts away.
+ * (CharacterRoster) rather than the create/own-sheet flow below. isDm is the
+ * whole branch, unaffected by player preview: a DM has no character, so the
+ * player's own-sheet flow would show a previewing DM nothing useful. Preview
+ * instead puts the DM's controls away on the sheets the roster opens (canEdit
+ * and the Give form read showDmUi), which is what a player browsing someone
+ * else's sheet sees.
  */
 export function Character() {
   const campaign = useCampaign();
+  // dm-identity: a DM has no character; preview is handled on the sheets.
   return campaign.isDm ? <CharacterRoster /> : <OwnCharacter />;
 }
 
@@ -310,7 +314,8 @@ export function CharacterSpells({
   isOwn: boolean;
 }) {
   const campaign = useCampaign();
-  const canEdit = isOwn || campaign.isDm;
+  const { showDmUi } = useDmView();
+  const canEdit = isOwn || showDmUi;
   const {
     data: entries = [],
     isLoading,
@@ -628,7 +633,8 @@ export function CharacterFeats({
   isOwn: boolean;
 }) {
   const campaign = useCampaign();
-  const canEdit = isOwn || campaign.isDm;
+  const { showDmUi } = useDmView();
+  const canEdit = isOwn || showDmUi;
   const {
     data: entries = [],
     isLoading,
@@ -913,7 +919,7 @@ export function CharacterCarried({
   characterId: string;
   isOwn: boolean;
 }) {
-  const campaign = useCampaign();
+  const { showDmUi } = useDmView();
   const { data: entries = [], error } = useCharacterInventory(characterId);
 
   const stacks = entries.length;
@@ -972,7 +978,7 @@ export function CharacterCarried({
             Open the pack →
           </Link>
         ) : (
-          campaign.isDm && <GiveItemForm characterId={characterId} />
+          showDmUi && <GiveItemForm characterId={characterId} />
         )}
       </div>
     </>

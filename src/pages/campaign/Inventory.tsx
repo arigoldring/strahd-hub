@@ -1,7 +1,7 @@
 import { SubmitEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCampaign } from "../../components/CampaignLayout";
-import { usePlayerPreview } from "../../components/PlayerPreviewContext";
+import { useDmView } from "../../hooks/useDmView";
 import { useCharacter } from "../../hooks/useCharacter";
 import { useCharacterInventory } from "../../hooks/useCharacterInventory";
 import { usePartyInventory } from "../../hooks/usePartyInventory";
@@ -510,12 +510,10 @@ function Hoard({
   campaignId: string;
   characterId?: string;
 }) {
-  const campaign = useCampaign();
-  const { previewing } = usePlayerPreview();
   // Nothing else on this page is reveal-gated — gear has no is_revealed and
   // never has — so this exists for exactly one line: the forge link at the foot
   // of the rail. Maps and NPC define it the same way for the same reason.
-  const showDmUi = campaign.isDm && !previewing;
+  const { showDmUi } = useDmView();
   const {
     data: entries = [],
     isLoading,

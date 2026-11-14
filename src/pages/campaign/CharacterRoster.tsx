@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useCampaign } from "../../components/CampaignLayout";
 import { useParty } from "../../hooks/useParty";
+import { useDmView } from "../../hooks/useDmView";
 import type { PartyCharacter } from "../../services/characters";
 import "./character.css";
 
@@ -18,6 +19,7 @@ import "./character.css";
  */
 export function CharacterRoster() {
   const campaign = useCampaign();
+  const { showDmUi } = useDmView();
   const { data: party = [], isLoading, error } = useParty(campaign.id);
 
   if (isLoading) return <p>Consulting the ledger...</p>;
@@ -33,8 +35,9 @@ export function CharacterRoster() {
         <p className="page-head__eyebrow">— Who Walks Barovia —</p>
         <h1>Characters</h1>
         <p className="page-head__sub">
-          Pick a player to see their sheet — spells, feats and gear can all be
-          added from there.
+          {showDmUi
+            ? "Pick a player to see their sheet — spells, feats and gear can all be added from there."
+            : "Pick a player to see their sheet."}
         </p>
       </header>
 

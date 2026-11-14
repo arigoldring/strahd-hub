@@ -23,6 +23,7 @@ export function CreateItem() {
   const navigate = useNavigate();
   const { createHomeBrewItem } = usePartyInventory(campaign.id);
 
+  // dm-identity: route guard; preview must not bounce a DM off this page.
   if (!campaign.isDm)
     return <Navigate to={`/campaign/${campaign.id}`} replace />;
 

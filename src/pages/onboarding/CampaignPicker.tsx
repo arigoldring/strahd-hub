@@ -218,6 +218,7 @@ function CampaignRow({
           about buttons that should not have been there. Since the only DM of a
           campaign is its creator (014), this gate is also exactly "the DM who
           created it may delete it". */}
+      {/* dm-identity: outside any campaign route; there is no preview here. */}
       {campaign.isDm && (
         <div className="campaign-row__actions">
           <button onClick={onStartRename}>Rename</button>
