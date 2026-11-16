@@ -6,6 +6,26 @@ fixed it, and which migration did it.
 
 ---
 
+### The demo characters started with default stats (noted 2026-10-05, resolved 2026-11-15, fixture only)
+
+`demo_campaign_reset.sql` predated 056, so every demo seat had all scores at 10,
+1 HP and no class or race, and nothing added since showed up on the demo. The
+fixture now writes a full sheet for each seat: scores, HP, race and subrace, a
+class and subclass (Artificer/Battle Smith on the demo seat, then Battle Master,
+Twilight, Gloom Stalker, Arcane Trickster and Evocation), saves from the class
+row, skills, tools and expertise, worn gear, fighting styles, maneuvers and
+infusions, a steel defender, and a few spent counters. It also sets a fixed
+reveal state, adds the NPCs the campaign's seed predated (058–064), and writes
+a live round-2 encounter. Each new table has a check that runs before the delete.
+Applied and re-run on 2026-11-15; both runs gave identical sheets.
+
+### The demo reset did not restore the party hoard or purse (noted 2026-08-31, resolved 2026-11-15, fixture only)
+
+Was in `ACCEPTED_ISSUES.md`. `party_inventory` and `party_currency` are
+member-writable, so a visitor could spend the purse or junk the hoard and the
+reset left both alone. The fixture now deletes and rewrites both (hoard stacks
+stamped as the DM's).
+
 ### Any signed-in account could read every profile (noted 2026-11-10 by audit pass 1, resolved 2026-11-15 by 173)
 
 007's "authenticated read profiles" was `using (true)`, written when one

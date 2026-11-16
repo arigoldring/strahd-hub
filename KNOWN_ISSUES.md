@@ -434,15 +434,6 @@ them as shared base-class rows (every campaign gets them), or as one
 campaign's homebrew rows (only this campaign does). The second keeps the
 optional rule optional.
 
-### The demo characters start with default stats (noted 2026-10-05)
-
-`demo_campaign_reset.sql` predates 056. Its characters still get a stats row
-(the trigger fires for the fixture's insert too), but with every score 10, 1
-HP and no class, so the demo sheet looks empty.
-
-**Fix:** extend the fixture with an UPDATE of `character_stats` and inserts
-into `character_classes`, after its characters insert.
-
 ### Magic templates and armour are text; nothing counts attunement (noted 2026-11-05, narrowed 2026-11-07 by 161-163)
 
 161 gave items `magic_bonus` and `base_weapon_id`, and 163 turned the 15

@@ -5,6 +5,26 @@
 -- recaps with bodies. Run it whenever the demo needs to go back to how it
 -- looked before strangers touched it.
 --
+-- Since 2026-11-15 each seat is also a full character sheet (056 onwards):
+-- ability scores, HP, race and subrace, a class and subclass at a set level,
+-- proficiencies, worn gear (057), feature picks (095/122: fighting styles,
+-- maneuvers, infusions), a steel defender (167), and a couple of spent use
+-- counters (153). The campaign gets a live encounter (171), a fixed reveal
+-- state for locations, NPCs, maps and fortunes, any NPCs its seed predates
+-- (058-064), and the party hoard and purse. The seats were chosen so each one
+-- shows a different part of the sheet:
+--
+--   Anika Stroh      Artificer 5, Battle Smith  Pallid Elf   the demo seat: steel defender, infusions
+--   Aldric Thorne    Fighter 5, Battle Master   Human        fighting style, maneuvers, no spells
+--   Brother Ilyan    Cleric 5, Twilight Domain  Reborn       full caster, spent slots
+--   Vasha Ridewind   Ranger 9, Gloom Stalker    Wood Elf     half caster, fighting style
+--   Nym Quickfinger  Rogue 5, Arcane Trickster  Lightfoot    third caster, expertise, magic weapon
+--   Ysolde Karth     Wizard 9, Evocation        Eladrin      deep caster, 5th-level slots
+--
+-- Ability scores are entered with racial increases already applied, because
+-- the sheet leaves ASIs to the player (character-sheet.md). HP maxima are
+-- average-per-level plus CON, entered the same way.
+--
 -- NOT a migration, and deliberately not numbered into db/*.sql. This writes no
 -- schema and takes no schema_migrations row, for the reason 036 built that
 -- ledger: it answers "which migrations have been applied", and a fixture in the
@@ -71,6 +91,17 @@
 --     -> character_feats                (041)
 --     -> character_item_descriptions    (047)
 --     -> character_spell_descriptions   (046)
+--     -> character_stats                (056, recreated by its insert trigger)
+--     -> character_classes              (056)
+--          -> character_feature_choices (095)
+--     -> character_proficiencies        (056)
+--     -> character_resource_uses        (153)
+--     -> character_companions           (167)
+--     -> encounter_combatants           (171)
+--
+-- The encounter row itself does not hang off a character, and `encounters`
+-- allows one per campaign, so it is deleted on its own. The party hoard and
+-- purse are deleted on their own too.
 --
 -- Scoped to `campaign_id = <the demo campaign>` and nothing wider. The other
 -- campaigns in this database, and the shared item/spell/feat catalogues (all
@@ -90,13 +121,17 @@
 --                      editable by no one. Nothing here writes to a row whose
 --                      role is 'dm'.
 --
---   locations, npcs    Reveal state is DM-only to change (018), so a demo
---   map reveals        visitor cannot vandalise any of it. Nothing to restore.
+--   locations, npcs    Not deleted, but SET. Reveal state is DM-only to change
+--   map reveals,       (018), so a visitor cannot vandalise it, but whoever
+--   fortunes           DMs the demo can, and a player only sees what is
+--                      revealed. So the reveal flags are set to a fixed list
+--                      below rather than left as the DM last clicked them. The
+--                      rows themselves (and their DM notes) are untouched;
+--                      missing seeded NPCs are added, never replaced.
 --
---   party_inventory    KNOWN GAP, written down rather than quietly closed: both
---   party_currency     are is_campaign_member for read AND write, so a visitor
---                      can add to and spend from the party hoard and purse, and
---                      this file does not put either back. See KNOWN_ISSUES.md.
+--   party_inventory    Deleted and rewritten (closed 2026-11-15). Both are
+--   party_currency     is_campaign_member for read AND write, so a visitor can
+--                      spend the purse and empty or junk the hoard.
 --
 -- ---------------------------------------------------------------------------
 -- PREREQS
@@ -122,9 +157,10 @@
 -- a failure costs nothing and leaves the campaign exactly as it was.
 --
 -- CORRECT OUTPUT: one result set, six rows, one per seat. no_byline must be 0
--- on every row -- see the gear insert. Recap and roster counts arrive as
--- notices in the Messages pane, because the SQL editor renders only the last
--- result set of a run and the six sheets are the more useful one to see.
+-- on every row -- see the gear insert. Recap, roster, encounter, hoard and
+-- reveal counts arrive as notices in the Messages pane, because the SQL
+-- editor renders only the last result set of a run and the six sheets are the
+-- more useful one to see.
 
 
 begin;
@@ -215,73 +251,93 @@ insert into purse (character_name, copper, silver, electrum, gold, platinum) val
 -- catalogue's spellings, odd as the second one reads. Every name below was
 -- checked against the live catalogue before this file was written, and the
 -- assertion block re-checks them on every run.
+--
+-- equipped (057) is what the sheet derives AC and the attack table from, so
+-- every seat wears its armour and holds its weapon. Only armour and weapon
+-- rows may carry it, and each seat wears at most one body armour and one
+-- shield -- the client un-equips the old armour when new armour goes on, and
+-- the assertion block holds this file to the same rule.
 create temp table gear (
   character_name text not null,
   item_name      text not null,
   quantity       int  not null,
-  from_dm        boolean not null default false
+  from_dm        boolean not null default false,
+  equipped       boolean not null default false
 ) on commit drop;
 
-insert into gear (character_name, item_name, quantity, from_dm) values
+insert into gear (character_name, item_name, quantity, from_dm, equipped) values
   -- Anika Stroh -- the demo seat, and the widest kit on the page, because it is
   -- the only sheet a visitor can edit: enough stacks to try a decrement, a stow
-  -- and a give-away without running the sheet empty.
-  ('Anika Stroh',     'Studded leather Armor', 1,  false),
-  ('Anika Stroh',     'Quarterstaff',          1,  false),
-  ('Anika Stroh',     'Dagger',                2,  false),
-  ('Anika Stroh',     'Spellbook',             1,  false),
-  ('Anika Stroh',     'Component Pouch',       1,  false),
-  ('Anika Stroh',     'Lantern, Hooded',       1,  false),
-  ('Anika Stroh',     'Oil',                   3,  false),
-  ('Anika Stroh',     'Rope',                  1,  false),
-  ('Anika Stroh',     'Rations',               4,  false),
-  ('Anika Stroh',     'Healer''s Kit',         1,  true),
-  ('Anika Stroh',     'Potion of Healing',     2,  true),
-  ('Anika Stroh',     'Holy Water',            1,  true),
+  -- and a give-away without running the sheet empty. An Artificer's kit since
+  -- 2026-11-15: medium armour and a shield (AC 18 with DEX 16), a crossbow, and
+  -- the All-Purpose Tool as the DM-handed magic item. The tools an Artificer is
+  -- proficient with are proficiencies below, not gear -- the catalogue has no
+  -- tool items.
+  ('Anika Stroh',     'Scale Mail',            1,  false, true),
+  ('Anika Stroh',     'Shield',                1,  false, true),
+  ('Anika Stroh',     'Crossbow, Light',       1,  false, true),
+  ('Anika Stroh',     'Case, Crossbow Bolt',   1,  false, false),
+  ('Anika Stroh',     'Dagger',                2,  false, false),
+  ('Anika Stroh',     'Component Pouch',       1,  false, false),
+  ('Anika Stroh',     'Lantern, Hooded',       1,  false, false),
+  ('Anika Stroh',     'Oil',                   3,  false, false),
+  ('Anika Stroh',     'Rope',                  1,  false, false),
+  ('Anika Stroh',     'Rations',               4,  false, false),
+  ('Anika Stroh',     'Healer''s Kit',         1,  true,  false),
+  ('Anika Stroh',     'Potion of Healing',     2,  true,  false),
+  ('Anika Stroh',     'Holy Water',            1,  true,  false),
+  ('Anika Stroh',     'All-Purpose Tool, +1',  1,  true,  false),
 
   -- Aldric Thorne -- the front line. No spells at all, which is the point of
   -- him: he is the seat that proves a sheet drops its empty half rather than
   -- printing a zero.
-  ('Aldric Thorne',   'Greatsword',            1,  false),
-  ('Aldric Thorne',   'Chain Mail',            1,  false),
-  ('Aldric Thorne',   'Handaxe',               2,  false),
-  ('Aldric Thorne',   'Rations',               5,  false),
-  ('Aldric Thorne',   'Torch',                 10, false),
-  ('Aldric Thorne',   'Potion of Healing',     2,  true),
+  ('Aldric Thorne',   'Greatsword',            1,  false, true),
+  ('Aldric Thorne',   'Chain Mail',            1,  false, true),
+  ('Aldric Thorne',   'Handaxe',               2,  false, false),
+  ('Aldric Thorne',   'Rations',               5,  false, false),
+  ('Aldric Thorne',   'Torch',                 10, false, false),
+  ('Aldric Thorne',   'Potion of Healing',     2,  true,  false),
 
   -- Brother Ilyan -- the cleric, and the reason Holy Water is on the sheet.
-  ('Brother Ilyan',   'Mace',                  1,  false),
-  ('Brother Ilyan',   'Chain Shirt',           1,  false),
-  ('Brother Ilyan',   'Shield',                1,  false),
-  ('Brother Ilyan',   'Holy Symbol',           1,  false),
-  ('Brother Ilyan',   'Holy Water',            3,  true),
-  ('Brother Ilyan',   'Healer''s Kit',         1,  false),
-  ('Brother Ilyan',   'Rations',               4,  false),
+  ('Brother Ilyan',   'Mace',                  1,  false, true),
+  ('Brother Ilyan',   'Chain Shirt',           1,  false, true),
+  ('Brother Ilyan',   'Shield',                1,  false, true),
+  ('Brother Ilyan',   'Holy Symbol',           1,  false, false),
+  ('Brother Ilyan',   'Holy Water',            3,  true,  false),
+  ('Brother Ilyan',   'Healer''s Kit',         1,  false, false),
+  ('Brother Ilyan',   'Rations',               4,  false, false),
 
-  ('Vasha Ridewind',  'Longbow',               1,  false),
-  ('Vasha Ridewind',  'Quiver',                1,  false),
-  ('Vasha Ridewind',  'Studded leather Armor', 1,  false),
-  ('Vasha Ridewind',  'Dagger',                2,  false),
-  ('Vasha Ridewind',  'Hunting Trap',          1,  false),
-  ('Vasha Ridewind',  'Rope',                  1,  false),
-  ('Vasha Ridewind',  'Rations',               6,  false),
-  ('Vasha Ridewind',  'Potion of Healing',     1,  true),
+  ('Vasha Ridewind',  'Longbow',               1,  false, true),
+  ('Vasha Ridewind',  'Quiver',                1,  false, false),
+  ('Vasha Ridewind',  'Studded leather Armor', 1,  false, true),
+  ('Vasha Ridewind',  'Dagger',                2,  false, false),
+  ('Vasha Ridewind',  'Hunting Trap',          1,  false, false),
+  ('Vasha Ridewind',  'Rope',                  1,  false, false),
+  ('Vasha Ridewind',  'Rations',               6,  false, false),
+  ('Vasha Ridewind',  'Potion of Healing',     1,  true,  false),
 
-  ('Nym Quickfinger', 'Dagger',                2,  false),
-  ('Nym Quickfinger', 'Leather Armor',         1,  false),
-  ('Nym Quickfinger', 'Crowbar',               1,  false),
-  ('Nym Quickfinger', 'Caltrops',              2,  false),
-  ('Nym Quickfinger', 'Lantern, Hooded',       1,  false),
-  ('Nym Quickfinger', 'Oil',                   4,  false),
-  ('Nym Quickfinger', 'Ball Bearings',         1,  true),
+  -- Dagger of Venom is one of 163's magic weapons with a base, so it reaches
+  -- the attack table with its +1. Handed over by the DM, which is the honest
+  -- way for a rogue to come by one.
+  ('Nym Quickfinger', 'Dagger of Venom',       1,  true,  true),
+  ('Nym Quickfinger', 'Dagger',                2,  false, false),
+  ('Nym Quickfinger', 'Leather Armor',         1,  false, true),
+  ('Nym Quickfinger', 'Crowbar',               1,  false, false),
+  ('Nym Quickfinger', 'Caltrops',              2,  false, false),
+  ('Nym Quickfinger', 'Lantern, Hooded',       1,  false, false),
+  ('Nym Quickfinger', 'Oil',                   4,  false, false),
+  ('Nym Quickfinger', 'Ball Bearings',         1,  true,  false),
 
   -- Ysolde Karth -- the deep caster. Light on gear on purpose: her panel is
-  -- carried by the spell list, which is the widest one on the page.
-  ('Ysolde Karth',    'Quarterstaff',          1,  false),
-  ('Ysolde Karth',    'Spellbook',             1,  false),
-  ('Ysolde Karth',    'Arcane Focus',          1,  false),
-  ('Ysolde Karth',    'Component Pouch',       1,  false),
-  ('Ysolde Karth',    'Potion of Healing',     1,  true);
+  -- carried by the spell list, which is the widest one on the page. The cloak
+  -- is a wondrous item that needs attunement, so one attunement line is on
+  -- screen; its +1 AC is in her ac_bonus below, since nothing counts it.
+  ('Ysolde Karth',    'Quarterstaff',          1,  false, true),
+  ('Ysolde Karth',    'Spellbook',             1,  false, false),
+  ('Ysolde Karth',    'Arcane Focus',          1,  false, false),
+  ('Ysolde Karth',    'Component Pouch',       1,  false, false),
+  ('Ysolde Karth',    'Potion of Healing',     1,  true,  false),
+  ('Ysolde Karth',    'Cloak of Protection',   1,  true,  false);
 
 -- ---------------------------------------------------------------------------
 -- spells
@@ -290,7 +346,13 @@ insert into gear (character_name, item_name, quantity, from_dm) values
 -- Spread across levels rather than piled at one, because a spell list groups
 -- under a header per level (spellsByLevel in services/spells.ts) and a
 -- single-level list never shows that the grouping works. Ysolde reaches level
--- 5, which is what makes her panel the tall one; Anika spans cantrip to 3.
+-- 5, which is what makes her panel the tall one; Anika spans cantrip to 2,
+-- the most a 5th-level Artificer can cast.
+--
+-- Every list is one its class can actually learn at its level: Anika's is the
+-- Artificer list (wizard spells swapped out 2026-11-15), Nym's are an Arcane
+-- Trickster's two (Disguise Self is illusion; Grease is his one any-school
+-- pick), and Vasha's Conjure Animals is why she is a 9th-level Ranger.
 --
 -- Aldric is absent from this table entirely -- see the note on his gear above.
 create temp table spellbook (
@@ -301,14 +363,13 @@ create temp table spellbook (
 insert into spellbook (character_name, spell_name) values
   ('Anika Stroh',     'Fire Bolt'),
   ('Anika Stroh',     'Guidance'),
-  ('Anika Stroh',     'Mage Armor'),
-  ('Anika Stroh',     'Magic Missile'),
+  ('Anika Stroh',     'Cure Wounds'),
+  ('Anika Stroh',     'Faerie Fire'),
+  ('Anika Stroh',     'Absorb Elements'),
   ('Anika Stroh',     'Feather Fall'),
-  ('Anika Stroh',     'Misty Step'),
-  ('Anika Stroh',     'Mirror Image'),
   ('Anika Stroh',     'Web'),
-  ('Anika Stroh',     'Fly'),
-  ('Anika Stroh',     'Counterspell'),
+  ('Anika Stroh',     'Heat Metal'),
+  ('Anika Stroh',     'Enlarge/Reduce'),
 
   ('Brother Ilyan',   'Sacred Flame'),
   ('Brother Ilyan',   'Guidance'),
@@ -436,6 +497,316 @@ insert into spell_desc (character_name, spell_name, custom_name, custom_descript
    'Barely a spell. A snap of the fingers, and something the size of a wasp goes where she points and keeps going until it hits.'),
   ('Ysolde Karth', 'Fireball', null,
    'She has stopped calling it by its name in front of the others, on the grounds that saying it out loud makes them duck.');
+
+-- ---------------------------------------------------------------------------
+-- the sheet: scores, HP, race (056, 164)
+-- ---------------------------------------------------------------------------
+
+-- Written as an UPDATE of the row 056's trigger makes on the characters
+-- insert, not an insert of its own. Scores are final, racial increases
+-- included. hp_current sits below the maximum on two seats so the HP widget
+-- shows a wounded bar next to full ones. ac_bonus is for what the sheet cannot
+-- count -- Ysolde's Cloak of Protection.
+--
+-- race and subrace are names, resolved against the shared catalogue
+-- (campaign_id is null) and checked in the assertion block. subrace is null
+-- for races that have none (Human, Reborn).
+create temp table sheet (
+  character_name text primary key,
+  str int not null, dex int not null, con int not null,
+  int_ int not null, wis int not null, cha int not null,
+  hp_max     int not null,
+  hp_current int not null,
+  ac_bonus   int not null default 0,
+  race       text not null,
+  subrace    text
+) on commit drop;
+
+insert into sheet (character_name, str, dex, con, int_, wis, cha, hp_max, hp_current, ac_bonus, race, subrace) values
+  ('Anika Stroh',      8, 16, 14, 17, 13, 10, 38, 31, 0, 'Elf',      'Pallid Elf'),
+  ('Aldric Thorne',   18, 12, 16,  9, 11, 11, 59, 44, 0, 'Human',    null),
+  ('Brother Ilyan',   14, 10, 14, 10, 17, 13, 38, 38, 0, 'Reborn',   null),
+  ('Vasha Ridewind',  12, 18, 14, 10, 15,  8, 76, 76, 0, 'Elf',      'Wood Elf'),
+  ('Nym Quickfinger',  8, 18, 12, 14, 12, 13, 33, 33, 0, 'Halfling', 'Lightfoot'),
+  ('Ysolde Karth',     8, 14, 14, 18, 12, 11, 56, 56, 1, 'Elf',      'Eladrin');
+
+-- ---------------------------------------------------------------------------
+-- classes (056, 066)
+-- ---------------------------------------------------------------------------
+
+-- One class each, all starting classes, all at or past their subclass level so
+-- the subclass shows. Saving throws are not listed: they are written from the
+-- class's own save_proficiencies, the way setStartingClass does it.
+create temp table class_levels (
+  character_name text primary key,
+  class_name     text not null,
+  subclass_name  text not null,
+  level          int  not null
+) on commit drop;
+
+insert into class_levels (character_name, class_name, subclass_name, level) values
+  ('Anika Stroh',     'Artificer', 'Battle Smith',        5),
+  ('Aldric Thorne',   'Fighter',   'Battle Master',       5),
+  ('Brother Ilyan',   'Cleric',    'Twilight Domain',     5),
+  ('Vasha Ridewind',  'Ranger',    'Gloom Stalker',       9),
+  ('Nym Quickfinger', 'Rogue',     'Arcane Trickster',    5),
+  ('Ysolde Karth',    'Wizard',    'School of Evocation', 9);
+
+-- ---------------------------------------------------------------------------
+-- proficiencies (056)
+-- ---------------------------------------------------------------------------
+
+-- Skills from class and background, tools, and expertise (level 2). Not
+-- listed: saves (above), and anything the race grants -- an elf's Perception
+-- comes from the race row, so writing it here would only duplicate it. Keys
+-- must satisfy 056's character_proficiencies_key_valid.
+create temp table profs (
+  character_name text not null,
+  kind           text not null,
+  key            text not null,
+  level          int  not null default 1
+) on commit drop;
+
+insert into profs (character_name, kind, key, level) values
+  ('Anika Stroh',     'skill', 'arcana',        1),
+  ('Anika Stroh',     'skill', 'investigation', 1),
+  ('Anika Stroh',     'skill', 'history',       1),
+  ('Anika Stroh',     'skill', 'sleightOfHand', 1),
+  ('Anika Stroh',     'tool',  'Thieves'' Tools', 1),
+  ('Anika Stroh',     'tool',  'Tinker''s Tools', 1),
+  ('Anika Stroh',     'tool',  'Smith''s Tools',  1),
+
+  ('Aldric Thorne',   'skill', 'athletics',     1),
+  ('Aldric Thorne',   'skill', 'intimidation',  1),
+  ('Aldric Thorne',   'skill', 'perception',    1),
+  ('Aldric Thorne',   'skill', 'survival',      1),
+  ('Aldric Thorne',   'tool',  'Smith''s Tools',  1),
+
+  ('Brother Ilyan',   'skill', 'insight',       1),
+  ('Brother Ilyan',   'skill', 'religion',      1),
+  ('Brother Ilyan',   'skill', 'medicine',      1),
+  ('Brother Ilyan',   'skill', 'persuasion',    1),
+
+  ('Vasha Ridewind',  'skill', 'stealth',       1),
+  ('Vasha Ridewind',  'skill', 'survival',      1),
+  ('Vasha Ridewind',  'skill', 'nature',        1),
+  ('Vasha Ridewind',  'skill', 'animalHandling', 1),
+
+  -- The one seat with expertise (Rogue 1), so the doubled bonus is on screen.
+  ('Nym Quickfinger', 'skill', 'stealth',       2),
+  ('Nym Quickfinger', 'skill', 'sleightOfHand', 1),
+  ('Nym Quickfinger', 'skill', 'acrobatics',    1),
+  ('Nym Quickfinger', 'skill', 'deception',     1),
+  ('Nym Quickfinger', 'skill', 'perception',    1),
+  ('Nym Quickfinger', 'skill', 'investigation', 1),
+  ('Nym Quickfinger', 'tool',  'Thieves'' Tools', 2),
+
+  ('Ysolde Karth',    'skill', 'arcana',        1),
+  ('Ysolde Karth',    'skill', 'history',       1),
+  ('Ysolde Karth',    'skill', 'investigation', 1),
+  ('Ysolde Karth',    'skill', 'insight',       1);
+
+-- ---------------------------------------------------------------------------
+-- feature picks (095, 122, 151)
+-- ---------------------------------------------------------------------------
+
+-- Feature and option by name, both from the shared catalogue. The feature is
+-- looked up within the seat's class, which is what keeps the Fighter's and the
+-- Ranger's two "Fighting Style" rows apart. Counts are within 122's allowance
+-- at these levels (Combat Superiority 3 at level 3, Infuse Item 4 at level 2);
+-- its insert trigger refuses anything over, with 23514.
+create temp table picks (
+  character_name text not null,
+  feature_name   text not null,
+  option_name    text not null
+) on commit drop;
+
+insert into picks (character_name, feature_name, option_name) values
+  ('Anika Stroh',     'Infuse Item',        'Enhanced Defense'),
+  ('Anika Stroh',     'Infuse Item',        'Enhanced Weapon'),
+  ('Anika Stroh',     'Infuse Item',        'Repeating Shot'),
+  ('Anika Stroh',     'Infuse Item',        'Homunculus Servant'),
+
+  ('Aldric Thorne',   'Fighting Style',     'Great Weapon Fighting'),
+  ('Aldric Thorne',   'Combat Superiority', 'Trip Attack'),
+  ('Aldric Thorne',   'Combat Superiority', 'Riposte'),
+  ('Aldric Thorne',   'Combat Superiority', 'Menacing Attack'),
+
+  ('Vasha Ridewind',  'Fighting Style',     'Archery');
+
+-- ---------------------------------------------------------------------------
+-- companion (167)
+-- ---------------------------------------------------------------------------
+
+-- Anika's steel defender. 167 stores damage, not current HP, and derives the
+-- rest from her level and INT; a little damage shows the defender's own HP bar
+-- doing something.
+create temp table companion (
+  character_name text primary key,
+  kind           text not null,
+  name           text,
+  damage         int  not null default 0
+) on commit drop;
+
+insert into companion (character_name, kind, name, damage) values
+  ('Anika Stroh', 'steel_defender', 'Rivet', 4);
+
+-- ---------------------------------------------------------------------------
+-- spent counters (153)
+-- ---------------------------------------------------------------------------
+
+-- Every seat starts rested (the cascade empties this table), except these, so
+-- a counter that is not full is on screen somewhere. Not on Anika: the visitor
+-- can spend her counters and rest them back, and should find them full.
+-- resource is either 'slot:<n>' (spell slots have no feature_resources row)
+-- or a feature name, resolved to 153's 'res:<uuid>' within the seat's class.
+create temp table spent (
+  character_name text not null,
+  resource       text not null,
+  used           int  not null
+) on commit drop;
+
+insert into spent (character_name, resource, used) values
+  ('Aldric Thorne', 'Second Wind', 1),
+  ('Brother Ilyan', 'slot:1',      2),
+  ('Brother Ilyan', 'Channel Divinity', 1);
+
+-- ---------------------------------------------------------------------------
+-- the encounter (171)
+-- ---------------------------------------------------------------------------
+
+-- One fight in progress, round 2, so the Combat page has a turn order, a
+-- bloodied monster and a downed one on a fresh demo. Rewritten on every run:
+-- a player can write their own PC's initiative (171), so the demo seat can
+-- reorder this. Anika's defender joins as a companion, which shares her
+-- initiative and so has none of its own.
+--
+-- combatant is the character name for a PC and for a companion (its owner),
+-- or the monster's display name. Monster status is not written: 171's trigger
+-- derives it from hp_current.
+create temp table fight (
+  combatant  text not null,
+  kind       text not null,   -- 'pc' | 'companion' | 'monster'
+  initiative int,
+  dex        int,             -- monsters only
+  hp_max     int,
+  hp_current int,
+  ac         int,
+  init_bonus int,
+  is_turn    boolean not null default false,
+  primary key (kind, combatant)
+) on commit drop;
+
+insert into fight (combatant, kind, initiative, dex, hp_max, hp_current, ac, init_bonus, is_turn) values
+  ('Vasha Ridewind',   'pc',        21, null, null, null, null, null, false),
+  ('Ysolde Karth',     'pc',        17, null, null, null, null, null, false),
+  ('Aldric Thorne',    'pc',        14, null, null, null, null, null, true),
+  ('Dire Wolf',        'monster',   13, 15,   37,   15,   14,   2,    false),
+  ('Nym Quickfinger',  'pc',        12, null, null, null, null, null, false),
+  ('Strahd Zombie',    'monster',    9,  6,   37,   37,    8,  -2,    false),
+  ('Anika Stroh',      'pc',         8, null, null, null, null, null, false),
+  ('Anika Stroh',      'companion', null, null, null, null, null, null, false),
+  ('Brother Ilyan',    'pc',         6, null, null, null, null, null, false),
+  ('Strahd Zombie 2',  'monster',    3,  6,   37,    0,    8,  -2,    false);
+
+-- ---------------------------------------------------------------------------
+-- reveal state (042, 048, 065)
+-- ---------------------------------------------------------------------------
+
+-- Where the party is after recap 3: the Village of Barovia, with the castle
+-- looming over it. Everything named here is revealed and everything else in
+-- that table is hidden, so the reset produces one state whatever the DM last
+-- clicked. Mad Mary's townhouse and Rahadin stay hidden on purpose, so DM
+-- preview has something to show that players do not see.
+create temp table revealed (
+  tbl  text not null,   -- 'location' | 'npc' | 'map' | 'fortune'
+  name text not null,   -- location/npc name, map_key, or fortune card number
+  is_found boolean not null default false,  -- fortunes only
+  primary key (tbl, name)
+) on commit drop;
+
+insert into revealed (tbl, name, is_found) values
+  ('map',      'barovia',                  false),
+  ('map',      'village-of-barovia',       false),
+  ('location', 'Village of Barovia',       false),
+  ('location', 'Castle Ravenloft',         false),
+  ('location', 'Tser Falls',               false),
+  ('location', 'Burgomaster''s Mansion',   false),
+  ('location', 'Blood of the Vine Tavern', false),
+  ('location', 'Bildrath''s Mercantile',   false),
+  ('location', 'Church',                   false),
+  ('location', 'Cemetery',                 false),
+  ('npc',      'Strahd von Zarovich',      false),
+  ('npc',      'Ismark Kolyanovich',       false),
+  ('npc',      'Ireena Kolyanovich',       false),
+  ('npc',      'Kolyan Indirovich',        false),
+  ('npc',      'Rose and Thorn',           false),
+  ('npc',      'Lancelot',                 false),
+  -- Two cards read, one of them already found, so the Fortunes page shows all
+  -- three states: hidden, revealed, found. Found is for artifact cards only
+  -- (campaign_fortunes_found_artifact_check), so it is card 1, not the ally.
+  ('fortune',  '1',                        true),
+  ('fortune',  '4',                        false);
+
+-- NPCs the campaign's seed predates. 048's trigger only seeds campaigns made
+-- after it, and this one was made before 058-064, so it has Strahd and Rahadin
+-- and none of the Death House or Kolyanovich NPCs recap 3 talks about. Copied
+-- from 064's seed_campaign_npcs, the latest version (seeding-portraits.md),
+-- and added only where the name is missing -- npcs has no unique
+-- (campaign_id, name), so `not exists` is the guard, 051's shape. Existing
+-- rows are never rewritten. location is resolved by name; this campaign has no
+-- Death House pin, so Rose and Thorn and Lancelot land with no location.
+create temp table npc_backfill (
+  name         text primary key,
+  description  text not null,
+  location     text not null,
+  portrait_key text not null
+) on commit drop;
+
+insert into npc_backfill (name, description, location, portrait_key) values
+  ('Rose and Thorn',
+   'A young girl and her little brother.',
+   'Death House', 'rose-and-thorn'),
+  ('Lancelot',
+   'A dog.',
+   'Death House', 'lancelot'),
+  ('Ismark Kolyanovich',
+   'Son of the late burgomaster and the village''s acting leader, sworn to protect his sister Ireena.',
+   'Burgomaster''s Mansion', 'ismark-kolyanovich'),
+  ('Ireena Kolyanovich',
+   'Portrait credit to www.patreon.com/calebisdrawing' || chr(10) ||
+   'Daughter of the late burgomaster and sister to Ismark -- red-haired, sword in hand, and the object of Strahd''s attention.',
+   'Village of Barovia', 'ireena-kolyanovich'),
+  ('Kolyan Indirovich',
+   'Portrait credit to www.patreon.com/calebisdrawing' || chr(10) ||
+   'Burgomaster of the Village of Barovia, and father of Ismark and Ireena.',
+   'Village of Barovia', 'kolyan-indirovich');
+
+-- ---------------------------------------------------------------------------
+-- party hoard and purse (021, 031, 045)
+-- ---------------------------------------------------------------------------
+
+-- Both are member-writable, so both are deleted and rewritten. Hoard stacks
+-- are stamped as the DM's: party_inventory has no added_by trigger, and loot
+-- in a shared pile is the DM's to have handed out.
+create temp table hoard (
+  item_name text primary key,
+  quantity  int not null
+) on commit drop;
+
+insert into hoard (item_name, quantity) values
+  ('Potion of Healing', 3),
+  ('Rations',           10),
+  ('Torch',             6),
+  ('Holy Water',        2),
+  ('Bag of Holding',    1);
+
+create temp table hoard_purse (
+  copper int not null, silver int not null, electrum int not null,
+  gold   int not null, platinum int not null
+) on commit drop;
+
+insert into hoard_purse values (140, 65, 0, 210, 4);
 
 -- ---------------------------------------------------------------------------
 -- recaps
@@ -643,6 +1014,224 @@ begin
   if missing is not null then
     raise exception 'No purse row for: %', missing;
   end if;
+
+  -- ---- the sheet tables (056 onwards) ----
+
+  -- Every seat needs a sheet and a class, or it renders as the all-10s,
+  -- classless sheet this section exists to replace.
+  select string_agg(r.character_name, ', ' order by r.character_name) into missing
+  from roster r
+  where not exists (select 1 from sheet s where s.character_name = r.character_name)
+     or not exists (select 1 from class_levels c where c.character_name = r.character_name);
+
+  if missing is not null then
+    raise exception 'No sheet or class_levels row for: %', missing;
+  end if;
+
+  select string_agg(distinct character_name, ', ') into missing
+  from (select character_name from sheet
+        union select character_name from class_levels
+        union select character_name from profs
+        union select character_name from picks
+        union select character_name from companion
+        union select character_name from spent
+        union select combatant from fight where kind <> 'monster') x
+  where character_name not in (select character_name from roster);
+
+  if missing is not null then
+    raise exception 'Sheet rows assigned to a character not in `roster`: %', missing;
+  end if;
+
+  select string_agg(s.character_name, ', ') into missing
+  from sheet s
+  where s.hp_current > s.hp_max or s.hp_current < 0;
+
+  if missing is not null then
+    raise exception 'hp_current outside 0..hp_max for: %', missing;
+  end if;
+
+  -- Race and subrace, shared rows only, and the subrace must belong to the race.
+  select string_agg(s.character_name || '/' || s.race || coalesce('/' || s.subrace, ''), ', ') into missing
+  from sheet s
+  where not exists (select 1 from races ra where ra.name = s.race and ra.campaign_id is null)
+     or (s.subrace is not null and not exists (
+           select 1 from subraces sr join races ra on ra.id = sr.race_id
+           where sr.name = s.subrace and ra.name = s.race
+             and sr.campaign_id is null and ra.campaign_id is null));
+
+  if missing is not null then
+    raise exception 'Race or subrace not in the shared catalogue: %', missing;
+  end if;
+
+  -- Class and subclass, shared rows, the subclass belonging to the class, and
+  -- the level at least the class's subclass level -- below it the sheet hides
+  -- the subclass, and the seat would demonstrate nothing.
+  select string_agg(c.character_name || '/' || c.class_name || '/' || c.subclass_name, ', ') into missing
+  from class_levels c
+  where not exists (
+    select 1 from classes cl join subclasses sc on sc.class_id = cl.id
+    where cl.name = c.class_name and sc.name = c.subclass_name
+      and cl.campaign_id is null and sc.campaign_id is null
+      and c.level between cl.subclass_level and 20
+  );
+
+  if missing is not null then
+    raise exception 'Class/subclass not in the shared catalogue, or level below the subclass level: %', missing;
+  end if;
+
+  -- Expertise is for skills and tools only (056's CHECK would also refuse it,
+  -- but after the delete).
+  select string_agg(p.character_name || '/' || p.key, ', ') into missing
+  from profs p
+  where p.level not in (1, 2) or (p.level = 2 and p.kind not in ('skill', 'tool'));
+
+  if missing is not null then
+    raise exception 'Invalid proficiency level: %', missing;
+  end if;
+
+  -- Each pick names exactly one shared feature of the seat's class, at or
+  -- below its level, and an option linked to that feature. "Exactly one",
+  -- because a name repeated within a class would make the insert's join write
+  -- the pick twice.
+  select string_agg(p.character_name || '/' || p.feature_name || '/' || p.option_name, ', ') into missing
+  from picks p
+  join class_levels c on c.character_name = p.character_name
+  where (
+    select count(*)
+    from class_features f
+    join classes cl on cl.id = f.class_id
+    left join subclasses sc on sc.id = f.subclass_id
+    join class_feature_options cfo on cfo.feature_id = f.id
+    join feature_options o on o.id = cfo.option_id
+    where f.name = p.feature_name and cl.name = c.class_name
+      and f.campaign_id is null and o.campaign_id is null
+      and o.name = p.option_name
+      and f.level <= c.level
+      and (sc.id is null or sc.name = c.subclass_name)
+  ) <> 1;
+
+  if missing is not null then
+    raise exception 'Pick not resolvable to exactly one feature option of the seat''s class: %', missing;
+  end if;
+
+  -- Feature-named counters, resolved the same way. Slot keys must fit 153's
+  -- CHECK.
+  select string_agg(s.character_name || '/' || s.resource, ', ') into missing
+  from spent s
+  join class_levels c on c.character_name = s.character_name
+  where s.resource !~ '^slot:[1-9]$'
+    and (
+      select count(*)
+      from feature_resources fr
+      join class_features f on f.id = fr.feature_id
+      join classes cl on cl.id = f.class_id
+      left join subclasses sc on sc.id = f.subclass_id
+      where f.name = s.resource and cl.name = c.class_name
+        and f.campaign_id is null and f.level <= c.level
+        and (sc.id is null or sc.name = c.subclass_name)
+    ) <> 1;
+
+  if missing is not null then
+    raise exception 'Spent counter not resolvable to exactly one feature resource: %', missing;
+  end if;
+
+  -- A steel defender only exists for a Battle Smith at 3rd level or higher.
+  select string_agg(co.character_name, ', ') into missing
+  from companion co
+  left join class_levels c on c.character_name = co.character_name
+  where co.kind = 'steel_defender'
+    and not (c.class_name = 'Artificer' and c.subclass_name = 'Battle Smith' and c.level >= 3);
+
+  if missing is not null then
+    raise exception 'Steel defender on a seat that is not a Battle Smith 3+: %', missing;
+  end if;
+
+  -- Worn gear: armour and weapons only, one body armour and one shield at
+  -- most per seat.
+  select string_agg(distinct g.character_name || '/' || g.item_name, ', ') into missing
+  from gear g
+  join items i on i.name = g.item_name and i.campaign_id is null
+  where g.equipped and i.kind not in ('armor', 'weapon');
+
+  if missing is not null then
+    raise exception 'Equipped item that is neither armour nor a weapon: %', missing;
+  end if;
+
+  select string_agg(x.character_name, ', ') into missing
+  from (
+    select g.character_name
+    from gear g
+    join items i on i.name = g.item_name and i.campaign_id is null
+    where g.equipped and i.kind = 'armor'
+    group by g.character_name
+    having count(*) filter (where i.armor_category = 'shield') > 1
+        or count(*) filter (where i.armor_category is distinct from 'shield') > 1
+  ) x;
+
+  if missing is not null then
+    raise exception 'More than one body armour or shield equipped: %', missing;
+  end if;
+
+  -- ---- the campaign tables ----
+
+  -- One fight, one current turn, and the companion's owner in it as a PC.
+  -- The turn is on a PC: the pointer is set through `seat`, which a monster
+  -- is not in.
+  if (select count(*) from fight where is_turn and kind = 'pc') <> 1
+     or exists (select 1 from fight where is_turn and kind <> 'pc') then
+    raise exception 'Expected exactly one is_turn row in `fight`, on a PC.';
+  end if;
+
+  select string_agg(f.combatant, ', ') into missing
+  from fight f
+  where (f.kind = 'monster' and (f.dex is null or f.hp_max is null or f.hp_current is null
+                                 or f.hp_current not between 0 and f.hp_max
+                                 or length(f.combatant) > 40))
+     or (f.kind = 'companion' and (f.initiative is not null or not exists (
+           select 1 from companion co where co.character_name = f.combatant)))
+     or (f.kind = 'companion' and not exists (
+           select 1 from fight p where p.kind = 'pc' and p.combatant = f.combatant))
+     or f.kind not in ('pc', 'companion', 'monster');
+
+  if missing is not null then
+    raise exception 'Malformed `fight` rows: %', missing;
+  end if;
+
+  -- Every reveal names a row that exists in this campaign (or, for an NPC, one
+  -- the backfill is about to add), so a typo cannot quietly leave something
+  -- hidden.
+  select string_agg(rv.tbl || ':' || rv.name, ', ') into missing
+  from revealed rv
+  where (rv.tbl = 'location' and not exists (
+           select 1 from locations l where l.campaign_id = target_campaign and l.name = rv.name))
+     or (rv.tbl = 'npc' and not exists (
+           select 1 from npcs n where n.campaign_id = target_campaign and n.name = rv.name)
+         and not exists (select 1 from npc_backfill b where b.name = rv.name))
+     or (rv.tbl = 'map' and not exists (
+           select 1 from campaign_map_reveals m where m.campaign_id = target_campaign and m.map_key = rv.name))
+     or (rv.tbl = 'fortune' and not exists (
+           select 1 from campaign_fortunes cf where cf.campaign_id = target_campaign and cf.card::text = rv.name))
+     or rv.tbl not in ('location', 'npc', 'map', 'fortune')
+     or (rv.is_found and rv.tbl <> 'fortune')
+     or (rv.is_found and not exists (
+           select 1 from campaign_fortunes cf where cf.campaign_id = target_campaign
+             and cf.card::text = rv.name and cf.is_artifact));
+
+  if missing is not null then
+    raise exception 'Reveal names nothing in this campaign: %', missing;
+  end if;
+
+  select string_agg(h.item_name, ', ') into missing
+  from hoard h
+  where not exists (select 1 from items i where i.name = h.item_name and i.campaign_id is null);
+
+  if missing is not null then
+    raise exception 'Hoard item not in the shared item catalogue: %', missing;
+  end if;
+
+  if (select count(*) from hoard_purse) <> 1 then
+    raise exception 'Expected exactly one row in `hoard_purse`.';
+  end if;
 end
 $$;
 
@@ -652,9 +1241,10 @@ $$;
 -- ===========================================================================
 
 -- Everything hanging off a character goes with it by cascade: inventory,
--- spells, feats, both description tables, and spent use counters (153), so
--- every demo character starts rested. See the header for the full list
--- and for what is deliberately left alone.
+-- spells, feats, both description tables, the sheet tables, picks, the
+-- companion, any combatant rows, and spent use counters (153), so every demo
+-- character starts rested. See the header for the full list and for what is
+-- deliberately left alone.
 --
 -- This takes the DM's own character too, if they made one. That is correct --
 -- the reset restores the six seats below and nothing else -- and it is why the
@@ -666,6 +1256,19 @@ where campaign_id = (select campaign_id from target);
 -- Deleted rather than updated, so last_edited_by/at come back null and a
 -- visitor's name does not survive the reset on a recap they rewrote.
 delete from session_recaps
+where campaign_id = (select campaign_id from target);
+
+-- The encounter, which outlives its combatants: `encounters` is unique on
+-- campaign_id, so the fresh one below needs this one gone. Its monsters'
+-- combatant and stat rows cascade.
+delete from encounters
+where campaign_id = (select campaign_id from target);
+
+-- The party hoard and purse, both member-writable (see the header).
+delete from party_inventory
+where campaign_id = (select campaign_id from target);
+
+delete from party_currency
 where campaign_id = (select campaign_id from target);
 
 
@@ -722,6 +1325,104 @@ join auth.users u on u.email = r.email
 join purse p on p.character_name = r.character_name
 cross join target t;
 
+-- character name -> the id just inserted, resolved once through the owner
+-- (roster.email -> auth.users -> characters.user_id) the way every insert
+-- below this point used to spell out. The sheet writes read it from here.
+create temp table seat (
+  character_name text primary key,
+  character_id   uuid not null unique
+) on commit drop;
+
+insert into seat (character_name, character_id)
+select r.character_name, ch.id
+from roster r
+join auth.users u on u.email = r.email
+cross join target t
+join characters ch on ch.campaign_id = t.campaign_id and ch.user_id = u.id;
+
+-- character_stats: UPDATE, because 056's create_character_stats_row trigger
+-- made a default row for each character on the insert above.
+-- pin_character_stats_row only pins character_id, so every column named here
+-- lands.
+update character_stats cs
+set strength = s.str, dexterity = s.dex, constitution = s.con,
+    intelligence = s.int_, wisdom = s.wis, charisma = s.cha,
+    hp_max = s.hp_max, hp_current = s.hp_current, hp_temp = 0,
+    ac_bonus = s.ac_bonus, speed_override = null,
+    race_id = ra.id,
+    subrace_id = sr.id
+from sheet s
+join seat st on st.character_name = s.character_name
+join races ra on ra.name = s.race and ra.campaign_id is null
+left join subraces sr on sr.name = s.subrace and sr.race_id = ra.id
+                     and sr.campaign_id is null
+where cs.character_id = st.character_id;
+
+-- character_classes, at their final level. Before the picks, which reference
+-- the entry, and at the final level rather than levelled up, so 122's
+-- allowance trigger counts against the level the picks are meant for.
+insert into character_classes (character_id, class_id, subclass_id, level, is_starting)
+select st.character_id, cl.id, sc.id, c.level, true
+from class_levels c
+join seat st       on st.character_name = c.character_name
+join classes cl    on cl.name = c.class_name and cl.campaign_id is null
+join subclasses sc on sc.name = c.subclass_name and sc.class_id = cl.id
+                  and sc.campaign_id is null;
+
+-- Saving throws, from the class row, the way setStartingClass writes them.
+insert into character_proficiencies (character_id, kind, key, level)
+select st.character_id, 'save', unnest(cl.save_proficiencies), 1
+from class_levels c
+join seat st    on st.character_name = c.character_name
+join classes cl on cl.name = c.class_name and cl.campaign_id is null;
+
+insert into character_proficiencies (character_id, kind, key, level)
+select st.character_id, p.kind, p.key, p.level
+from profs p
+join seat st on st.character_name = p.character_name;
+
+-- Feature picks, joined exactly as the assertion block resolved them.
+insert into character_feature_choices
+  (character_id, character_class_id, class_id, feature_id, option_id)
+select st.character_id, cc.id, cl.id, f.id, o.id
+from picks p
+join seat st          on st.character_name = p.character_name
+join class_levels c   on c.character_name = p.character_name
+join classes cl       on cl.name = c.class_name and cl.campaign_id is null
+join character_classes cc on cc.character_id = st.character_id and cc.class_id = cl.id
+join class_features f on f.class_id = cl.id and f.name = p.feature_name
+                     and f.campaign_id is null and f.level <= c.level
+left join subclasses sc on sc.id = f.subclass_id
+join class_feature_options cfo on cfo.feature_id = f.id
+join feature_options o on o.id = cfo.option_id and o.name = p.option_name
+                      and o.campaign_id is null
+where sc.id is null or sc.name = c.subclass_name;
+
+insert into character_companions (character_id, kind, name, damage, hp_temp)
+select st.character_id, co.kind, co.name, co.damage, 0
+from companion co
+join seat st on st.character_name = co.character_name;
+
+-- Spent counters: slot keys as written, feature names as 'res:<uuid>'.
+insert into character_resource_uses (character_id, resource_key, used)
+select st.character_id, s.resource, s.used
+from spent s
+join seat st on st.character_name = s.character_name
+where s.resource ~ '^slot:[1-9]$';
+
+insert into character_resource_uses (character_id, resource_key, used)
+select st.character_id, 'res:' || fr.id, s.used
+from spent s
+join seat st          on st.character_name = s.character_name
+join class_levels c   on c.character_name = s.character_name
+join classes cl       on cl.name = c.class_name and cl.campaign_id is null
+join class_features f on f.class_id = cl.id and f.name = s.resource
+                     and f.campaign_id is null and f.level <= c.level
+left join subclasses sc on sc.id = f.subclass_id
+join feature_resources fr on fr.feature_id = f.id
+where s.resource !~ '^slot:[1-9]$'
+  and (sc.id is null or sc.name = c.subclass_name);
+
 -- character_inventory, in two parts, and the reason is a trigger that is not
 -- currently there.
 --
@@ -763,6 +1464,7 @@ create temp table gear_resolved (
   item_id      uuid not null,
   quantity     int  not null,
   adder_id     uuid not null,
+  equipped     boolean not null,
   primary key (character_id, item_id)
 ) on commit drop;
 
@@ -772,11 +1474,12 @@ create temp table gear_resolved (
 -- these same rows, so it is the owner that is stable either way. Kept for the
 -- same reason it was written: character_name is the key inside this file's own
 -- tables, where it is only ever compared against itself.
-insert into gear_resolved (character_id, item_id, quantity, adder_id)
+insert into gear_resolved (character_id, item_id, quantity, adder_id, equipped)
 select ch.id,
        i.id,
        g.quantity,
-       case when g.from_dm then dm.user_id else ch.user_id end
+       case when g.from_dm then dm.user_id else ch.user_id end,
+       g.equipped
 from gear g
 join roster r     on r.character_name = g.character_name
 join auth.users u on u.email = r.email
@@ -808,8 +1511,8 @@ begin
     -- replaces it with auth.uid(), which the set_config above has just set to
     -- the same adder. The GUC and the column agree by construction, so the row
     -- is the same under either regime.
-    insert into character_inventory (character_id, item_id, quantity, added_by)
-    select gr.character_id, gr.item_id, gr.quantity, gr.adder_id
+    insert into character_inventory (character_id, item_id, quantity, added_by, equipped)
+    select gr.character_id, gr.item_id, gr.quantity, gr.adder_id, gr.equipped
     from gear_resolved gr
     where gr.adder_id = adder;
   end loop;
@@ -874,6 +1577,96 @@ select t.campaign_id, rc.session_number, rc.title, rc.body
 from recap rc
 cross join target t;
 
+-- NPCs the campaign's seed predates, added only if missing. No npc_dm_notes
+-- row: 064's only seeded note is Rose and Thorn's, and notes are the DM's to
+-- write -- npcs.ts reads a missing row as no notes.
+insert into npcs (campaign_id, name, description, location_id, is_revealed, portrait_key)
+select t.campaign_id, b.name, b.description,
+       (select l.id from locations l
+        where l.campaign_id = t.campaign_id and l.name = b.location
+        limit 1),
+       false, b.portrait_key
+from npc_backfill b
+cross join target t
+where not exists (
+  select 1 from npcs n where n.campaign_id = t.campaign_id and n.name = b.name
+);
+
+-- Reveal state: listed means revealed, unlisted means hidden. Plain UPDATEs as
+-- the table owner; the pin triggers on these tables restore only the columns
+-- they pin, and is_revealed / is_found are the columns the DM edits.
+update locations l
+set is_revealed = exists (
+  select 1 from revealed rv where rv.tbl = 'location' and rv.name = l.name)
+where l.campaign_id = (select campaign_id from target);
+
+update npcs n
+set is_revealed = exists (
+  select 1 from revealed rv where rv.tbl = 'npc' and rv.name = n.name)
+where n.campaign_id = (select campaign_id from target);
+
+update campaign_map_reveals m
+set is_revealed = exists (
+  select 1 from revealed rv where rv.tbl = 'map' and rv.name = m.map_key)
+where m.campaign_id = (select campaign_id from target);
+
+update campaign_fortunes cf
+set is_revealed = rv.name is not null,
+    is_found    = coalesce(rv.is_found, false)
+from campaign_fortunes cf2
+left join revealed rv on rv.tbl = 'fortune' and rv.name = cf2.card::text
+where cf.id = cf2.id
+  and cf.campaign_id = (select campaign_id from target);
+
+-- The encounter: the row, then its combatants, then monster stats, then the
+-- turn pointer, which needs a combatant id to point at.
+insert into encounters (campaign_id, round)
+select t.campaign_id, 2 from target t;
+
+insert into encounter_combatants (encounter_id, kind, character_id, name, dex, initiative)
+select e.id, f.kind,
+       case when f.kind = 'monster' then null else st.character_id end,
+       case when f.kind = 'monster' then f.combatant end,
+       f.dex,
+       f.initiative
+from fight f
+join encounters e on e.campaign_id = (select campaign_id from target)
+left join seat st on st.character_name = f.combatant and f.kind <> 'monster';
+
+insert into encounter_monster_stats (combatant_id, hp_max, hp_current, hp_temp, ac, init_bonus)
+select ec.id, f.hp_max, f.hp_current, 0, f.ac, f.init_bonus
+from fight f
+join encounters e on e.campaign_id = (select campaign_id from target)
+join encounter_combatants ec on ec.encounter_id = e.id
+                            and ec.kind = 'monster' and ec.name = f.combatant
+where f.kind = 'monster';
+
+update encounters e
+set turn_combatant_id = ec.id
+from fight f
+join seat st on st.character_name = f.combatant
+join encounter_combatants ec on ec.character_id = st.character_id and ec.kind = f.kind
+where f.is_turn
+  and ec.encounter_id = e.id
+  and e.campaign_id = (select campaign_id from target);
+
+-- The party hoard and purse. added_by is the DM (see the CAST note).
+insert into party_inventory (campaign_id, item_id, quantity, added_by)
+select t.campaign_id, i.id, h.quantity, dm.user_id
+from hoard h
+cross join target t
+join items i on i.name = h.item_name and i.campaign_id is null
+cross join lateral (
+  select cm.user_id from campaign_members cm
+  where cm.campaign_id = t.campaign_id and cm.role = 'dm'
+  limit 1
+) dm;
+
+insert into party_currency (campaign_id, copper, silver, electrum, gold, platinum)
+select t.campaign_id, hp.copper, hp.silver, hp.electrum, hp.gold, hp.platinum
+from hoard_purse hp
+cross join target t;
+
 
 -- ===========================================================================
 -- WHAT LANDED
@@ -889,16 +1682,44 @@ declare
   n_recaps  int;
   n_members int;
   n_chars   int;
+  n_fight   int;
+  n_turn    int;
+  n_hoard   int;
+  n_npcs    int;
+  revealed_summary text;
 begin
   select campaign_id into target_campaign from target;
 
   select count(*) into n_recaps  from session_recaps  where campaign_id = target_campaign;
   select count(*) into n_members from campaign_members where campaign_id = target_campaign;
   select count(*) into n_chars   from characters       where campaign_id = target_campaign;
+  select count(*) into n_fight
+    from encounter_combatants ec join encounters e on e.id = ec.encounter_id
+   where e.campaign_id = target_campaign;
+  select count(*) into n_turn
+    from encounters where campaign_id = target_campaign and turn_combatant_id is not null;
+  select count(*) into n_hoard from party_inventory where campaign_id = target_campaign;
+  select count(*) into n_npcs  from npcs where campaign_id = target_campaign;
+
+  select format('locations %s/%s, npcs %s/%s, maps %s/%s, fortunes %s/%s (found %s)',
+    (select count(*) filter (where is_revealed) from locations where campaign_id = target_campaign),
+    (select count(*) from locations where campaign_id = target_campaign),
+    (select count(*) filter (where is_revealed) from npcs where campaign_id = target_campaign),
+    n_npcs,
+    (select count(*) filter (where is_revealed) from campaign_map_reveals where campaign_id = target_campaign),
+    (select count(*) from campaign_map_reveals where campaign_id = target_campaign),
+    (select count(*) filter (where is_revealed) from campaign_fortunes where campaign_id = target_campaign),
+    (select count(*) from campaign_fortunes where campaign_id = target_campaign),
+    (select count(*) filter (where is_found) from campaign_fortunes where campaign_id = target_campaign))
+  into revealed_summary;
 
   raise notice 'recaps: % (expect 3)', n_recaps;
   raise notice 'characters: % (expect 6)', n_chars;
   raise notice 'campaign_members: % (6 seeded seats + the DM + anyone else already on the roster)', n_members;
+  raise notice 'encounter combatants: % (expect %), turn set: % (expect 1)',
+    n_fight, (select count(*) from fight), n_turn;
+  raise notice 'party hoard stacks: % (expect %)', n_hoard, (select count(*) from hoard);
+  raise notice 'revealed: %', revealed_summary;
 end
 $$;
 
@@ -914,6 +1735,28 @@ $$;
 -- screen would tell you.
 select ch.name        as character,
        p.display_name as played_by,
+       (select string_agg(cl.name || coalesce(' (' || sc.name || ')', '') || ' ' || cc.level, ', ')
+        from character_classes cc
+        join classes cl on cl.id = cc.class_id
+        left join subclasses sc on sc.id = cc.subclass_id
+        where cc.character_id = ch.id) as class,
+       (select coalesce(sr.name, ra.name)
+        from character_stats cs
+        left join races ra on ra.id = cs.race_id
+        left join subraces sr on sr.id = cs.subrace_id
+        where cs.character_id = ch.id) as race,
+       (select cs.hp_current || '/' || cs.hp_max from character_stats cs
+        where cs.character_id = ch.id) as hp,
+       (select count(*) from character_proficiencies cp
+        where cp.character_id = ch.id) as profs,
+       (select count(*) from character_feature_choices fc
+        where fc.character_id = ch.id) as picks,
+       (select count(*) from character_companions co
+        where co.character_id = ch.id) as companions,
+       (select count(*) from character_resource_uses ru
+        where ru.character_id = ch.id) as spent,
+       (select count(*) from character_inventory ci
+        where ci.character_id = ch.id and ci.equipped) as worn,
        (select count(*) from character_inventory ci
         where ci.character_id = ch.id) as gear,
        (select coalesce(sum(ci.quantity), 0) from character_inventory ci

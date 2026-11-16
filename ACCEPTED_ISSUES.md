@@ -83,25 +83,6 @@ broken from inside. That is what makes an unattended public link survivable.
 is delete-then-insert precisely so a rename and a junk stack go away rather than
 being topped up around.
 
-### The demo reset does not restore the party hoard or purse (noted 2026-08-31)
-
-`demo_campaign_reset.sql` scopes its delete to characters (and, by cascade, their
-inventory, spells, feats and descriptions) plus the recap rows.
-`party_inventory` and `party_currency` are outside it. Both are
-`is_campaign_member` for read **and** write — that is 045's stated design, "the
-DM can add to the party's pool" being no special case because the DM is a member
-— so a demo visitor can add to and spend from both, and nothing puts them back.
-
-**Trigger:** a visitor using the Inventory page's party half, or the party purse.
-
-**Cost:** the one drift in the demo that accumulates. Small in practice, because
-the hoard starts at a single row and there is nothing to buy, but it is the one
-place where "re-running the seed is the recovery path" is not currently true.
-
-**Fix if the answer changes:** two more deletes scoped to the same
-`campaign_id`, and a seeded hoard and purse in the fixture's cast section. About
-eight lines, and the file's header names the gap so it is findable from there.
-
 ### An invite posted beside the demo link would let it out of its campaign (noted 2026-08-31)
 
 The demo account's containment is entirely its single `campaign_members` row.
