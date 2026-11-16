@@ -2057,6 +2057,7 @@ export type Database = {
         Args: { target_entry: string }
         Returns: undefined
       }
+      dm_invite_claimant_visible: { Args: { target: string }; Returns: boolean }
       feature_picks_allowed: {
         Args: { class_level: number; target_feature: string }
         Returns: number
@@ -2092,6 +2093,7 @@ export type Database = {
         Args: { new_display_name: string }
         Returns: undefined
       }
+      shares_campaign_with: { Args: { target: string }; Returns: boolean }
       use_resource: {
         Args: {
           cap: number

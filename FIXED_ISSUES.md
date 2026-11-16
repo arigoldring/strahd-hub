@@ -6,6 +6,20 @@ fixed it, and which migration did it.
 
 ---
 
+### Any signed-in account could read every profile (noted 2026-11-10 by audit pass 1, resolved 2026-11-15 by 173)
+
+007's "authenticated read profiles" was `using (true)`, written when one
+group used the app. Sign-in is open to any Google account and the demo seat
+to anyone, so a stranger could read every user's display name, id and global
+`role` (which accounts are DMs) across all campaigns: 20 profiles, against 0
+legitimately visible. 173 replaces it with "read profiles of campaign peers":
+`shares_campaign_with(id)`, or `dm_invite_claimant_visible(id)` for a global
+DM naming who claimed a DM invite. Both are security definer because the
+tables they read (`campaign_members`, `dm_invites`) would refuse or recurse
+under the reader's RLS. Verified by impersonation: stranger 0, demo account
+exactly its 10 campaign peers, a DM their peers plus DM-invite claimants.
+Former members now read null on old bylines and invites.
+
 ### DM controls showed in player preview (noted 2026-08-19, resolved 2026-11-12, no migration)
 
 Eleven pages each recomputed `showDmUi = campaign.isDm && !previewing`, and

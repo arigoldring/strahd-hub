@@ -116,11 +116,12 @@ function MintForm({
 
 function InviteRow({ invite, kind }: { invite: Invite; kind: InviteKind }) {
   // `used`, not claimedByName — the name is also null when the claimant's
-  // profile has since been deleted, so on its own it cannot tell "nobody has
+  // profile has since been deleted or they've left the campaign (173 only
+  // shows you campaign peers), so on its own it cannot tell "nobody has
   // burned this" from "burned by someone since gone". Invite says so, and the
   // recap byline in Recaps.tsx has the same trap.
   if (invite.used) {
-    const who = invite.claimedByName ?? "someone since deleted";
+    const who = invite.claimedByName ?? "someone since departed";
     const when = invite.usedAt
       ? new Date(invite.usedAt).toLocaleDateString()
       : "unknown date";

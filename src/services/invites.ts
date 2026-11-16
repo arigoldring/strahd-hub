@@ -36,9 +36,12 @@ import type { Tables } from "../types/database.types";
  */
 
 // One shape for every read, so an invite is the same object wherever it came
-// from. The embed works for the reason 007 made it work for recap bylines: RLS
-// applies to embedded joins too, and the widened profiles SELECT policy is what
-// keeps display_name from coming back null for everyone but yourself.
+// from. The embed works for the reason recap bylines work: RLS applies to
+// embedded joins too, and 173's profiles SELECT policy is what keeps
+// display_name from coming back null for everyone but yourself. A player-invite
+// claimant is readable because claiming made them a member of your campaign;
+// a DM-invite claimant usually shares no campaign with you, so 173 gives a
+// global DM its own branch for them (dm_invite_claimant_visible).
 const INVITE_SELECT = "*, claimant:used_by(display_name)";
 
 // A union, and that is the point rather than a shortcut: the two tables are
@@ -64,9 +67,10 @@ export interface Invite {
   label: string | null;
   used: boolean;
   usedAt: string | null;
-  // null while unused, and also null if the claimant's profile was deleted —
-  // `used` is the authoritative "has this been burned" signal, not this name.
-  // Same trap 007 documents for recap bylines.
+  // null while unused, and also null if the claimant's profile was deleted or
+  // (player invites) they have since left the campaign, so 173's policy no
+  // longer shows them to you. `used` is the authoritative "has this been
+  // burned" signal, not this name.
   claimedByName: string | null;
   createdAt: string;
 }

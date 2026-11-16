@@ -35,9 +35,10 @@ import { toItem, type Item } from "./items";
 
 // added_by is embedded and aliased the way RECAP_SELECT does it: a uuid is
 // useless to a component, so the join flattens to a display name in the mapper
-// and nothing downstream ever holds a foreign key. Works only because the
-// profiles SELECT policy is open to authenticated readers — RLS applies to
-// embedded joins too, and a narrower policy would silently return null here.
+// and nothing downstream ever holds a foreign key. Works only because 173's
+// profiles SELECT policy lets you read anyone who shares a campaign with you,
+// and the adder is the sheet's owner or the campaign's DM. RLS applies to
+// embedded joins too, so an adder who has since left the campaign reads null.
 const CHARACTER_INVENTORY_SELECT = "*, items(*), addedBy:added_by(display_name)";
 
 // items is a single non-null object (character_inventory holds a NOT NULL

@@ -311,9 +311,11 @@ type PartyCharacterRow = Tables<"characters"> & {
 // to embedded joins, so it would return a name for exactly one character —
 // yours — and null for everyone else's.
 //
-// So the names come from profiles directly, which the "authenticated read
-// profiles" policy in 007 opens to any signed-in reader — the same policy
-// CHARACTER_INVENTORY_SELECT leans on to flatten added_by. Still two requests
+// So the names come from profiles directly, which 173's "read profiles of
+// campaign peers" policy opens to anyone who shares a campaign with the
+// profile. Every owner here is a member of this campaign, so all of them
+// resolve. It's the same policy CHARACTER_INVENTORY_SELECT leans on to flatten
+// added_by. Still two requests
 // for any size of party rather than the N+1 an embed was avoiding.
 export async function getPartyCharacters(
   campaignId: string,

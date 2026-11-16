@@ -13,10 +13,12 @@ import type { Tables } from "../types/database.types";
 
 // Every query uses this same shape so a recap is the same object no matter
 // which function produced it — a save returns exactly what a fetch would.
-// The embed is what makes the byline possible, and it only works because
-// 007_recaps.sql widened the profiles SELECT policy: RLS applies to embedded
-// joins too, so without that policy display_name comes back null for everyone
-// except yourself, with no error to explain why.
+// The embed is what makes the byline possible, and it only works because the
+// profiles SELECT policy (173, "read profiles of campaign peers") lets you read
+// anyone who shares a campaign with you: RLS applies to embedded joins too, so
+// without it display_name comes back null for everyone except yourself, with
+// no error to explain why. An editor who has since left every campaign you're
+// in reads null for the same reason.
 const RECAP_SELECT = "*, editor:last_edited_by(display_name)";
 
 // Postgres SQLSTATE for a unique violation — here, two recaps in one campaign
